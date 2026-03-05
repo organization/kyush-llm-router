@@ -8,5 +8,9 @@ node_modules/
 # Distribution files
 dist/
 
+# Database files
+*.db
+server/data/
+
 # User defined
 memo.md

@@ -1,28 +1,29 @@
-import db from '../config/database';
+import { getDb } from '../config/database';
 import { User, CreateUserData, UpdateUserData } from '../../../shared/types';
 
 export class UserModel {
   static findAll(): User[] {
-    return db.prepare('SELECT * FROM users ORDER BY created_at DESC').all() as User[];
+    return getDb().prepare('SELECT * FROM users ORDER BY created_at DESC').all() as User[];
   }
 
   static findById(id: number): User | undefined {
-    return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined;
+    return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined;
   }
 
   static findByApiKey(apiKey: string): User | undefined {
-    return db.prepare('SELECT * FROM users WHERE api_key = ? AND is_active = 1').get(apiKey) as User | undefined;
+    return getDb().prepare('SELECT * FROM users WHERE api_key = ? AND is_active = 1').get(apiKey) as User | undefined;
   }
 
   static create(data: CreateUserData): User {
-    const stmt = db.prepare(
+    const apiKey = `sk-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    const stmt = getDb().prepare(
       'INSERT INTO users (api_key, name, email) VALUES (?, ?, ?)'
     );
-    const result = stmt.run(data.name, data.email || null);
+    const result = stmt.run(apiKey, data.name, data.email || null);
     
     return {
       id: result.lastInsertRowid as number,
-      api_key: data.name,
+      api_key: apiKey,
       name: data.name,
       email: data.email,
       is_active: true,
@@ -55,17 +56,17 @@ export class UserModel {
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(id);
 
-    db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    getDb().prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
     return this.findById(id);
   }
 
   static delete(id: number): boolean {
-    const result = db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    const result = getDb().prepare('DELETE FROM users WHERE id = ?').run(id);
     return result.changes > 0;
   }
 
   static deactivate(id: number): boolean {
-    const result = db.prepare('UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const result = getDb().prepare('UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     return result.changes > 0;
   }
 
@@ -74,7 +75,7 @@ export class UserModel {
     if (!user) return null;
 
     const newApiKey = `sk-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-    db.prepare('UPDATE users SET api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newApiKey, id);
+    getDb().prepare('UPDATE users SET api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newApiKey, id);
     return newApiKey;
   }
 }

@@ -1,9 +1,10 @@
-import analyticsDb from '../config/analytics-db';
+import { getAnalyticsDb } from '../config/analytics-db';
 import { RequestLog } from '../../../shared/types';
 
 export class AnalyticsService {
   static logRequest(logData: Omit<RequestLog, 'id' | 'created_at'>): void {
-    const stmt = analyticsDb.prepare(`
+    const db = getAnalyticsDb();
+    const stmt = db.prepare(`
       INSERT INTO request_logs (
         user_id, backend_id, endpoint, request_model, response_model,
         prompt_tokens, completion_tokens, total_tokens,
@@ -30,9 +31,10 @@ export class AnalyticsService {
   }
 
   private static updateUsageStats(userId: number, backendId: number, tokens: number): void {
+    const db = getAnalyticsDb();
     const today = new Date().toISOString().split('T')[0];
 
-    const upsertStmt = analyticsDb.prepare(`
+    const upsertStmt = db.prepare(`
       INSERT INTO usage_stats (user_id, backend_id, date, total_requests, total_tokens)
       VALUES (?, ?, ?, 1, ?)
       ON CONFLICT(user_id, backend_id, date)
@@ -45,10 +47,11 @@ export class AnalyticsService {
   }
 
   private static updateBackendMetrics(backendId: number, logData: Omit<RequestLog, 'id' | 'created_at'>): void {
+    const db = getAnalyticsDb();
     const today = new Date().toISOString().split('T')[0];
     const isSuccess = logData.status_code >= 200 && logData.status_code < 300;
 
-    const existing = analyticsDb.prepare(
+    const existing = db.prepare(
       'SELECT * FROM backend_metrics WHERE backend_id = ? AND date = ?'
     ).get(backendId, today) as {
       total_requests: number;
@@ -66,7 +69,7 @@ export class AnalyticsService {
         : existing.avg_response_time_ms;
       const newSuccessRate = (newTotalRequests - newErrorCount) / newTotalRequests;
 
-      analyticsDb.prepare(`
+      db.prepare(`
         UPDATE backend_metrics SET
           total_requests = ?,
           total_tokens = ?,
@@ -76,7 +79,7 @@ export class AnalyticsService {
         WHERE backend_id = ? AND date = ?
       `).run(newTotalRequests, newTotalTokens, newAvgResponseTime, newErrorCount, newSuccessRate, backendId, today);
     } else {
-      analyticsDb.prepare(`
+      db.prepare(`
         INSERT INTO backend_metrics (
           backend_id, date, total_requests, total_tokens,
           avg_response_time_ms, error_count, success_rate
@@ -93,12 +96,14 @@ export class AnalyticsService {
   }
 
   static getRequestLogs(limit: number = 100, offset: number = 0): RequestLog[] {
-    return analyticsDb.prepare(`
+    const db = getAnalyticsDb();
+    return db.prepare(`
       SELECT * FROM request_logs ORDER BY created_at DESC LIMIT ? OFFSET ?
     `).all(limit, offset) as RequestLog[];
   }
 
   static getUsageStats(userId?: number, backendId?: number, days: number = 30): unknown[] {
+    const db = getAnalyticsDb();
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -119,10 +124,11 @@ export class AnalyticsService {
 
     query += ' ORDER BY date DESC, user_id, backend_id';
 
-    return analyticsDb.prepare(query).all(...params);
+    return db.prepare(query).all(...params);
   }
 
   static getBackendMetrics(backendId?: number, days: number = 30): unknown[] {
+    const db = getAnalyticsDb();
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -139,6 +145,6 @@ export class AnalyticsService {
 
     query += ' ORDER BY date DESC';
 
-    return analyticsDb.prepare(query).all(...params);
+    return db.prepare(query).all(...params);
   }
 }
