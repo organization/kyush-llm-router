@@ -1,0 +1,12 @@
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Project dependencies
+node_modules/
+
+# Distribution files
+dist/
+
+# User defined
+memo.md

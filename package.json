@@ -1,0 +1,29 @@
+{
+  "name": "kyush-llm-router",
+  "version": "1.0.0",
+  "description": "LLM routing server with multi-user API key management",
+  "scripts": {
+    "dev": "concurrently \"pnpm exec tsx watch server/src/index.ts\" \"pnpm -r --filter client run dev\"",
+    "build": "pnpm -r build",
+    "start": "pnpm -r start"
+  },
+  "keywords": [
+    "llm",
+    "router",
+    "openai",
+    "proxy"
+  ],
+  "author": "",
+  "license": "MIT",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "tsx": "^4.21.0"
+  }
+}
