@@ -30,6 +30,15 @@ export const Users: Component = () => {
     refetch();
   };
 
+  const copyToClipboard = async (apiKey: string) => {
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      alert('API 키가 클립보드에 복사되었습니다!');
+    } catch (err) {
+      alert('클립보드 복사 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <Layout>
       <div style={{ padding: '30px' }}>
@@ -63,7 +72,16 @@ export const Users: Component = () => {
                   <td style={{ padding: '12px' }}>{user.id}</td>
                   <td style={{ padding: '12px' }}>{user.name}</td>
                   <td style={{ padding: '12px' }}>{user.email || '-'}</td>
-                  <td style={{ padding: '12px', 'font-family': 'monospace', 'font-size': '0.85rem' }}>{user.api_key.substring(0, 15)}...</td>
+                   <td style={{ padding: '12px', display: 'flex', 'align-items': 'center', gap: '8px' }}>
+                     <span style={{ 'font-family': 'monospace', 'font-size': '0.85rem' }}>{user.api_key.substring(0, 15)}...</span>
+                     <button
+                       onClick={() => copyToClipboard(user.api_key)}
+                       title="API 키 복사"
+                       style={{ padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.75rem' }}
+                     >
+                       📋 복사
+                     </button>
+                   </td>
                   <td style={{ padding: '12px', color: user.is_active ? '#22c55e' : '#ef4444' }}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </td>
