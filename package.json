@@ -6,7 +6,8 @@
     "dev": "concurrently \"pnpm exec tsx watch server/src/index.ts\" \"pnpm -r --filter client run dev\"",
     "build": "pnpm -r build",
     "start": "pnpm -r start",
-    "test": "pnpm -r --filter server test"
+    "test": "pnpm -r --filter server test",
+    "bench": "pnpm -r --filter server run bench"
   },
   "keywords": [
     "llm",

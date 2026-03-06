@@ -26,7 +26,12 @@ export class RouterService {
     headers: Record<string, string>,
     body?: unknown
   ): Promise<{ status: number; data: unknown }> {
-    const backendUrl = backend.base_url.replace(/\/$/, '') + path;
+    let backendPath = path;
+    if (backend.base_url.includes('/v1')) {
+      backendPath = path.replace(/^\/v1/, '');
+    }
+    
+    const backendUrl = backend.base_url.replace(/\/$/, '') + backendPath;
 
     const fetchHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -51,9 +56,58 @@ export class RouterService {
         data,
       };
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Extract detailed error information from error cause
+      let cause: string | undefined;
+      let errorType: string;
+      
+      if (error instanceof Error && error.cause) {
+        const causeError = error.cause as any;
+        const causeCode = causeError.code || causeError.errno;
+        const causeSyscall = causeError.syscall;
+        const causeAddress = causeError.address || causeError.hostname;
+        const causePort = causeError.port;
+        
+        if (causeCode === 'ECONNREFUSED') {
+          errorType = 'Backend connection refused';
+          cause = causeAddress && causePort 
+            ? `Backend server at ${causeAddress}:${causePort} is not accepting connections`
+            : 'Backend server is not accepting connections';
+        } else if (causeCode === 'ETIMEDOUT' || causeCode === 'ECONNABORTED') {
+          errorType = 'Backend request timeout';
+          cause = 'Connection to backend timed out';
+        } else if (causeCode === 'ENOTFOUND') {
+          errorType = 'Backend unreachable';
+          cause = causeAddress ? `Could not resolve hostname: ${causeAddress}` : 'Could not resolve backend hostname';
+        } else if (causeCode === 'EPIPE' || causeSyscall === 'write') {
+          errorType = 'Backend connection lost';
+          cause = causeSyscall ? `Connection broken during ${causeSyscall} operation` : 'Connection broken during operation';
+        } else {
+          errorType = 'Backend connection error';
+          cause = `${causeCode || 'Unknown error'} during ${causeSyscall || 'connection'}`;
+        }
+      } else if (errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNABORTED')) {
+        errorType = 'Backend request timeout';
+        cause = 'Connection timed out after 30s';
+      } else if (errorMsg.includes('aborted')) {
+        errorType = 'Request aborted';
+        cause = 'Request was aborted before completion';
+      } else {
+        errorType = 'Failed to forward request to backend';
+        cause = errorMsg;
+      }
+
+      const detailedError = {
+        error: errorType,
+        cause: cause,
+        backend: backend.base_url,
+        path: path,
+      };
+
       return {
         status: 502,
-        data: { error: 'Failed to forward request to backend' },
+        data: detailedError,
       };
     }
   }

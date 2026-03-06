@@ -2,11 +2,13 @@ import { Component, createResource, For, createSignal } from 'solid-js';
 import { api } from '../api/client';
 import type { Backend } from '../types';
 import { Layout } from '../components/Layout';
+import { EditModal } from '../components/EditModal';
 
 export const Backends: Component = () => {
   const [backends, { refetch }] = createResource(() => api.backends.getAll());
   const [showModal, setShowModal] = createSignal(false);
   const [formData, setFormData] = createSignal({ name: '', base_url: '', api_key: '' });
+  const [editingBackend, setEditingBackend] = createSignal<Backend | null>(null);
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -22,6 +24,26 @@ export const Backends: Component = () => {
   const handleDelete = async (backendId: number) => {
     if (!confirm('Are you sure you want to delete this backend?')) return;
     await api.backends.delete(backendId);
+    refetch();
+  };
+
+  const handleEdit = (backend: Backend) => {
+    setEditingBackend(backend);
+  };
+
+  const handleUpdate = async (data: Record<string, any>) => {
+    if (!editingBackend()) return;
+    
+    if (!confirm('Are you sure you want to update this backend?')) return;
+
+    const updateData: Partial<Backend> = {};
+    if (data.name) updateData.name = data.name.trim();
+    if (data.base_url) updateData.base_url = data.base_url.trim();
+    if (data.api_key !== undefined) updateData.api_key = data.api_key.trim() || undefined;
+    if (data.is_active !== undefined) updateData.is_active = data.is_active;
+
+    await api.backends.update(editingBackend()!.id, updateData);
+    setEditingBackend(null);
     refetch();
   };
 
@@ -60,14 +82,20 @@ export const Backends: Component = () => {
                   <td style={{ padding: '12px', color: backend.is_active ? '#22c55e' : '#ef4444' }}>
                     {backend.is_active ? 'Active' : 'Inactive'}
                   </td>
-                  <td style={{ padding: '12px' }}>
-                    <button
-                      onClick={() => handleDelete(backend.id)}
-                      style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                    >
-                      Delete
-                    </button>
-                  </td>
+                   <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
+                     <button
+                       onClick={() => handleEdit(backend)}
+                       style={{ padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
+                     >
+                       Edit
+                     </button>
+                     <button
+                       onClick={() => handleDelete(backend.id)}
+                       style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
+                     >
+                       Delete
+                     </button>
+                   </td>
                 </tr>
               )}</For>
             </tbody>
@@ -128,6 +156,27 @@ export const Backends: Component = () => {
               </form>
             </div>
           </div>
+        )}
+
+        {editingBackend() && (
+          <EditModal
+            isOpen={!!editingBackend()}
+            onClose={() => setEditingBackend(null)}
+            onSubmit={handleUpdate}
+            title="Edit Backend"
+            fields={[
+              { name: 'name', label: 'Name', type: 'text', required: true },
+              { name: 'base_url', label: 'Base URL', type: 'text', required: true },
+              { name: 'api_key', label: 'API Key', type: 'text', required: false },
+              { name: 'is_active', label: 'Active', type: 'checkbox', required: false },
+            ]}
+            initialValues={{
+              name: editingBackend()!.name,
+              base_url: editingBackend()!.base_url,
+              api_key: editingBackend()!.api_key || '',
+              is_active: editingBackend()!.is_active,
+            }}
+          />
         )}
       </div>
     </Layout>

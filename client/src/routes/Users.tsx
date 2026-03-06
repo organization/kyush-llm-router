@@ -2,11 +2,13 @@ import { Component, createResource, For, createSignal } from 'solid-js';
 import { api } from '../api/client';
 import type { User } from '../types';
 import { Layout } from '../components/Layout';
+import { EditModal } from '../components/EditModal';
 
 export const Users: Component = () => {
   const [users, { refetch }] = createResource(() => api.users.getAll());
   const [showModal, setShowModal] = createSignal(false);
   const [formData, setFormData] = createSignal({ name: '', email: '' });
+  const [editingUser, setEditingUser] = createSignal<User | null>(null);
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -27,6 +29,25 @@ export const Users: Component = () => {
   const handleDelete = async (userId: number) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     await api.users.delete(userId);
+    refetch();
+  };
+
+  const handleEdit = (user: User) => {
+    setEditingUser(user);
+  };
+
+  const handleUpdate = async (data: Record<string, any>) => {
+    if (!editingUser()) return;
+    
+    if (!confirm('Are you sure you want to update this user?')) return;
+
+    const updateData: Partial<User> = {};
+    if (data.name) updateData.name = data.name.trim();
+    if (data.email !== undefined) updateData.email = data.email.trim() || undefined;
+    if (data.is_active !== undefined) updateData.is_active = data.is_active;
+
+    await api.users.update(editingUser()!.id, updateData);
+    setEditingUser(null);
     refetch();
   };
 
@@ -85,20 +106,26 @@ export const Users: Component = () => {
                   <td style={{ padding: '12px', color: user.is_active ? '#22c55e' : '#ef4444' }}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </td>
-                  <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => handleRegenerateApiKey(user.id)}
-                      style={{ padding: '4px 8px', background: '#64748b', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                    >
-                      Regenerate Key
-                    </button>
-                    <button
-                      onClick={() => handleDelete(user.id)}
-                      style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                    >
-                      Delete
-                    </button>
-                  </td>
+                   <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
+                     <button
+                       onClick={() => handleRegenerateApiKey(user.id)}
+                       style={{ padding: '4px 8px', background: '#64748b', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
+                     >
+                       Regenerate Key
+                     </button>
+                     <button
+                       onClick={() => handleEdit(user)}
+                       style={{ padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
+                     >
+                       Edit
+                     </button>
+                     <button
+                       onClick={() => handleDelete(user.id)}
+                       style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
+                     >
+                       Delete
+                     </button>
+                   </td>
                 </tr>
               )}</For>
             </tbody>
@@ -147,6 +174,25 @@ export const Users: Component = () => {
               </form>
             </div>
           </div>
+        )}
+
+        {editingUser() && (
+          <EditModal
+            isOpen={!!editingUser()}
+            onClose={() => setEditingUser(null)}
+            onSubmit={handleUpdate}
+            title="Edit User"
+            fields={[
+              { name: 'name', label: 'Name', type: 'text', required: true },
+              { name: 'email', label: 'Email', type: 'email', required: false },
+              { name: 'is_active', label: 'Active', type: 'checkbox', required: false },
+            ]}
+            initialValues={{
+              name: editingUser()!.name,
+              email: editingUser()!.email || '',
+              is_active: editingUser()!.is_active,
+            }}
+          />
         )}
       </div>
     </Layout>

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Application } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -10,33 +10,44 @@ import { logger } from './utils/logger';
 
 dotenv.config();
 
-const app = express();
+export function createServer(): Application {
+  const app = express();
+
+  const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://localhost:5173', 'http://localhost:3001'];
+
+  app.use(cors({
+    origin: corsOrigins,
+    credentials: true,
+  }));
+  app.use(express.json());
+
+  app.use('/admin', adminRoutes);
+  app.use('/v1', apiRoutes);
+  app.use('/admin/analytics', analyticsRoutes);
+
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  app.use((req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
+  return app;
+}
+
+const app = createServer();
 const PORT = process.env.SERVER_PORT || 3000;
 
-const corsOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:5173', 'http://localhost:3001'];
+// Only start server if this is the main module (not imported)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Admin API: http://localhost:${PORT}/admin`);
+    logger.info(`OpenAI API: http://localhost:${PORT}/v1`);
+  });
+}
 
-app.use(cors({
-  origin: corsOrigins,
-  credentials: true,
-}));
-app.use(express.json());
-
-app.use('/admin', adminRoutes);
-app.use('/v1', apiRoutes);
-app.use('/admin/analytics', analyticsRoutes);
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
-
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  logger.info(`Admin API: http://localhost:${PORT}/admin`);
-  logger.info(`OpenAI API: http://localhost:${PORT}/v1`);
-});
+export default app;

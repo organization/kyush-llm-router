@@ -52,13 +52,19 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
     });
 
     if (response.status >= 400) {
-      logger.error(`Backend error for user ${user.id}: ${JSON.stringify(response.data)}`);
+      const errorDetails = response.data as any;
+      const errorInfo = errorDetails.error || 'Unknown error';
+      const causeInfo = errorDetails.cause ? ` (Cause: ${errorDetails.cause})` : '';
+      const backendInfo = errorDetails.backend ? ` [Backend: ${errorDetails.backend}]` : '';
+      logger.error(`Backend error for user ${user.id}: ${errorInfo}${causeInfo}${backendInfo}`);
     }
 
     res.status(response.status).json(response.data);
   } catch (error) {
     const responseTime = Date.now() - startTime;
 
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    
     AnalyticsService.logRequest({
       user_id: user.id,
       backend_id: backend.id,
@@ -66,11 +72,11 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       request_model: req.body.model,
       status_code: 502,
       response_time_ms: responseTime,
-      error_message: error instanceof Error ? error.message : 'Unknown error',
+      error_message: errorMsg,
     });
 
-    logger.error(`Request failed for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    res.status(502).json({ error: 'Backend request failed' });
+    logger.error(`Request failed for user ${user.id}: ${errorMsg}`);
+    res.status(502).json({ error: 'Backend request failed', details: errorMsg });
   }
 });
 
@@ -98,8 +104,9 @@ router.get('/models', async (req: AuthenticatedRequest, res: Response) => {
 
     res.status(response.status).json(response.data);
   } catch (error) {
-    logger.error(`Models request failed for user ${req.user!.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    res.status(502).json({ error: 'Failed to fetch models from backend' });
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`Models request failed for user ${req.user!.id}: ${errorMsg}`);
+    res.status(502).json({ error: 'Failed to fetch models from backend', details: errorMsg });
   }
 });
 
