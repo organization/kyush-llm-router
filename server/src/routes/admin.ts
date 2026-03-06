@@ -5,7 +5,7 @@ import { PermissionModel } from '../models/Permission';
 import { generateApiKey } from '../utils/apiKey';
 import { CreateUserData, CreateBackendData, CreatePermissionData, UpdateUserData, UpdateBackendData } from '../../../shared/types';
 
-const router = Router();
+const router: Router = Router();
 
 // ============ User Management ============
 

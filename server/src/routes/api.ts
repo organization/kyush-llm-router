@@ -4,7 +4,7 @@ import { RouterService } from '../services/RouterService';
 import { AnalyticsService } from '../services/AnalyticsService';
 import { logger } from '../utils/logger';
 
-const router = Router();
+const router: Router = Router();
 
 router.use(authenticate);
 
