@@ -10,7 +10,6 @@ dist/
 
 # Database files
 **/*.db
-server/data/
 data/*.db
 
 # Agent Session log
