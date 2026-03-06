@@ -9,8 +9,12 @@ node_modules/
 dist/
 
 # Database files
-*.db
+**/*.db
 server/data/
+data/*.db
+
+# Agent Session log
+session-*.md
 
 # User defined
 memo.md

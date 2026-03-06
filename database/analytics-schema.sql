@@ -15,9 +15,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     status_code INTEGER,
     response_time_ms INTEGER,
     error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (backend_id) REFERENCES backends(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Usage stats table (aggregated daily per user-backend pair)
@@ -28,8 +26,6 @@ CREATE TABLE IF NOT EXISTS usage_stats (
     date DATE NOT NULL,
     total_requests INTEGER DEFAULT 0,
     total_tokens INTEGER DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (backend_id) REFERENCES backends(id),
     UNIQUE(user_id, backend_id, date)
 );
 
@@ -43,7 +39,6 @@ CREATE TABLE IF NOT EXISTS backend_metrics (
     avg_response_time_ms REAL DEFAULT 0,
     error_count INTEGER DEFAULT 0,
     success_rate REAL DEFAULT 1.0,
-    FOREIGN KEY (backend_id) REFERENCES backends(id),
     UNIQUE(backend_id, date)
 );
 

@@ -3,31 +3,35 @@ import { RequestLog } from '../../../shared/types';
 
 export class AnalyticsService {
   static logRequest(logData: Omit<RequestLog, 'id' | 'created_at'>): void {
-    const db = getAnalyticsDb();
-    const stmt = db.prepare(`
-      INSERT INTO request_logs (
-        user_id, backend_id, endpoint, request_model, response_model,
-        prompt_tokens, completion_tokens, total_tokens,
-        status_code, response_time_ms, error_message
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    try {
+      const db = getAnalyticsDb();
+      const stmt = db.prepare(`
+        INSERT INTO request_logs (
+          user_id, backend_id, endpoint, request_model, response_model,
+          prompt_tokens, completion_tokens, total_tokens,
+          status_code, response_time_ms, error_message
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    stmt.run(
-      logData.user_id,
-      logData.backend_id,
-      logData.endpoint,
-      logData.request_model || null,
-      logData.response_model || null,
-      logData.prompt_tokens || null,
-      logData.completion_tokens || null,
-      logData.total_tokens || null,
-      logData.status_code,
-      logData.response_time_ms || null,
-      logData.error_message || null
-    );
+      stmt.run(
+        logData.user_id,
+        logData.backend_id,
+        logData.endpoint,
+        logData.request_model || null,
+        logData.response_model || null,
+        logData.prompt_tokens || null,
+        logData.completion_tokens || null,
+        logData.total_tokens || null,
+        logData.status_code,
+        logData.response_time_ms || null,
+        logData.error_message || null
+      );
 
-    this.updateUsageStats(logData.user_id, logData.backend_id, logData.total_tokens || 0);
-    this.updateBackendMetrics(logData.backend_id, logData);
+      this.updateUsageStats(logData.user_id, logData.backend_id, logData.total_tokens || 0);
+      this.updateBackendMetrics(logData.backend_id, logData);
+    } catch (error) {
+      console.error('Failed to log analytics:', error);
+    }
   }
 
   private static updateUsageStats(userId: number, backendId: number, tokens: number): void {
