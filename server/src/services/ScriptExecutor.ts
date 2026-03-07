@@ -44,21 +44,22 @@ export class CompiledScript {
 
     // Provide console via Reference callbacks (only primitives can cross applySync boundary)
     const logFns = {
+      _logLog: new ivm.Reference((...args: string[]) => logger.log(`[script] ${args.join(' ')}`)),
+      _logDebug: new ivm.Reference((...args: string[]) => logger.debug(`[script] ${args.join(' ')}`)),
       _logInfo: new ivm.Reference((...args: string[]) => logger.info(`[script] ${args.join(' ')}`)),
       _logWarn: new ivm.Reference((...args: string[]) => logger.warn(`[script] ${args.join(' ')}`)),
       _logError: new ivm.Reference((...args: string[]) => logger.error(`[script] ${args.join(' ')}`)),
-      _logDebug: new ivm.Reference((...args: string[]) => logger.debug(`[script] ${args.join(' ')}`)),
     };
     for (const [name, ref] of Object.entries(logFns)) {
       await jail.set(name, ref);
     }
     await ctx.eval(`
       globalThis.console = {
-        log:   (...a) => _logInfo.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
+        log:   (...a) => _logLog.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
+        debug: (...a) => _logDebug.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
         info:  (...a) => _logInfo.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
         warn:  (...a) => _logWarn.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
         error: (...a) => _logError.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
-        debug: (...a) => _logDebug.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
       };
     `, { timeout: SCRIPT_TIMEOUT_MS });
 

@@ -8,13 +8,14 @@ const colors = {
   gray: '\x1b[90m',
 };
 
-export function log(level: 'info' | 'warn' | 'error' | 'debug', message: string, meta?: unknown): void {
+export function log(level: 'log' | 'debug' | 'info' | 'warn' | 'error', message: string, meta?: unknown): void {
   const timestamp = new Date().toISOString();
   const levelColor = {
+    log: colors.blue,
+    debug: colors.gray,
     info: colors.green,
     warn: colors.yellow,
     error: colors.red,
-    debug: colors.gray,
   }[level];
 
   const prefix = `[${timestamp}] ${levelColor}[${level.toUpperCase()}]${colors.reset}`;
@@ -26,8 +27,9 @@ export function log(level: 'info' | 'warn' | 'error' | 'debug', message: string,
 }
 
 export const logger = {
+  log: (message: string, meta?: unknown) => log('log', message, meta),
+  debug: (message: string, meta?: unknown) => log('debug', message, meta),
   info: (message: string, meta?: unknown) => log('info', message, meta),
   warn: (message: string, meta?: unknown) => log('warn', message, meta),
   error: (message: string, meta?: unknown) => log('error', message, meta),
-  debug: (message: string, meta?: unknown) => log('debug', message, meta),
 };
