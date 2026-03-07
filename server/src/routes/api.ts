@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticate, AuthenticatedRequest } from './auth';
 import { RouterService } from '../services/RouterService';
 import { AnalyticsService } from '../services/AnalyticsService';
+import { ScriptEngine } from '../services/ScriptEngine';
 import { logger } from '../utils/logger';
 
 const router: Router = Router();
@@ -27,15 +28,51 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
   try {
     const { model, messages, ...rest } = req.body;
 
+    const execContext = {
+      user: { id: user.id, name: user.name, email: user.email },
+      backend: { id: backend.id, name: backend.name, base_url: backend.base_url },
+      request: {
+        method: 'POST',
+        path: '/v1/chat/completions',
+        headers: { 'Content-Type': 'application/json' },
+        body: req.body,
+        isStream: req.body.stream === true,
+      },
+    };
+
+    const { context: modifiedContext, errors: requestErrors } = await ScriptEngine.applyOnRequestScripts(
+      execContext,
+      user.id,
+      backend.id
+    );
+
+    if (requestErrors.length > 0) {
+      logger.warn(`Script warnings for user ${user.id}: ${requestErrors.join('; ')}`);
+    }
+
     const response = await RouterService.forwardRequest(
       backend,
       '/v1/chat/completions',
       'POST',
-      { 'Content-Type': 'application/json' },
-      req.body
+      modifiedContext.request.headers,
+      modifiedContext.request.body
     );
 
     const responseTime = Date.now() - startTime;
+
+    const responseContext = {
+      status: response.status,
+      headers: {},
+      body: response.data,
+      isStream: req.body.stream === true,
+    };
+
+    await ScriptEngine.applyOnResponseScripts(
+      execContext,
+      responseContext,
+      user.id,
+      backend.id
+    );
 
     AnalyticsService.logRequest({
       user_id: user.id,

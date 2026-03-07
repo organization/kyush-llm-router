@@ -129,3 +129,58 @@ export interface OpenAIModel {
   created: number;
   owned_by: string;
 }
+
+export type ScriptType = 'per-user-backend' | 'per-backend' | 'per-user';
+
+export interface UserScript {
+  id: number;
+  name: string;
+  script_type: ScriptType;
+  target_user_id: number | null;
+  target_backend_id: number | null;
+  script_code: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateScriptData {
+  name: string;
+  script_type: ScriptType;
+  target_user_id?: number | null;
+  target_backend_id?: number | null;
+  script_code: string;
+  is_active?: boolean;
+}
+
+export interface UpdateScriptData {
+  name?: string;
+  script_type?: ScriptType;
+  target_user_id?: number | null;
+  target_backend_id?: number | null;
+  script_code?: string;
+  is_active?: boolean;
+}
+
+/**
+ * Serializable script context data that can be transferred across isolate boundaries
+ * via structured clone ({ copy: true }).
+ * Non-serializable values (ReadableStream, callbacks) are NOT included here.
+ */
+export interface ScriptContextData {
+  user: { id: number; name: string; email?: string } | null;
+  backend: { id: number; name: string; base_url: string } | null;
+  request: {
+    method: string;
+    path: string;
+    headers: Record<string, string>;
+    body: unknown;
+    isStream: boolean;
+  };
+  response?: {
+    status: number;
+    headers: Record<string, string>;
+    body: unknown;
+    isStream: boolean;
+  };
+}

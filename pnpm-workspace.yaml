@@ -1,7 +1,8 @@
 packages:
-  - 'server'
-  - 'client'
+  - server
+  - client
 
 onlyBuiltDependencies:
-  - 'better-sqlite3'
-  - 'esbuild'
+  - better-sqlite3
+  - esbuild
+  - isolated-vm

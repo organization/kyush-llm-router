@@ -11,6 +11,7 @@ const navItems = [
   { path: '/backends', label: 'Backends', icon: '🔧' },
   { path: '/permissions', label: 'Permissions', icon: '🔐' },
   { path: '/analytics', label: 'Analytics', icon: '📈' },
+  { path: '/scripts', label: 'Scripts', icon: '📝' },
 ];
 
 export const Layout: ParentComponent<LayoutProps> = (props) => {

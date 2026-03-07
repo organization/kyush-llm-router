@@ -60,3 +60,35 @@ export type BackendMetrics = {
   error_count: number;
   success_rate: number;
 };
+
+export type ScriptType = 'per-user-backend' | 'per-backend' | 'per-user';
+
+export type UserScript = {
+  id: number;
+  name: string;
+  script_type: ScriptType;
+  target_user_id: number | null;
+  target_backend_id: number | null;
+  script_code: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateScriptData = {
+  name: string;
+  script_type: ScriptType;
+  target_user_id?: number | null;
+  target_backend_id?: number | null;
+  script_code: string;
+  is_active?: boolean;
+};
+
+export type UpdateScriptData = {
+  name?: string;
+  script_type?: ScriptType;
+  target_user_id?: number | null;
+  target_backend_id?: number | null;
+  script_code?: string;
+  is_active?: boolean;
+};

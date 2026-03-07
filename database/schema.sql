@@ -38,3 +38,23 @@ CREATE TABLE IF NOT EXISTS permissions (
 CREATE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key);
 CREATE INDEX IF NOT EXISTS idx_permissions_user ON permissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_permissions_backend ON permissions(backend_id);
+
+-- User Scripts table
+CREATE TABLE IF NOT EXISTS user_scripts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    script_type TEXT NOT NULL CHECK(script_type IN ('per-user-backend', 'per-backend', 'per-user')),
+    target_user_id INTEGER,
+    target_backend_id INTEGER,
+    script_code TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_backend_id) REFERENCES backends(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_scripts_type ON user_scripts(script_type);
+CREATE INDEX IF NOT EXISTS idx_user_scripts_active ON user_scripts(is_active);
+CREATE INDEX IF NOT EXISTS idx_user_scripts_target_user ON user_scripts(target_user_id);
+CREATE INDEX IF NOT EXISTS idx_user_scripts_target_backend ON user_scripts(target_backend_id);
