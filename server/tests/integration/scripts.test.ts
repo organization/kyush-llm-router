@@ -294,8 +294,6 @@ export const onResponse = (context) => {
     });
 
     it('should load and validate script syntax', async () => {
-      // Note: Full execution testing may fail due to isolated-vm transfer limitations
-      // with certain object types. This test verifies the API endpoint works.
       const testPayload = {
         user: { id: userId, name: 'Test User' },
         backend: { id: backendId, name: 'Test Backend', base_url: 'http://localhost:8006/v1' },
@@ -315,13 +313,9 @@ export const onResponse = (context) => {
         .post(`/admin/scripts/${testScriptId}/test`)
         .send(testPayload);
 
-      // Script should be loaded (syntax valid), execution may fail due to transfer limitations
-      // Accept both 200 (success) and 400 (execution error but script loaded)
-      expect([200, 400]).toContain(response.status);
-      if (response.status === 200) {
-        expect(response.body).toHaveProperty('hasOnRequest');
-        expect(response.body).toHaveProperty('hasOnResponse');
-      }
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('hasOnRequest');
+      expect(response.body).toHaveProperty('hasOnResponse');
     });
 
     it('should return 404 for non-existent script', async () => {
