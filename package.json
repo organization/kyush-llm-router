@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "LLM routing server with multi-user API key management",
   "scripts": {
-    "dev": "concurrently \"pnpm exec tsx watch server/src/index.ts\" \"pnpm -r --filter client run dev\"",
+    "dev": "concurrently \"pnpm -r --filter server dev\" \"pnpm -r --filter client dev\"",
     "build": "pnpm -r build",
     "start": "pnpm -r start",
     "test": "pnpm -r --filter server test",
