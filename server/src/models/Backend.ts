@@ -2,16 +2,26 @@ import { getDb } from '../config/database';
 import { Backend, CreateBackendData, UpdateBackendData } from '../../../shared/types';
 
 export class BackendModel {
+  static asBackend(row: any): Backend {
+    row.is_active = !!row.is_active;
+    return row;
+  }
+
+  static mightBeBackend(row: any): Backend | undefined {
+    if (!row) return undefined;
+    return this.asBackend(row);
+  }
+
   static findAll(): Backend[] {
-    return getDb().prepare('SELECT * FROM backends ORDER BY created_at DESC').all() as Backend[];
+    return getDb().prepare('SELECT * FROM backends ORDER BY created_at DESC').all().map(this.asBackend);
   }
 
   static findById(id: number): Backend | undefined {
-    return getDb().prepare('SELECT * FROM backends WHERE id = ?').get(id) as Backend | undefined;
+    return this.mightBeBackend(getDb().prepare('SELECT * FROM backends WHERE id = ?').get(id));
   }
 
   static findActive(): Backend[] {
-    return getDb().prepare('SELECT * FROM backends WHERE is_active = 1 ORDER BY name').all() as Backend[];
+    return getDb().prepare('SELECT * FROM backends WHERE is_active = 1 ORDER BY name').all().map(this.asBackend);
   }
 
   static create(data: CreateBackendData): Backend {

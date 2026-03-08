@@ -2,24 +2,34 @@ import { getDb } from '../config/database';
 import { UserScript, CreateScriptData, UpdateScriptData } from '../../../shared/types';
 
 export class ScriptModel {
+  static asUserScript(row: any): UserScript {
+    row.is_active = !!row.is_active;
+    return row as UserScript;
+  }
+
+  static mightBeUserScript(row: any): UserScript | undefined {
+    if (!row) return undefined;
+    return this.asUserScript(row);
+  }
+
   static findAll(): UserScript[] {
-    return getDb().prepare('SELECT * FROM user_scripts ORDER BY created_at DESC').all() as UserScript[];
+    return getDb().prepare('SELECT * FROM user_scripts ORDER BY created_at DESC').all().map(this.asUserScript);
   }
 
   static findById(id: number): UserScript | undefined {
-    return getDb().prepare('SELECT * FROM user_scripts WHERE id = ?').get(id) as UserScript | undefined;
+    return this.mightBeUserScript(getDb().prepare('SELECT * FROM user_scripts WHERE id = ?').get(id));
   }
 
   static findByName(name: string): UserScript | undefined {
-    return getDb().prepare('SELECT * FROM user_scripts WHERE name = ?').get(name) as UserScript | undefined;
+    return this.mightBeUserScript(getDb().prepare('SELECT * FROM user_scripts WHERE name = ?').get(name));
   }
 
   static findByScriptType(scriptType: string): UserScript[] {
-    return getDb().prepare('SELECT * FROM user_scripts WHERE script_type = ? ORDER BY created_at DESC').all(scriptType) as UserScript[];
+    return getDb().prepare('SELECT * FROM user_scripts WHERE script_type = ? ORDER BY created_at DESC').all(scriptType).map(this.asUserScript);
   }
 
   static findActive(): UserScript[] {
-    return getDb().prepare('SELECT * FROM user_scripts WHERE is_active = 1 ORDER BY created_at DESC').all() as UserScript[];
+    return getDb().prepare('SELECT * FROM user_scripts WHERE is_active = 1 ORDER BY created_at DESC').all().map(this.asUserScript);
   }
 
   static create(data: CreateScriptData): UserScript {
@@ -114,7 +124,7 @@ export class ScriptModel {
   static getMatchingScripts(userId: number, backendId: number): UserScript[] {
     const db = getDb();
     
-    const allScripts = db.prepare('SELECT * FROM user_scripts WHERE is_active = 1').all() as UserScript[];
+    const allScripts = db.prepare('SELECT * FROM user_scripts WHERE is_active = 1').all().map(this.asUserScript);
     
     return allScripts.filter(script => {
       if (script.script_type === 'per-user-backend') {
@@ -131,7 +141,7 @@ export class ScriptModel {
   static getMatchingBackendScripts(backendId: number): UserScript[] {
     const db = getDb();
     
-    const allScripts = db.prepare('SELECT * FROM user_scripts WHERE is_active = 1').all() as UserScript[];
+    const allScripts = db.prepare('SELECT * FROM user_scripts WHERE is_active = 1').all().map(this.asUserScript);
     
     return allScripts.filter(script => {
       if (script.script_type === 'per-backend') {
@@ -146,7 +156,7 @@ export class ScriptModel {
   static getMatchingUserScripts(userId: number): UserScript[] {
     const db = getDb();
     
-    const allScripts = db.prepare('SELECT * FROM user_scripts WHERE is_active = 1').all() as UserScript[];
+    const allScripts = db.prepare('SELECT * FROM user_scripts WHERE is_active = 1').all().map(this.asUserScript);
     
     return allScripts.filter(script => {
       if (script.script_type === 'per-user') {

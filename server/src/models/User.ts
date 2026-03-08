@@ -1,17 +1,28 @@
 import { getDb } from '../config/database';
 import { User, CreateUserData, UpdateUserData } from '../../../shared/types';
+import { generateApiKey } from '../utils/apiKey';
 
 export class UserModel {
+  static asUser(row: any): User {
+    row.is_active = !!row.is_active;
+    return row as User;
+  }
+
+  static mightBeUser(row: any): User | undefined {
+    if (!row) return undefined;
+    return this.asUser(row);
+  }
+
   static findAll(): User[] {
-    return getDb().prepare('SELECT * FROM users ORDER BY created_at DESC').all() as User[];
+    return getDb().prepare('SELECT * FROM users ORDER BY created_at DESC').all().map(this.asUser);
   }
 
   static findById(id: number): User | undefined {
-    return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined;
+    return this.mightBeUser(getDb().prepare('SELECT * FROM users WHERE id = ?').get(id));
   }
 
   static findByApiKey(apiKey: string): User | undefined {
-    return getDb().prepare('SELECT * FROM users WHERE api_key = ? AND is_active = 1').get(apiKey) as User | undefined;
+    return this.mightBeUser(getDb().prepare('SELECT * FROM users WHERE api_key = ? AND is_active = 1').get(apiKey));
   }
 
   static create(data: CreateUserData): User {
@@ -46,7 +57,7 @@ export class UserModel {
     }
     if (data.is_active !== undefined) {
       updates.push('is_active = ?');
-      values.push(data.is_active);
+      values.push(data.is_active ? 1 : 0);
     }
 
     if (updates.length === 0) {
@@ -74,7 +85,7 @@ export class UserModel {
     const user = this.findById(id);
     if (!user) return null;
 
-    const newApiKey = `sk-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    const newApiKey = generateApiKey();
     getDb().prepare('UPDATE users SET api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newApiKey, id);
     return newApiKey;
   }

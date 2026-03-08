@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { AnalyticsService } from '../services/AnalyticsService';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/usage', (req: Request, res: Response) => {
   const { userId, backendId, days } = req.query;

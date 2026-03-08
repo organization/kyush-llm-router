@@ -9,7 +9,7 @@ export class RouterService {
 
     const allBackends = BackendModel.findAll();
     const backends = allBackends
-      .filter(b => (b.is_active === true || b.is_active === 1) && allowedBackendIds.includes(b.id));
+      .filter(b => (b.is_active === true) && allowedBackendIds.includes(b.id));
 
     if (backends.length === 0) {
       return null;
