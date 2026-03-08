@@ -8,7 +8,9 @@ import apiRoutes from './routes/api';
 import analyticsRoutes from './routes/analytics';
 import { logger } from './utils/logger';
 
-dotenv.config();
+dotenv.config({
+  quiet: true,
+});
 
 export function createServer(): Application {
   const app = express();
