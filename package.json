@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "LLM routing server with multi-user API key management",
   "scripts": {
-    "dev": "concurrently \"pnpm -r --filter server dev\" \"pnpm -r --filter client dev\"",
+    "dev": "pnpm --parallel dev",
     "build": "pnpm -r build",
-    "start": "pnpm -r start",
+    "start": "pnpm --parallel start",
     "test": "pnpm -r --filter server test",
     "bench": "pnpm -r --filter server run bench"
   },
@@ -23,9 +23,5 @@
   ],
   "engines": {
     "node": ">=18.0.0"
-  },
-  "devDependencies": {
-    "concurrently": "^9.2.1",
-    "tsx": "^4.21.0"
   }
 }
