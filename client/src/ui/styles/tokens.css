@@ -1,0 +1,154 @@
+:root {
+  color-scheme: light dark;
+  --font-ui: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Consolas", monospace;
+
+  --text-1: 11px;
+  --text-2: 12px;
+  --text-3: 13px;
+  --text-4: 14px;
+  --text-5: 16px;
+  --text-6: 18px;
+
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+
+  --radius-1: 2px;
+  --radius-2: 4px;
+  --radius-3: 6px;
+
+  --control-height-dense: 30px;
+  --control-height-regular: 36px;
+  --row-height-dense: 34px;
+  --row-height-regular: 40px;
+
+  --color-bg: #f3f4f6;
+  --color-bg-elevated: #ffffff;
+  --color-bg-panel: #fbfbfc;
+  --color-bg-inset: #e8eaee;
+  --color-bg-hover: #eef2f8;
+
+  --color-text: #10131a;
+  --color-text-muted: #5a6472;
+  --color-text-soft: #778092;
+
+  --color-border: #cad1da;
+  --color-border-strong: #98a2b3;
+  --color-border-danger: #cb6f6f;
+
+  --color-accent: #2357d8;
+  --color-accent-strong: #173ea4;
+  --color-accent-soft: #dbe7ff;
+  --color-focus: #2c6bff;
+  --color-success: #1f7a45;
+  --color-success-soft: #daf1e1;
+  --color-warning: #946200;
+  --color-warning-soft: #fff0c2;
+  --color-danger: #b42318;
+  --color-danger-soft: #ffdeda;
+  --color-info-soft: #deebff;
+
+  --shadow-panel: 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow-dialog: 0 12px 32px rgb(15 23 42 / 0.18);
+  --focus-ring: 0 0 0 2px var(--color-bg-elevated), 0 0 0 4px var(--color-focus);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #111317;
+    --color-bg-elevated: #181b20;
+    --color-bg-panel: #1d2127;
+    --color-bg-inset: #0e1014;
+    --color-bg-hover: #242a33;
+
+    --color-text: #f2f4f8;
+    --color-text-muted: #b5bcc9;
+    --color-text-soft: #929cad;
+
+    --color-border: #353d48;
+    --color-border-strong: #5f6b7a;
+    --color-border-danger: #8c3b3b;
+
+    --color-accent: #79a6ff;
+    --color-accent-strong: #a9c5ff;
+    --color-accent-soft: #162848;
+    --color-focus: #8cb4ff;
+    --color-success: #72d39a;
+    --color-success-soft: #173323;
+    --color-warning: #e7c062;
+    --color-warning-soft: #3f3010;
+    --color-danger: #ff8a80;
+    --color-danger-soft: #431d1f;
+    --color-info-soft: #142840;
+
+    --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow-dialog: 0 18px 44px rgb(0 0 0 / 0.45);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f3f4f6;
+  --color-bg-elevated: #ffffff;
+  --color-bg-panel: #fbfbfc;
+  --color-bg-inset: #e8eaee;
+  --color-bg-hover: #eef2f8;
+  --color-text: #10131a;
+  --color-text-muted: #5a6472;
+  --color-text-soft: #778092;
+  --color-border: #cad1da;
+  --color-border-strong: #98a2b3;
+  --color-border-danger: #cb6f6f;
+  --color-accent: #2357d8;
+  --color-accent-strong: #173ea4;
+  --color-accent-soft: #dbe7ff;
+  --color-focus: #2c6bff;
+  --color-success: #1f7a45;
+  --color-success-soft: #daf1e1;
+  --color-warning: #946200;
+  --color-warning-soft: #fff0c2;
+  --color-danger: #b42318;
+  --color-danger-soft: #ffdeda;
+  --color-info-soft: #deebff;
+  --shadow-panel: 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow-dialog: 0 12px 32px rgb(15 23 42 / 0.18);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #111317;
+  --color-bg-elevated: #181b20;
+  --color-bg-panel: #1d2127;
+  --color-bg-inset: #0e1014;
+  --color-bg-hover: #242a33;
+  --color-text: #f2f4f8;
+  --color-text-muted: #b5bcc9;
+  --color-text-soft: #929cad;
+  --color-border: #353d48;
+  --color-border-strong: #5f6b7a;
+  --color-border-danger: #8c3b3b;
+  --color-accent: #79a6ff;
+  --color-accent-strong: #a9c5ff;
+  --color-accent-soft: #162848;
+  --color-focus: #8cb4ff;
+  --color-success: #72d39a;
+  --color-success-soft: #173323;
+  --color-warning: #e7c062;
+  --color-warning-soft: #3f3010;
+  --color-danger: #ff8a80;
+  --color-danger-soft: #431d1f;
+  --color-info-soft: #142840;
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-dialog: 0 18px 44px rgb(0 0 0 / 0.45);
+}
+
+:root[data-density="regular"] {
+  --control-height-dense: var(--control-height-regular);
+  --row-height-dense: var(--row-height-regular);
+}

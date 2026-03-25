@@ -1,0 +1,70 @@
+.script-editor {
+  position: relative;
+  min-width: 0;
+  min-height: 600px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2);
+  background: var(--color-bg-inset);
+}
+
+.script-editor > * {
+  height: 600px !important;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.script-editor .monaco-editor,
+.script-editor .monaco-editor-background,
+.script-editor .overflow-guard {
+  max-width: 100% !important;
+}
+
+.script-target {
+  min-width: 0;
+}
+
+.script-target__primary {
+  margin: 0;
+}
+
+.script-target__secondary {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-1);
+}
+
+.api-key-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.api-key-cell__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .script-editor {
+    min-height: 520px;
+  }
+
+  .script-editor > * {
+    height: 520px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .script-editor {
+    min-height: 420px;
+  }
+
+  .script-editor > * {
+    height: 420px !important;
+  }
+}
