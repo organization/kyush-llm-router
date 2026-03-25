@@ -1,22 +1,36 @@
-version: '3.8'
-
 services:
-  router:
-    build: .
+  server:
+    build:
+      context: .
+      target: server
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - SERVER_PORT=3000
-      - CLIENT_PORT=3001
-      - CORE_DB_PATH=/data/core.db
-      - ANALYTICS_DB_PATH=/data/analytics.db
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      NODE_ENV: production
+      SERVER_PORT: 3000
+      DB_DIR: /data
+      TZ: ${TZ:-UTC}
+      CORS_ORIGINS: http://localhost:3002,http://127.0.0.1:3002
     volumes:
       - router-data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  client:
+    build:
+      context: .
+      target: client
+    depends_on:
+      - server
+    ports:
+      - "3002:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
