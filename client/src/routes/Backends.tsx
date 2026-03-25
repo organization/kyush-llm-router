@@ -1,4 +1,5 @@
 import { createResource, createSignal, Show, type Component } from 'solid-js';
+import { Pencil, Plus, Trash2 } from 'lucide-solid';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import type { Backend } from '../types';
@@ -10,6 +11,7 @@ import {
   DataGrid,
   EmptyState,
   FormDialog,
+  IconButton,
   PageHeader,
   Panel,
   StatusBadge,
@@ -124,7 +126,7 @@ export const Backends: Component = () => {
         <PageHeader
           title="Backends"
           description="Register upstream LLM targets, connection URLs, and activation state for routing."
-          actions={<Button variant="primary" onClick={openCreateDialog}>Add Backend</Button>}
+          actions={<IconButton variant="primary" icon={<Plus />} label="Add Backend" onClick={openCreateDialog} />}
         />
 
         <Show when={notice()}>
@@ -138,7 +140,13 @@ export const Backends: Component = () => {
           >
             <Show
               when={(backends()?.length ?? 0) > 0}
-              fallback={<EmptyState title="No backends yet" description="Add a backend before granting permissions or routing requests." action={<Button variant="primary" onClick={openCreateDialog}>Add Backend</Button>} />}
+              fallback={
+                <EmptyState
+                  title="No backends yet"
+                  description="Add a backend before granting permissions or routing requests."
+                  action={<IconButton variant="primary" icon={<Plus />} label="Add Backend" onClick={openCreateDialog} />}
+                />
+              }
             >
               <DataGrid
                 rows={backends() ?? []}
@@ -161,8 +169,8 @@ export const Backends: Component = () => {
                 loading={backends.loading}
                 rowActions={(backend) => (
                   <div class="ui-row-actions">
-                    <Button onClick={() => openEditDialog(backend)}>Edit</Button>
-                    <Button variant="danger" onClick={() => requestDelete(backend)}>Delete</Button>
+                    <IconButton icon={<Pencil />} label="Edit" onClick={() => openEditDialog(backend)} />
+                    <IconButton variant="danger" icon={<Trash2 />} label="Delete" onClick={() => requestDelete(backend)} />
                   </div>
                 )}
               />

@@ -4,6 +4,7 @@ export * from './primitives/Button';
 export * from './primitives/Checkbox';
 export * from './primitives/Dialog';
 export * from './primitives/DropdownMenu';
+export * from './primitives/IconButton';
 export * from './primitives/Popover';
 export * from './primitives/Select';
 export * from './primitives/Switch';

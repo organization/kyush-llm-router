@@ -13,6 +13,7 @@ import {
   ConfirmDialog,
   DataGrid,
   EmptyState,
+  IconButton,
   MetaCluster,
   PageHeader,
   Panel,
@@ -35,11 +36,48 @@ interface ScriptFormState {
   is_active: boolean;
 }
 
-const defaultCode = `export async function onRequest(ctx) {
+const defaultCode = `// User-defined middleware script
+// Available functions: onRequest, onResponse
+
+/**
+ * Called before the request is forwarded to the backend
+ * @param ctx - Script context with user, backend, and request information
+ * @returns Modified context
+ */
+export async function onRequest(ctx) {
+  // Example: Add custom header
+  // ctx.request.headers['X-Custom-Header'] = 'value';
+
+  // Example: Edit body
+  // if (typeof ctx.request.body === 'object') {
+  //  if (typeof ctx.request.body['chat_template_kwargs'] !== 'object') {
+  //    ctx.request.body['chat_template_kwargs'] = {};
+  //  }
+  
+  // Example: Log request
+  // console.log('Request:', ctx.request.method, ctx.request.path);
+  
   return ctx;
 }
 
+/**
+ * Called after receiving response from the backend
+ * @param ctx - Script context with response information
+ * @returns Modified context
+ */
 export async function onResponse(ctx) {
+  // Example: Log response
+  // console.log('Response status:', ctx.response?.status);
+  
+  // Example: Handle streaming responses
+  // if (ctx.response?.isStream && ctx.onChunk) {
+  //   const originalOnChunk = ctx.onChunk;
+  //   ctx.onChunk = (chunk) => {
+  //     console.log('Stream chunk:', chunk);
+  //     originalOnChunk(chunk);
+  //   };
+  // }
+  
   return ctx;
 }
 `;
@@ -288,10 +326,7 @@ export const Scripts: Component = () => {
             title="Script registry"
             description="Select a script to edit, test, or change activation state."
             actions={
-              <Button onClick={() => void refetchScripts()}>
-                <RefreshCw />
-                Refresh
-              </Button>
+              <IconButton icon={<RefreshCw />} label="Refresh" onClick={() => void refetchScripts()} />
             }
             bodyClass="ui-stack ui-stack--tight"
           >
@@ -306,10 +341,7 @@ export const Scripts: Component = () => {
                     title="No scripts yet"
                     description="Create your first middleware script to intercept requests or responses."
                     action={
-                      <Button variant="primary" onClick={() => syncForm(null)}>
-                        <Plus />
-                        Create Script
-                      </Button>
+                      <IconButton variant="primary" icon={<Plus />} label="Create Script" onClick={() => syncForm(null)} />
                     }
                   />
                 }
@@ -351,14 +383,12 @@ export const Scripts: Component = () => {
                   onRowClick={(script) => syncForm(script)}
                   rowActions={(script) => (
                     <div class="ui-row-actions">
-                      <Button onClick={() => void toggleActive(script)}>
-                        {script.is_active ? <PowerOff /> : <Power />}
-                        {script.is_active ? 'Disable' : 'Enable'}
-                      </Button>
-                      <Button variant="danger" onClick={() => requestDelete(script)}>
-                        <Trash2 />
-                        Delete
-                      </Button>
+                      <IconButton
+                        icon={script.is_active ? <PowerOff /> : <Power />}
+                        label={script.is_active ? 'Disable' : 'Enable'}
+                        onClick={() => void toggleActive(script)}
+                      />
+                      <IconButton variant="danger" icon={<Trash2 />} label="Delete" onClick={() => requestDelete(script)} />
                     </div>
                   )}
                 />
@@ -368,22 +398,19 @@ export const Scripts: Component = () => {
 
           <Panel
             title={form().id ? `Editing ${form().name}` : 'New script draft'}
-            description="Use the dense form and editor tabs to maintain routing middleware without leaving the page."
+            description="Configure middleware scripts, run validation tests before applying changes."
             actions={
               <div class="ui-chip-group">
                 <StatusBadge tone={form().is_active ? 'success' : 'warning'}>{form().is_active ? 'Active' : 'Draft'}</StatusBadge>
-                <Button variant="primary" onClick={() => void saveScript()} disabled={submitting()}>
-                  <Save />
-                  {form().id ? 'Save Script' : 'Create Script'}
-                </Button>
-                <Button onClick={() => syncForm(null)}>
-                  <Plus />
-                  New Script
-                </Button>
-                <Button onClick={() => syncForm(selectedScript())}>
-                  <RotateCcw />
-                  Reset
-                </Button>
+                <IconButton
+                  variant="primary"
+                  icon={<Save />}
+                  label={form().id ? 'Save Script' : 'Create Script'}
+                  onClick={() => void saveScript()}
+                  disabled={submitting()}
+                />
+                <IconButton icon={<Plus />} label="New Script" onClick={() => syncForm(null)} />
+                <IconButton icon={<RotateCcw />} label="Reset" onClick={() => syncForm(selectedScript())} />
               </div>
             }
             bodyClass="ui-stack"
@@ -454,10 +481,7 @@ export const Scripts: Component = () => {
                 <div class="ui-stack">
                   <p class="ui-copy">The test runner uses the first available user/backend as sample context and a mock chat completion request.</p>
                   <div class="ui-row-actions">
-                    <Button variant="primary" onClick={() => void runTest()} disabled={testing()}>
-                      <Play />
-                      {testing() ? 'Running...' : 'Run Test'}
-                    </Button>
+                    <IconButton variant="primary" icon={<Play />} label={testing() ? 'Running...' : 'Run Test'} onClick={() => void runTest()} disabled={testing()} />
                   </div>
                   <Show
                     when={testResult()}

@@ -202,6 +202,7 @@ select {
 }
 
 .ui-panel {
+  min-width: 0;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2);
@@ -212,12 +213,15 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-4);
+  min-width: 0;
   padding: var(--space-5);
   border-bottom: 1px solid var(--color-border);
 }
 
 .ui-panel__body {
+  min-width: 0;
   padding: var(--space-5);
 }
 
@@ -253,6 +257,21 @@ select {
   width: 14px;
   height: 14px;
   flex: none;
+}
+
+.ui-button--icon {
+  min-width: 0;
+}
+
+.ui-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.ui-button__label {
+  display: inline;
 }
 
 .ui-button:hover {
@@ -424,12 +443,15 @@ select {
 .ui-tabs {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .ui-tabs__list {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2);
@@ -455,6 +477,7 @@ select {
 }
 
 .ui-tabs__content {
+  min-width: 0;
   padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2);
@@ -529,6 +552,13 @@ select {
   padding: 0 var(--space-3);
   border-radius: var(--radius-1);
   cursor: pointer;
+}
+
+.ui-dropdown__item svg,
+.ui-select__item svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
 .ui-dropdown__item[data-highlighted],
@@ -671,9 +701,11 @@ select {
 .ui-data-grid {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .ui-data-grid__shell {
+  min-width: 0;
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2);
@@ -1029,6 +1061,7 @@ select {
   flex: 1 1 0;
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .ui-panel__title,
@@ -1075,6 +1108,7 @@ select {
 
 .ui-row-actions {
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 
@@ -1091,6 +1125,18 @@ select {
   grid-template-columns: minmax(320px, 1.1fr) minmax(0, 1.4fr);
   gap: var(--space-5);
   align-items: start;
+}
+
+@media (max-width: 1280px) {
+  .ui-split-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
+  .ui-data-grid__table {
+    min-width: 640px;
+  }
 }
 
 .ui-section-grid {
@@ -1140,6 +1186,7 @@ select {
 
 .script-editor {
   position: relative;
+  min-width: 0;
   min-height: 600px;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -1150,6 +1197,14 @@ select {
 .script-editor > * {
   height: 600px !important;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.script-editor .monaco-editor,
+.script-editor .monaco-editor-background,
+.script-editor .overflow-guard {
+  max-width: 100% !important;
 }
 
 .script-target {
@@ -1161,7 +1216,7 @@ select {
 }
 
 .script-target__secondary {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-1);
 }
@@ -1178,6 +1233,16 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .ui-button--icon {
+    padding: 0 var(--space-3);
+  }
+
+  .ui-button--icon .ui-button__label {
+    display: none;
+  }
 }
 
 @media (max-width: 960px) {
@@ -1207,6 +1272,54 @@ select {
 
   .page-header__actions {
     justify-content: start;
+  }
+
+  .ui-panel__header {
+    align-items: start;
+  }
+
+  .ui-tabs__trigger {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .ui-data-grid__table {
+    min-width: 560px;
+  }
+
+  .ui-tabs__content {
+    padding: var(--space-4);
+  }
+
+  .script-editor {
+    min-height: 520px;
+  }
+
+  .script-editor > * {
+    height: 520px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    padding: var(--space-4);
+  }
+
+  .ui-panel__header,
+  .ui-panel__body {
+    padding: var(--space-4);
+  }
+
+  .ui-data-grid__table {
+    min-width: 480px;
+  }
+
+  .script-editor {
+    min-height: 420px;
+  }
+
+  .script-editor > * {
+    height: 420px !important;
   }
 }
 

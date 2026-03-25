@@ -1,4 +1,5 @@
 import { createMemo, createResource, createSignal, For, Show, type Component } from 'solid-js';
+import { Copy, KeyRound, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-solid';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import type { User } from '../types';
@@ -14,6 +15,7 @@ import {
   DropdownMenu,
   EmptyState,
   FormDialog,
+  IconButton,
   PageHeader,
   Panel,
   StatusBadge,
@@ -33,6 +35,8 @@ const emptyForm = (): UserFormState => ({
   email: '',
   is_active: true,
 });
+
+const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 5)}...`;
 
 export const Users: Component = () => {
   const [users, { refetch }] = createResource(() => api.users.getAll());
@@ -158,7 +162,7 @@ export const Users: Component = () => {
         <PageHeader
           title="Users"
           description="Manage API identities, lifecycle state, and operational access for the router."
-          actions={<Button variant="primary" onClick={openCreateDialog}>Add User</Button>}
+          actions={<IconButton variant="primary" icon={<Plus />} label="Add User" onClick={openCreateDialog} />}
         />
 
         <Show when={notice()}>
@@ -192,7 +196,13 @@ export const Users: Component = () => {
           >
             <Show
               when={filteredUsers().length > 0 || users.loading}
-              fallback={<EmptyState title="No users yet" description="Create the first user to issue an API key and start routing traffic." action={<Button variant="primary" onClick={openCreateDialog}>Add User</Button>} />}
+              fallback={
+                <EmptyState
+                  title="No users yet"
+                  description="Create the first user to issue an API key and start routing traffic."
+                  action={<IconButton variant="primary" icon={<Plus />} label="Add User" onClick={openCreateDialog} />}
+                />
+              }
             >
               <DataGrid
                 rows={filteredUsers()}
@@ -220,10 +230,10 @@ export const Users: Component = () => {
                     class: 'ui-text-mono',
                     cell: (user) => (
                       <div class="api-key-cell">
-                        <span class="api-key-cell__value" title={user.api_key}>
-                          {user.api_key}
+                        <span class="api-key-cell__value" title="Hidden by default">
+                          {maskApiKey(user.api_key)}
                         </span>
-                        <Button onClick={() => void handleCopyApiKey(user.api_key)}>Copy</Button>
+                        <IconButton icon={<Copy />} label="Copy" onClick={() => void handleCopyApiKey(user.api_key)} />
                       </div>
                     ),
                   },
@@ -238,13 +248,24 @@ export const Users: Component = () => {
                 emptyMessage="No users match the current search."
                 rowActions={(user) => (
                   <div class="ui-row-actions">
-                    <Button onClick={() => void handleRegenerateApiKey(user)}>Regenerate</Button>
+                    <IconButton icon={<KeyRound />} label="Regenerate" onClick={() => void handleRegenerateApiKey(user)} />
                     <DropdownMenu.Root>
-                      <DropdownMenu.Trigger>More</DropdownMenu.Trigger>
+                      <DropdownMenu.Trigger as={Button} class="ui-button--icon" aria-label="More actions">
+                        <span class="ui-button__icon" aria-hidden="true">
+                          <MoreHorizontal />
+                        </span>
+                        <span class="ui-button__label">More</span>
+                      </DropdownMenu.Trigger>
                       <DropdownMenu.Portal>
                         <DropdownMenu.Content>
-                          <DropdownMenu.Item onSelect={() => openEditDialog(user)}>Edit</DropdownMenu.Item>
-                          <DropdownMenu.Item onSelect={() => requestDelete(user)}>Delete</DropdownMenu.Item>
+                          <DropdownMenu.Item onSelect={() => openEditDialog(user)}>
+                            <Pencil />
+                            Edit
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item onSelect={() => requestDelete(user)}>
+                            <Trash2 />
+                            Delete
+                          </DropdownMenu.Item>
                         </DropdownMenu.Content>
                       </DropdownMenu.Portal>
                     </DropdownMenu.Root>
@@ -306,7 +327,7 @@ export const Users: Component = () => {
                   <span class="meta-key">Name</span>
                   <span class="meta-value">{user().name}</span>
                   <span class="meta-key">API Key</span>
-                  <span class="meta-value">{user().api_key}</span>
+                  <span class="meta-value">Hidden by default</span>
                 </div>
               )}
             </Show>

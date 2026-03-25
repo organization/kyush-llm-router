@@ -1,4 +1,5 @@
 import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
+import { Plus, ShieldMinus } from 'lucide-solid';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import {
@@ -8,6 +9,7 @@ import {
   DataGrid,
   EmptyState,
   FormDialog,
+  IconButton,
   MetaCluster,
   PageHeader,
   Panel,
@@ -74,7 +76,7 @@ export const Permissions: Component = () => {
         <PageHeader
           title="Permissions"
           description="Control which users may route requests to which backends."
-          actions={<Button variant="primary" onClick={() => setDialogOpen(true)}>Grant Permission</Button>}
+          actions={<IconButton variant="primary" icon={<Plus />} label="Grant Permission" onClick={() => setDialogOpen(true)} />}
         />
 
         <Show when={notice()}>
@@ -88,7 +90,13 @@ export const Permissions: Component = () => {
           >
             <Show
               when={(permissions()?.length ?? 0) > 0}
-              fallback={<EmptyState title="No permissions yet" description="Grant a user access to a backend to allow routing." action={<Button variant="primary" onClick={() => setDialogOpen(true)}>Grant Permission</Button>} />}
+              fallback={
+                <EmptyState
+                  title="No permissions yet"
+                  description="Grant a user access to a backend to allow routing."
+                  action={<IconButton variant="primary" icon={<Plus />} label="Grant Permission" onClick={() => setDialogOpen(true)} />}
+                />
+              }
             >
               <DataGrid
                 rows={permissions() ?? []}
@@ -117,15 +125,15 @@ export const Permissions: Component = () => {
                 getRowKey={(permission) => `${permission.user_id}-${permission.backend_id}`}
                 loading={permissions.loading || users.loading || backends.loading}
                 rowActions={(permission) => (
-                  <Button
+                  <IconButton
                     variant="danger"
+                    icon={<ShieldMinus />}
+                    label="Revoke"
                     onClick={() => {
                       setPendingDelete({ user_id: permission.user_id, backend_id: permission.backend_id });
                       setConfirmOpen(true);
                     }}
-                  >
-                    Revoke
-                  </Button>
+                  />
                 )}
               />
             </Show>

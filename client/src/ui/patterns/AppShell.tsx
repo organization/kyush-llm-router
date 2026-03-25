@@ -2,7 +2,7 @@ import { A, useLocation } from '@solidjs/router';
 import { ChartColumn, FileCode, LayoutDashboard, Moon, Server, ShieldCheck, Sun, Users } from 'lucide-solid';
 import { For, createMemo, createSignal, onCleanup, onMount, type JSX, type ParentComponent } from 'solid-js';
 import SnakegroundBg from '../../components/SnakegroundBg';
-import { Button } from '../primitives/Button';
+import { IconButton } from '../primitives/IconButton';
 import { cn } from '../lib/cn';
 import type { ThemeMode } from '../tokens';
 
@@ -100,10 +100,12 @@ export const AppShell: ParentComponent<AppShellProps> = (props) => {
         </nav>
 
         <div class="nav-rail__footer">
-          <Button class="nav-rail__theme-toggle" onClick={toggleTheme}>
-            {resolvedTheme() === 'dark' ? <Sun /> : <Moon />}
-            {resolvedTheme() === 'dark' ? 'Light Mode' : 'Dark Mode'}
-          </Button>
+          <IconButton
+            class="nav-rail__theme-toggle"
+            icon={resolvedTheme() === 'dark' ? <Sun /> : <Moon />}
+            label={resolvedTheme() === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            onClick={toggleTheme}
+          />
         </div>
       </aside>
 
