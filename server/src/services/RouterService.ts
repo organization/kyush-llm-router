@@ -58,6 +58,14 @@ export class RouterService {
     // Always let fetch/undici compute Content-Length from the final outgoing body.
     delete fetchHeaders['content-length'];
     delete fetchHeaders['Content-Length'];
+    delete fetchHeaders.authorization;
+    delete fetchHeaders.Authorization;
+    delete fetchHeaders['content-type'];
+    delete fetchHeaders['Content-Type'];
+
+    if (preparedBody !== undefined) {
+      fetchHeaders['Content-Type'] = 'application/json';
+    }
 
     if (backend.api_key) {
       fetchHeaders['Authorization'] = `Bearer ${backend.api_key}`;
