@@ -67,3 +67,6 @@ Client → auth.ts (API 키 검증, 권한 로드)
 테스트 유틸: `server/tests/integration/utils/` (testApp.ts, mockBackend.ts)
 
 벤치마크: `server/benchmarks/` (runner.ts, scenarios.ts, report.ts, stats.ts)
+
+사용 문서:
+- [docs/benchmarks.md](/C:/Users/user/Sync/Workspace/kyush-llm-router/docs/benchmarks.md) - benchmark CLI usage, modes, output, caveats

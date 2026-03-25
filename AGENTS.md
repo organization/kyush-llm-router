@@ -69,3 +69,4 @@ pnpm run bench      # 벤치마크 실행
 - [docs/database.md](docs/database.md) — DB 테이블 스키마 전체
 - [docs/api.md](docs/api.md) — API 엔드포인트 레퍼런스
 - [docs/scripts.md](docs/scripts.md) — Script Engine 사용법, 타입, 예제
+- [docs/benchmarks.md](docs/benchmarks.md) — benchmark CLI 사용법
