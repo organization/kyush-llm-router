@@ -23,13 +23,13 @@ export const Dashboard: Component = () => {
           items={[
             { label: 'Total Users', value: data()?.users.length ?? 0, hint: 'Provisioned API identities' },
             { label: 'Active Backends', value: data()?.backends.filter((backend) => backend.is_active).length ?? 0, hint: 'Routable upstream targets' },
-            { label: 'Recent Requests', value: data()?.recentRequests.length ?? 0, hint: 'Loaded in the current overview' },
+            { label: 'Recent Requests', value: data()?.recentRequests.rows.length ?? 0, hint: 'Loaded in the current overview' },
           ]}
         />
 
         <Panel title="Recent Requests" description="Latest request activity across the router with status and model context.">
           <DataGrid
-            rows={data()?.recentRequests ?? []}
+            rows={data()?.recentRequests.rows ?? []}
             columns={[
               { id: 'user_id', header: 'User', mono: true, cell: (request) => <span>{request.user_id}</span> },
               { id: 'backend_id', header: 'Backend', mono: true, cell: (request) => <span>{request.backend_id}</span> },
@@ -50,7 +50,7 @@ export const Dashboard: Component = () => {
             loading={data.loading}
             emptyMessage="No recent requests yet."
           />
-          {!data.loading && (data()?.recentRequests.length ?? 0) === 0 && (
+          {!data.loading && (data()?.recentRequests.rows.length ?? 0) === 0 && (
             <EmptyState title="No requests yet" description="Traffic will appear here once authenticated users send requests through the router." />
           )}
         </Panel>

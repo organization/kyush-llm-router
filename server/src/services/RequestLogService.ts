@@ -1,5 +1,5 @@
 import { listRequestLogMonths, getRequestLogsDb } from '../config/request-logs-db';
-import { RequestLog } from '../../../shared/types';
+import { RequestLog, RequestLogPage } from '../../../shared/types';
 import { getLocalDateKey, getLocalMonthKey, getMonthKeyFromDateString, getUtcTimestamp } from '../utils/time';
 
 export interface RequestLogInsert {
@@ -90,6 +90,26 @@ function buildWhereClause(query: RequestLogQuery): { whereClause: string; params
   };
 }
 
+function getMonthRowCount(monthKey: string, whereClause: string, params: unknown[]): number {
+  const db = getRequestLogsDb(monthKey);
+  const matchedInMonth = db.prepare(`
+    SELECT COUNT(*) as count FROM request_logs
+    ${whereClause}
+  `).get(...params) as { count: number };
+
+  return matchedInMonth.count;
+}
+
+function getMonthRows(monthKey: string, whereClause: string, params: unknown[], limit: number, offset: number): RequestLog[] {
+  const db = getRequestLogsDb(monthKey);
+  return db.prepare(`
+    SELECT * FROM request_logs
+    ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, offset).map(normalizeRequestLog);
+}
+
 function getQueryMonth(query: RequestLogQuery): string {
   if (query.date) {
     return getMonthKeyFromDateString(query.date);
@@ -155,56 +175,55 @@ export class RequestLogService {
     );
   }
 
-  static getRequestLogs(query: RequestLogQuery = {}): RequestLog[] {
+  static getRequestLogs(query: RequestLogQuery = {}): RequestLogPage {
     const limit = clampLimit(query.limit);
     let offset = Math.max(0, query.offset || 0);
     const { whereClause, params } = buildWhereClause(query);
 
     if (query.month || query.date) {
-      const db = getRequestLogsDb(getQueryMonth(query));
-      return db.prepare(`
-        SELECT * FROM request_logs
-        ${whereClause}
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-      `).all(...params, limit, offset).map(normalizeRequestLog);
+      const monthKey = getQueryMonth(query);
+      const total = getMonthRowCount(monthKey, whereClause, params);
+      const rows = offset >= total ? [] : getMonthRows(monthKey, whereClause, params, limit, offset);
+
+      return {
+        rows,
+        total,
+        limit,
+        offset,
+      };
     }
 
     const months = listRequestLogMonths();
+    const originalOffset = offset;
     const results: RequestLog[] = [];
+    let total = 0;
 
     for (const month of months) {
-      if (results.length >= limit) {
-        break;
-      }
+      const matchedInMonth = getMonthRowCount(month, whereClause, params);
+      total += matchedInMonth;
 
-      const db = getRequestLogsDb(month);
-      const remaining = limit - results.length;
-      const rows = db.prepare(`
-        SELECT * FROM request_logs
-        ${whereClause}
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-      `).all(...params, remaining, offset).map(normalizeRequestLog);
-
-      if (rows.length > 0) {
-        results.push(...rows);
-        offset = 0;
+      if (matchedInMonth === 0) {
         continue;
       }
 
-      const matchedInMonth = db.prepare(`
-        SELECT COUNT(*) as count FROM request_logs
-        ${whereClause}
-      `).get(...params) as { count: number };
+      if (matchedInMonth <= offset) {
+        offset -= matchedInMonth;
+        continue;
+      }
 
-      if (matchedInMonth.count <= offset) {
-        offset -= matchedInMonth.count;
-      } else {
+      if (results.length < limit) {
+        const remaining = limit - results.length;
+        const rows = getMonthRows(month, whereClause, params, remaining, offset);
+        results.push(...rows);
         offset = 0;
       }
     }
 
-    return results;
+    return {
+      rows: results,
+      total,
+      limit,
+      offset: originalOffset,
+    };
   }
 }

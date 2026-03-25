@@ -49,6 +49,13 @@ export type RequestLog = {
   created_at: string;
 };
 
+export type RequestLogPage = {
+  rows: RequestLog[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type UsageStats = {
   id: number;
   user_id: number;

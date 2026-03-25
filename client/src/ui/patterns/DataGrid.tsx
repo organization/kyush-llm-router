@@ -43,10 +43,56 @@ export interface DataGridProps<T> {
   onToggleRowSelection?: (row: T, nextSelected: boolean) => void;
 }
 
+type PaginationToken = number | 'ellipsis';
+
+function buildPaginationTokens(currentPage: number, totalPages: number): PaginationToken[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set<number>([1, totalPages, currentPage]);
+  for (let page = currentPage - 1; page <= currentPage + 1; page += 1) {
+    if (page > 1 && page < totalPages) {
+      pages.add(page);
+    }
+  }
+
+  if (currentPage <= 3) {
+    pages.add(2);
+    pages.add(3);
+    pages.add(4);
+  }
+
+  if (currentPage >= totalPages - 2) {
+    pages.add(totalPages - 1);
+    pages.add(totalPages - 2);
+    pages.add(totalPages - 3);
+  }
+
+  const sortedPages = Array.from(pages)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((left, right) => left - right);
+
+  const tokens: PaginationToken[] = [];
+  for (const page of sortedPages) {
+    const previous = tokens[tokens.length - 1];
+    if (typeof previous === 'number' && page - previous > 1) {
+      tokens.push('ellipsis');
+    }
+    tokens.push(page);
+  }
+
+  return tokens;
+}
+
 export function DataGrid<T>(props: DataGridProps<T>) {
   const pageCount = () => {
     if (!props.pagination) return 1;
     return Math.max(1, Math.ceil(props.pagination.total / props.pagination.pageSize));
+  };
+  const paginationTokens = () => {
+    if (!props.pagination) return [] as PaginationToken[];
+    return buildPaginationTokens(props.pagination.page, pageCount());
   };
 
   return (
@@ -187,15 +233,34 @@ export function DataGrid<T>(props: DataGridProps<T>) {
               class="ui-pagination__button"
               disabled={props.pagination!.page <= 1}
               onClick={() => props.pagination!.onPageChange(Math.max(1, props.pagination!.page - 1))}
+              aria-label="Previous page"
             >
-              Prev
+              &lt;
             </button>
+            <For each={paginationTokens()}>
+              {(token) => (
+                token === 'ellipsis' ? (
+                  <span class="ui-pagination__ellipsis" aria-hidden="true">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    class={cn('ui-pagination__button', props.pagination!.page === token && 'ui-pagination__button--active')}
+                    aria-current={props.pagination!.page === token ? 'page' : undefined}
+                    onClick={() => props.pagination!.onPageChange(token)}
+                  >
+                    {token}
+                  </button>
+                )
+              )}
+            </For>
             <button
               class="ui-pagination__button"
               disabled={props.pagination!.page >= pageCount()}
               onClick={() => props.pagination!.onPageChange(Math.min(pageCount(), props.pagination!.page + 1))}
+              aria-label="Next page"
             >
-              Next
+              &gt;
             </button>
           </div>
         </div>

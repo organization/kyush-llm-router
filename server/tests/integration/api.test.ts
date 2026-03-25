@@ -109,10 +109,11 @@ describe('Auth & Proxy API', () => {
       const analyticsResponse = await request(app).get('/admin/analytics/requests?limit=10');
       
       expect(analyticsResponse.status).toBe(200);
-      expect(Array.isArray(analyticsResponse.body)).toBe(true);
+      expect(Array.isArray(analyticsResponse.body.rows)).toBe(true);
+      expect(typeof analyticsResponse.body.total).toBe('number');
       
       // Find our logged request
-      const loggedRequest = analyticsResponse.body.find((r: any) => 
+      const loggedRequest = analyticsResponse.body.rows.find((r: any) => 
         r.status_code === 502 && r.endpoint === '/v1/chat/completions'
       );
       
@@ -149,8 +150,10 @@ describe('Auth & Proxy API', () => {
 
       expect(firstPage.status).toBe(200);
       expect(secondPage.status).toBe(200);
-      expect(firstPage.body[0].user_id).toBe(9992);
-      expect(secondPage.body[0].user_id).toBe(9991);
+      expect(firstPage.body.total).toBe(2);
+      expect(secondPage.body.total).toBe(2);
+      expect(firstPage.body.rows[0].user_id).toBe(9992);
+      expect(secondPage.body.rows[0].user_id).toBe(9991);
     });
   });
 });

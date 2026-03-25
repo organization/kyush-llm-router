@@ -8,7 +8,7 @@ export const Analytics: Component = () => {
   const [usage] = createResource(() => api.analytics.getUsage(undefined, undefined, 7));
   const [metrics] = createResource(() => api.analytics.getMetrics(undefined, 7));
 
-  const requestRows = () => requests() ?? [];
+  const requestRows = () => requests()?.rows ?? [];
   const usageRows = () => usage() ?? [];
   const metricRows = () => metrics() ?? [];
 

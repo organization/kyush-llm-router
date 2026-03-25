@@ -286,9 +286,24 @@
   cursor: pointer;
 }
 
+.ui-pagination__button--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
 .ui-pagination__button[disabled] {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.ui-pagination__ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 30px;
+  color: var(--color-text-soft);
 }
 
 .ui-log-console {

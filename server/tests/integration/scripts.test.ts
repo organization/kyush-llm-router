@@ -410,7 +410,7 @@ export const onResponse = (context) => {
       
       // Check that request was logged with script execution
       const analyticsResponse = await request(app).get('/admin/analytics/requests?limit=10');
-      const loggedRequest = analyticsResponse.body.find((r: any) => 
+      const loggedRequest = analyticsResponse.body.rows.find((r: any) => 
         r.user_id === parseInt(userApiKey.split('-')[1]) || r.endpoint === '/v1/chat/completions'
       );
       

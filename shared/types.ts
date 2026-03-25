@@ -82,6 +82,13 @@ export interface RequestLog {
   created_at: string;
 }
 
+export interface RequestLogPage {
+  rows: RequestLog[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface UsageStats {
   id: number;
   user_id: number;

@@ -1,5 +1,5 @@
 import { getAnalyticsDb } from '../config/analytics-db';
-import { RequestLog } from '../../../shared/types';
+import { RequestLogPage } from '../../../shared/types';
 import { RequestLogInsert, RequestLogQuery, RequestLogService } from './RequestLogService';
 import { getLocalDateKey } from '../utils/time';
 
@@ -82,7 +82,7 @@ export class AnalyticsService {
     }
   }
 
-  static getRequestLogs(query: RequestLogQuery = {}): RequestLog[] {
+  static getRequestLogs(query: RequestLogQuery = {}): RequestLogPage {
     return RequestLogService.getRequestLogs(query);
   }
 

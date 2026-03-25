@@ -65,7 +65,12 @@ export const DetailLogs: Component = () => {
       })
   );
 
-  const requestRows = createMemo(() => logs() ?? []);
+  const requestPage = createMemo(() => logs());
+  const requestRows = createMemo(() => requestPage()?.rows ?? []);
+  const totalRows = createMemo(() => requestPage()?.total ?? 0);
+  const pageCount = createMemo(() => Math.max(1, Math.ceil(totalRows() / pageSize())));
+  const rangeStart = createMemo(() => (totalRows() === 0 ? 0 : (page() - 1) * pageSize() + 1));
+  const rangeEnd = createMemo(() => Math.min(totalRows(), page() * pageSize()));
   const selectedLog = createMemo<RequestLog | undefined>(() => requestRows().find((row) => row.id === selectedLogId()));
   const selectedLogHasConversation = createMemo(() =>
     selectedLog() ? hasRenderableConversation(selectedLog()!.request_body, selectedLog()!.response_body) : false
@@ -73,12 +78,12 @@ export const DetailLogs: Component = () => {
 
   const userOptions = createMemo(() => [
     { value: '', label: 'All users' },
-    ...((users() ?? []).map((user) => ({ value: String(user.id), label: `${user.id} · ${user.name}` }))),
+    ...((users() ?? []).map((user) => ({ value: String(user.id), label: `${user.id} - ${user.name}` }))),
   ]);
 
   const backendOptions = createMemo(() => [
     { value: '', label: 'All backends' },
-    ...((backends() ?? []).map((backend) => ({ value: String(backend.id), label: `${backend.id} · ${backend.name}` }))),
+    ...((backends() ?? []).map((backend) => ({ value: String(backend.id), label: `${backend.id} - ${backend.name}` }))),
   ]);
 
   const endpointOptions = [
@@ -113,8 +118,9 @@ export const DetailLogs: Component = () => {
 
         <SummaryStrip
           items={[
-            { label: 'Rows Loaded', value: requestRows().length, hint: `Page ${page()} · ${pageSize()} / page` },
-            { label: 'Verbose Rows', value: requestRows().filter((row) => row.detail_logged).length, hint: 'Current result set' },
+            { label: 'Total Matches', value: totalRows(), hint: totalRows() > 0 ? `${rangeStart()}-${rangeEnd()} on page ${page()}` : `Page ${page()} of ${pageCount()}` },
+            { label: 'Rows Loaded', value: requestRows().length, hint: `${pageSize()} per page` },
+            { label: 'Verbose Rows', value: requestRows().filter((row) => row.detail_logged).length, hint: 'Current page' },
             { label: 'Selected Log', value: selectedLog()?.id ?? '-', hint: selectedLog() ? 'Focused inspector row' : 'No selection' },
           ]}
         />
@@ -177,7 +183,7 @@ export const DetailLogs: Component = () => {
               pagination={{
                 page: page(),
                 pageSize: pageSize(),
-                total: page() * pageSize() + (requestRows().length === pageSize() ? 1 : 0),
+                total: totalRows(),
                 onPageChange: (nextPage) => setPage(nextPage),
                 onPageSizeChange: (nextPageSize) => {
                   setPageSize(nextPageSize);

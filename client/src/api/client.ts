@@ -1,4 +1,4 @@
-import type { User, Backend, Permission, RequestLog, UsageStats, BackendMetrics, UserScript, CreateScriptData, UpdateScriptData } from '../types';
+import type { User, Backend, Permission, RequestLogPage, UsageStats, BackendMetrics, UserScript, CreateScriptData, UpdateScriptData } from '../types';
 
 const API_BASE = '/api';
 
@@ -85,7 +85,7 @@ export const api = {
       params.append('days', String(days));
       return fetchJson<UsageStats[]>(`${API_BASE}/admin/analytics/usage?${params}`);
     },
-    getRequests: (params: { limit?: number; offset?: number; month?: string; date?: string; q?: string; userId?: number; backendId?: number; endpoint?: string; detailLogged?: boolean } = {}): Promise<RequestLog[]> => {
+    getRequests: (params: { limit?: number; offset?: number; month?: string; date?: string; q?: string; userId?: number; backendId?: number; endpoint?: string; detailLogged?: boolean } = {}): Promise<RequestLogPage> => {
       const search = new URLSearchParams();
       search.set('limit', String(params.limit ?? 100));
       search.set('offset', String(params.offset ?? 0));
@@ -96,7 +96,7 @@ export const api = {
       if (params.backendId) search.set('backendId', String(params.backendId));
       if (params.endpoint) search.set('endpoint', params.endpoint);
       if (params.detailLogged !== undefined) search.set('detailLogged', params.detailLogged ? '1' : '0');
-      return fetchJson<RequestLog[]>(`${API_BASE}/admin/analytics/requests?${search}`);
+      return fetchJson<RequestLogPage>(`${API_BASE}/admin/analytics/requests?${search}`);
     },
     getMetrics: (backendId?: number, days: number = 30): Promise<BackendMetrics[]> => {
       const params = new URLSearchParams();
