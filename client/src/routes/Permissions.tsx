@@ -1,134 +1,184 @@
-import { Component, createResource, For, createSignal } from 'solid-js';
+import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
 import { api } from '../api/client';
-import type { User, Backend, Permission } from '../types';
 import { Layout } from '../components/Layout';
+import {
+  Alert,
+  Button,
+  ConfirmDialog,
+  DataGrid,
+  EmptyState,
+  FormDialog,
+  MetaCluster,
+  PageHeader,
+  Panel,
+  Select,
+  StatusBadge,
+} from '../ui';
 
 export const Permissions: Component = () => {
-  const [users, { refetch: refetchUsers }] = createResource(() => api.users.getAll());
-  const [backends, { refetch: refetchBackends }] = createResource(() => api.backends.getAll());
-  const [permissions, { refetch: refetchPermissions }] = createResource(() => api.permissions.getAll());
-  const [showModal, setShowModal] = createSignal(false);
-  const [formData, setFormData] = createSignal({ user_id: '', backend_id: '' });
+  const [users] = createResource(() => api.users.getAll());
+  const [backends] = createResource(() => api.backends.getAll());
+  const [permissions, { refetch }] = createResource(() => api.permissions.getAll());
+  const [dialogOpen, setDialogOpen] = createSignal(false);
+  const [confirmOpen, setConfirmOpen] = createSignal(false);
+  const [submitting, setSubmitting] = createSignal(false);
+  const [form, setForm] = createSignal({ user_id: '', backend_id: '' });
+  const [notice, setNotice] = createSignal<{ tone: 'success' | 'danger'; message: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = createSignal<{ user_id: number; backend_id: number } | null>(null);
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    const { user_id, backend_id } = formData();
-    if (!user_id || !backend_id) return;
+  const userOptions = createMemo(() => (users() ?? []).map((user) => ({ value: String(user.id), label: user.name })));
+  const backendOptions = createMemo(() => (backends() ?? []).map((backend) => ({ value: String(backend.id), label: backend.name })));
 
-    await api.permissions.create({ user_id: Number(user_id), backend_id: Number(backend_id) });
-    setFormData({ user_id: '', backend_id: '' });
-    setShowModal(false);
-    refetchPermissions();
+  const createPermission = async (event: Event) => {
+    event.preventDefault();
+    if (!form().user_id || !form().backend_id) {
+      setNotice({ tone: 'danger', message: 'Select both a user and a backend.' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.permissions.create({ user_id: Number(form().user_id), backend_id: Number(form().backend_id) });
+      setNotice({ tone: 'success', message: 'Permission granted.' });
+      setForm({ user_id: '', backend_id: '' });
+      setDialogOpen(false);
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Permission grant failed.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDelete = async (userId: number, backendId: number) => {
-    if (!confirm('Are you sure you want to revoke this permission?')) return;
-    await api.permissions.delete(userId, backendId);
-    refetchPermissions();
+  const revokePermission = async () => {
+    const current = pendingDelete();
+    if (!current) return;
+
+    setSubmitting(true);
+    try {
+      await api.permissions.delete(current.user_id, current.backend_id);
+      setNotice({ tone: 'success', message: 'Permission revoked.' });
+      setConfirmOpen(false);
+      setPendingDelete(null);
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Permission revoke failed.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Layout>
-      <div style={{ padding: '30px' }}>
-        <div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'center', 'margin-bottom': '20px' }}>
-          <h2 style={{ margin: 0 }}>Permissions</h2>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '6px', cursor: 'pointer' }}
+      <div class="ui-app-page">
+        <PageHeader
+          title="Permissions"
+          description="Control which users may route requests to which backends."
+          actions={<Button variant="primary" onClick={() => setDialogOpen(true)}>Grant Permission</Button>}
+        />
+
+        <Show when={notice()}>
+          {(currentNotice) => <Alert tone={currentNotice().tone}>{currentNotice().message}</Alert>}
+        </Show>
+
+        <Panel title="Permission matrix" description="User-to-backend assignments used by the router authorization layer.">
+          <Show
+            when={!(permissions.loading || users.loading || backends.loading) || (permissions()?.length ?? 0) > 0}
+            fallback={<EmptyState title="Loading permissions" description="Reading users, backends, and assignment records." />}
           >
-            Add Permission
-          </button>
-        </div>
+            <Show
+              when={(permissions()?.length ?? 0) > 0}
+              fallback={<EmptyState title="No permissions yet" description="Grant a user access to a backend to allow routing." action={<Button variant="primary" onClick={() => setDialogOpen(true)}>Grant Permission</Button>} />}
+            >
+              <DataGrid
+                rows={permissions() ?? []}
+                columns={[
+                  {
+                    id: 'user',
+                    header: 'User',
+                    cell: (permission) => <span>{users()?.find((user) => user.id === permission.user_id)?.name ?? `User #${permission.user_id}`}</span>,
+                  },
+                  {
+                    id: 'backend',
+                    header: 'Backend',
+                    cell: (permission) => <span>{backends()?.find((backend) => backend.id === permission.backend_id)?.name ?? `Backend #${permission.backend_id}`}</span>,
+                  },
+                  {
+                    id: 'created_at',
+                    header: 'Created',
+                    cell: (permission) => <span>{new Date(permission.created_at).toLocaleString()}</span>,
+                  },
+                  {
+                    id: 'status',
+                    header: 'Status',
+                    cell: () => <StatusBadge tone="success">Assigned</StatusBadge>,
+                  },
+                ]}
+                getRowKey={(permission) => `${permission.user_id}-${permission.backend_id}`}
+                loading={permissions.loading || users.loading || backends.loading}
+                rowActions={(permission) => (
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setPendingDelete({ user_id: permission.user_id, backend_id: permission.backend_id });
+                      setConfirmOpen(true);
+                    }}
+                  >
+                    Revoke
+                  </Button>
+                )}
+              />
+            </Show>
+          </Show>
+        </Panel>
 
-        {permissions.loading || users.loading || backends.loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table style={{ width: '100%', 'border-collapse': 'collapse', background: 'white', 'border-radius': '8px', overflow: 'hidden', 'box-shadow': '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <thead style={{ background: '#f8fafc' }}>
-              <tr>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>User</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Backend</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Created At</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={permissions()}>{(permission) => {
-                const user = users()?.find(u => u.id === permission.user_id);
-                const backend = backends()?.find(b => b.id === permission.backend_id);
+        <FormDialog
+          open={dialogOpen()}
+          onOpenChange={setDialogOpen}
+          title="Grant Permission"
+          description="Bind one user to one backend using the compact assignment dialog."
+          footer={
+            <>
+              <Button onClick={() => setDialogOpen(false)} disabled={submitting()}>Cancel</Button>
+              <Button type="submit" form="permission-form" variant="primary" disabled={submitting()}>Grant</Button>
+            </>
+          }
+          class="ui-dialog__content--compact"
+        >
+          <form id="permission-form" class="ui-form" onSubmit={(event) => void createPermission(event)}>
+            <Select label="User" value={form().user_id} onChange={(value) => setForm((current) => ({ ...current, user_id: value }))} options={userOptions()} placeholder="Select user" />
+            <Select
+              label="Backend"
+              value={form().backend_id}
+              onChange={(value) => setForm((current) => ({ ...current, backend_id: value }))}
+              options={backendOptions()}
+              placeholder="Select backend"
+            />
+          </form>
+        </FormDialog>
 
-                return (
-                  <tr style={{ 'border-bottom': '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '12px' }}>{user?.name || `User #${permission.user_id}`}</td>
-                    <td style={{ padding: '12px' }}>{backend?.name || `Backend #${permission.backend_id}`}</td>
-                    <td style={{ padding: '12px' }}>{new Date(permission.created_at).toLocaleString()}</td>
-                    <td style={{ padding: '12px' }}>
-                      <button
-                        onClick={() => handleDelete(permission.user_id, permission.backend_id)}
-                        style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                      >
-                        Revoke
-                      </button>
-                    </td>
-                  </tr>
-                );
-              }}</For>
-            </tbody>
-          </table>
-        )}
-
-        {showModal() && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'z-index': 1000 }}>
-            <div style={{ background: 'white', padding: '30px', 'border-radius': '8px', width: '400px' }}>
-              <h3 style={{ margin: '0 0 20px 0' }}>Add Permission</h3>
-              <form onSubmit={handleSubmit}>
-                <div style={{ 'margin-bottom': '15px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>User *</label>
-                  <select
-                    value={formData().user_id}
-                    onChange={(e) => setFormData({ ...formData(), user_id: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                    required
-                  >
-                    <option value="">Select a user</option>
-                    <For each={users()}>{(user) => (
-                      <option value={user.id}>{user.name}</option>
-                    )}</For>
-                  </select>
-                </div>
-                <div style={{ 'margin-bottom': '20px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Backend *</label>
-                  <select
-                    value={formData().backend_id}
-                    onChange={(e) => setFormData({ ...formData(), backend_id: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                    required
-                  >
-                    <option value="">Select a backend</option>
-                    <For each={backends()}>{(backend) => (
-                      <option value={backend.id}>{backend.name}</option>
-                    )}</For>
-                  </select>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', 'justify-content': 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    Grant
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          open={confirmOpen()}
+          onOpenChange={setConfirmOpen}
+          title="Revoke permission"
+          description="This removes the routing relationship between the selected user and backend."
+          confirmLabel="Revoke"
+          tone="danger"
+          busy={submitting()}
+          details={
+            <Show when={pendingDelete()}>
+              {(current) => (
+                <MetaCluster
+                  items={[
+                    { key: 'User', value: users()?.find((user) => user.id === current().user_id)?.name ?? String(current().user_id) },
+                    { key: 'Backend', value: backends()?.find((backend) => backend.id === current().backend_id)?.name ?? String(current().backend_id) },
+                  ]}
+                />
+              )}
+            </Show>
+          }
+          onConfirm={() => void revokePermission()}
+        />
       </div>
     </Layout>
   );

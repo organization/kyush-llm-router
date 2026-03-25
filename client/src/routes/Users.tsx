@@ -1,199 +1,318 @@
-import { Component, createResource, For, createSignal } from 'solid-js';
+import { createMemo, createResource, createSignal, For, Show, type Component } from 'solid-js';
 import { api } from '../api/client';
-import type { User } from '../types';
 import { Layout } from '../components/Layout';
-import { EditModal } from '../components/EditModal';
+import type { User } from '../types';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  CommandBar,
+  CommandBarGroup,
+  CommandBarHint,
+  ConfirmDialog,
+  DataGrid,
+  DropdownMenu,
+  EmptyState,
+  FormDialog,
+  PageHeader,
+  Panel,
+  StatusBadge,
+  TextField,
+} from '../ui';
+
+type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
+
+interface UserFormState {
+  name: string;
+  email: string;
+  is_active: boolean;
+}
+
+const emptyForm = (): UserFormState => ({
+  name: '',
+  email: '',
+  is_active: true,
+});
 
 export const Users: Component = () => {
   const [users, { refetch }] = createResource(() => api.users.getAll());
-  const [showModal, setShowModal] = createSignal(false);
-  const [formData, setFormData] = createSignal({ name: '', email: '' });
+  const [query, setQuery] = createSignal('');
+  const [dialogOpen, setDialogOpen] = createSignal(false);
+  const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [editingUser, setEditingUser] = createSignal<User | null>(null);
+  const [pendingDeleteUser, setPendingDeleteUser] = createSignal<User | null>(null);
+  const [submitting, setSubmitting] = createSignal(false);
+  const [notice, setNotice] = createSignal<{ tone: NoticeTone; message: string } | null>(null);
+  const [form, setForm] = createSignal<UserFormState>(emptyForm());
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    const { name, email } = formData();
-    if (!name.trim()) return;
+  const filteredUsers = createMemo(() => {
+    const value = query().trim().toLowerCase();
+    const list = users() ?? [];
+    if (!value) return list;
+    return list.filter((user) => {
+      const haystack = [user.name, user.email ?? '', user.api_key].join(' ').toLowerCase();
+      return haystack.includes(value);
+    });
+  });
 
-    await api.users.create({ name: name.trim(), email: email.trim() || undefined });
-    setFormData({ name: '', email: '' });
-    setShowModal(false);
-    refetch();
-  };
+  const activeCount = createMemo(() => (users() ?? []).filter((user) => user.is_active).length);
 
-  const handleRegenerateApiKey = async (userId: number) => {
-    await api.users.regenerateApiKey(userId);
-    refetch();
-  };
-
-  const handleDelete = async (userId: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-    await api.users.delete(userId);
-    refetch();
-  };
-
-  const handleEdit = (user: User) => {
-    setEditingUser(user);
-  };
-
-  const handleUpdate = async (data: Record<string, any>) => {
-    if (!editingUser()) return;
-    
-    if (!confirm('Are you sure you want to update this user?')) return;
-
-    const updateData: Partial<User> = {};
-    if (data.name) updateData.name = data.name.trim();
-    if (data.email !== undefined) updateData.email = data.email.trim() || undefined;
-    if (data.is_active !== undefined) updateData.is_active = data.is_active;
-
-    await api.users.update(editingUser()!.id, updateData);
+  const openCreateDialog = () => {
     setEditingUser(null);
-    refetch();
+    setForm(emptyForm());
+    setDialogOpen(true);
   };
 
-  const copyToClipboard = async (apiKey: string) => {
+  const openEditDialog = (user: User) => {
+    setEditingUser(user);
+    setForm({
+      name: user.name,
+      email: user.email ?? '',
+      is_active: user.is_active,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async (event: Event) => {
+    event.preventDefault();
+
+    const current = form();
+    if (!current.name.trim()) {
+      setNotice({ tone: 'danger', message: 'Name is required.' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (editingUser()) {
+        await api.users.update(editingUser()!.id, {
+          name: current.name.trim(),
+          email: current.email.trim() || undefined,
+          is_active: current.is_active,
+        });
+        setNotice({ tone: 'success', message: 'User updated.' });
+      } else {
+        await api.users.create({
+          name: current.name.trim(),
+          email: current.email.trim() || undefined,
+        });
+        setNotice({ tone: 'success', message: 'User created.' });
+      }
+
+      setDialogOpen(false);
+      setForm(emptyForm());
+      setEditingUser(null);
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'User save failed.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRegenerateApiKey = async (user: User) => {
+    try {
+      await api.users.regenerateApiKey(user.id);
+      setNotice({ tone: 'success', message: `API key regenerated for ${user.name}.` });
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'API key regeneration failed.' });
+    }
+  };
+
+  const handleCopyApiKey = async (apiKey: string) => {
     try {
       await navigator.clipboard.writeText(apiKey);
-      alert('API 키가 클립보드에 복사되었습니다!');
-    } catch (err) {
-      alert('클립보드 복사 중 오류가 발생했습니다.');
+      setNotice({ tone: 'success', message: 'API key copied to clipboard.' });
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Clipboard copy failed.' });
+    }
+  };
+
+  const requestDelete = (user: User) => {
+    setPendingDeleteUser(user);
+    setConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    const user = pendingDeleteUser();
+    if (!user) return;
+
+    setSubmitting(true);
+    try {
+      await api.users.delete(user.id);
+      setNotice({ tone: 'success', message: `User ${user.name} deleted.` });
+      setConfirmOpen(false);
+      setPendingDeleteUser(null);
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'User deletion failed.' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
     <Layout>
-      <div style={{ padding: '30px' }}>
-        <div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'center', 'margin-bottom': '20px' }}>
-          <h2 style={{ margin: 0 }}>Users</h2>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '6px', cursor: 'pointer' }}
+      <div class="ui-app-page">
+        <PageHeader
+          title="Users"
+          description="Manage API identities, lifecycle state, and operational access for the router."
+          actions={<Button variant="primary" onClick={openCreateDialog}>Add User</Button>}
+        />
+
+        <Show when={notice()}>
+          {(currentNotice) => (
+            <Alert tone={currentNotice().tone === 'danger' ? 'danger' : currentNotice().tone === 'warning' ? 'warning' : currentNotice().tone === 'success' ? 'success' : 'info'}>
+              {currentNotice().message}
+            </Alert>
+          )}
+        </Show>
+
+        <CommandBar>
+          <CommandBarGroup>
+            <TextField label="Search users" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
+          </CommandBarGroup>
+          <CommandBarGroup>
+            <StatusBadge tone="success">{`${activeCount()} active`}</StatusBadge>
+            <CommandBarHint>
+              <span class="ui-kbd">/</span> search
+            </CommandBarHint>
+          </CommandBarGroup>
+        </CommandBar>
+
+        <Panel
+          title="User registry"
+          description="Dense operational view with API key overflow handling and row-level actions."
+          bodyClass="ui-stack ui-stack--tight"
+        >
+          <Show
+            when={!users.loading || filteredUsers().length > 0}
+            fallback={<EmptyState title="Loading users" description="Fetching identities and access state from the admin API." />}
           >
-            Add User
-          </button>
-        </div>
+            <Show
+              when={filteredUsers().length > 0 || users.loading}
+              fallback={<EmptyState title="No users yet" description="Create the first user to issue an API key and start routing traffic." action={<Button variant="primary" onClick={openCreateDialog}>Add User</Button>} />}
+            >
+              <DataGrid
+                rows={filteredUsers()}
+                columns={[
+                  {
+                    id: 'id',
+                    header: 'ID',
+                    mono: true,
+                    cell: (user) => <span>{user.id}</span>,
+                  },
+                  {
+                    id: 'name',
+                    header: 'Name',
+                    cell: (user) => <span>{user.name}</span>,
+                  },
+                  {
+                    id: 'email',
+                    header: 'Email',
+                    truncate: true,
+                    cell: (user) => <span title={user.email ?? '-'}>{user.email || '-'}</span>,
+                  },
+                  {
+                    id: 'api_key',
+                    header: 'API Key',
+                    class: 'ui-text-mono',
+                    cell: (user) => (
+                      <div class="api-key-cell">
+                        <span class="api-key-cell__value" title={user.api_key}>
+                          {user.api_key}
+                        </span>
+                        <Button onClick={() => void handleCopyApiKey(user.api_key)}>Copy</Button>
+                      </div>
+                    ),
+                  },
+                  {
+                    id: 'status',
+                    header: 'Status',
+                    cell: (user) => <StatusBadge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
+                  },
+                ]}
+                getRowKey={(user) => user.id}
+                loading={users.loading}
+                emptyMessage="No users match the current search."
+                rowActions={(user) => (
+                  <div class="ui-row-actions">
+                    <Button onClick={() => void handleRegenerateApiKey(user)}>Regenerate</Button>
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger>More</DropdownMenu.Trigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.Content>
+                          <DropdownMenu.Item onSelect={() => openEditDialog(user)}>Edit</DropdownMenu.Item>
+                          <DropdownMenu.Item onSelect={() => requestDelete(user)}>Delete</DropdownMenu.Item>
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
+                  </div>
+                )}
+              />
+            </Show>
+          </Show>
+        </Panel>
 
-        {users.loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table style={{ width: '100%', 'border-collapse': 'collapse', background: 'white', 'border-radius': '8px', overflow: 'hidden', 'box-shadow': '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <thead style={{ background: '#f8fafc' }}>
-              <tr>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>ID</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Name</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Email</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>API Key</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Status</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={users()}>{(user) => (
-                <tr style={{ 'border-bottom': '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '12px' }}>{user.id}</td>
-                  <td style={{ padding: '12px' }}>{user.name}</td>
-                  <td style={{ padding: '12px' }}>{user.email || '-'}</td>
-                   <td style={{ padding: '12px', display: 'flex', 'align-items': 'center', gap: '8px' }}>
-                     <span style={{ 'font-family': 'monospace', 'font-size': '0.85rem' }}>{user.api_key.substring(0, 15)}...</span>
-                     <button
-                       onClick={() => copyToClipboard(user.api_key)}
-                       title="API 키 복사"
-                       style={{ padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.75rem' }}
-                     >
-                       📋 복사
-                     </button>
-                   </td>
-                  <td style={{ padding: '12px', color: user.is_active ? '#22c55e' : '#ef4444' }}>
-                    {user.is_active ? 'Active' : 'Inactive'}
-                  </td>
-                   <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
-                     <button
-                       onClick={() => handleRegenerateApiKey(user.id)}
-                       style={{ padding: '4px 8px', background: '#64748b', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                     >
-                       Regenerate Key
-                     </button>
-                     <button
-                       onClick={() => handleEdit(user)}
-                       style={{ padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                     >
-                       Edit
-                     </button>
-                     <button
-                       onClick={() => handleDelete(user.id)}
-                       style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                     >
-                       Delete
-                     </button>
-                   </td>
-                </tr>
-              )}</For>
-            </tbody>
-          </table>
-        )}
+        <FormDialog
+          open={dialogOpen()}
+          onOpenChange={setDialogOpen}
+          title={editingUser() ? 'Edit User' : 'Add User'}
+          description="Compact form dialog for user identity and lifecycle status."
+          footer={
+            <>
+              <Button onClick={() => setDialogOpen(false)} disabled={submitting()}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" form="user-form" disabled={submitting()}>
+                {editingUser() ? 'Save Changes' : 'Create User'}
+              </Button>
+            </>
+          }
+          class="ui-dialog__content--compact"
+        >
+          <form id="user-form" class="ui-form" onSubmit={(event) => void handleSubmit(event)}>
+            <TextField label="Name" value={form().name} onInput={(event) => setForm((current) => ({ ...current, name: event.currentTarget.value }))} />
+            <TextField
+              label="Email"
+              value={form().email}
+              placeholder="ops@example.com"
+              onInput={(event) => setForm((current) => ({ ...current, email: event.currentTarget.value }))}
+            />
+            <Show when={editingUser()}>
+              <Checkbox
+                label="User is active"
+                description="Inactive users keep their record but cannot route traffic."
+                checked={form().is_active}
+                onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
+              />
+            </Show>
+          </form>
+        </FormDialog>
 
-        {showModal() && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'z-index': 1000 }}>
-            <div style={{ background: 'white', padding: '30px', 'border-radius': '8px', width: '400px' }}>
-              <h3 style={{ margin: '0 0 20px 0' }}>Add New User</h3>
-              <form onSubmit={handleSubmit}>
-                <div style={{ 'margin-bottom': '15px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Name *</label>
-                  <input
-                    type="text"
-                    value={formData().name}
-                    onInput={(e) => setFormData({ ...formData(), name: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px', 'box-sizing': 'border-box' }}
-                    required
-                  />
+        <ConfirmDialog
+          open={confirmOpen()}
+          onOpenChange={setConfirmOpen}
+          title="Delete user"
+          description="This removes the user record and invalidates the current API key."
+          confirmLabel="Delete User"
+          tone="danger"
+          busy={submitting()}
+          details={
+            <Show when={pendingDeleteUser()}>
+              {(user) => (
+                <div class="meta-cluster">
+                  <span class="meta-key">Name</span>
+                  <span class="meta-value">{user().name}</span>
+                  <span class="meta-key">API Key</span>
+                  <span class="meta-value">{user().api_key}</span>
                 </div>
-                <div style={{ 'margin-bottom': '20px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Email</label>
-                  <input
-                    type="email"
-                    value={formData().email}
-                    onInput={(e) => setFormData({ ...formData(), email: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px', 'box-sizing': 'border-box' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '10px', 'justify-content': 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    Create
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {editingUser() && (
-          <EditModal
-            isOpen={!!editingUser()}
-            onClose={() => setEditingUser(null)}
-            onSubmit={handleUpdate}
-            title="Edit User"
-            fields={[
-              { name: 'name', label: 'Name', type: 'text', required: true },
-              { name: 'email', label: 'Email', type: 'email', required: false },
-              { name: 'is_active', label: 'Active', type: 'checkbox', required: false },
-            ]}
-            initialValues={{
-              name: editingUser()!.name,
-              email: editingUser()!.email || '',
-              is_active: editingUser()!.is_active,
-            }}
-          />
-        )}
+              )}
+            </Show>
+          }
+          onConfirm={() => void handleDelete()}
+        />
       </div>
     </Layout>
   );

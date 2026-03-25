@@ -1,107 +1,99 @@
-import { Component, createResource, For } from 'solid-js';
+import { createResource, type Component } from 'solid-js';
 import { api } from '../api/client';
-import type { RequestLog, UsageStats, BackendMetrics } from '../types';
 import { Layout } from '../components/Layout';
+import { DataGrid, EmptyState, MetaCluster, PageHeader, Panel, StatusBadge, SummaryStrip } from '../ui';
 
 export const Analytics: Component = () => {
   const [requests] = createResource(() => api.analytics.getRequests(50));
   const [usage] = createResource(() => api.analytics.getUsage(undefined, undefined, 7));
   const [metrics] = createResource(() => api.analytics.getMetrics(undefined, 7));
 
+  const requestRows = () => requests() ?? [];
+  const usageRows = () => usage() ?? [];
+  const metricRows = () => metrics() ?? [];
+
   return (
     <Layout>
-      <div style={{ padding: '30px' }}>
-        <h2 style={{ margin: '0 0 20px 0' }}>Analytics</h2>
+      <div class="ui-app-page">
+        <PageHeader
+          title="Analytics"
+          description="Panel-based operational analytics for request logs, usage totals, and backend performance."
+        />
 
-        <div style={{ display: 'grid', 'grid-template-columns': 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', 'margin-bottom': '30px' }}>
-          <div style={{ background: 'white', padding: '20px', 'border-radius': '8px', 'box-shadow': '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 15px 0', 'font-size': '0.9rem', color: '#64748b' }}>Recent Requests</h3>
-            <div style={{ 'max-height': '300px', overflow: 'auto' }}>
-              {requests.loading ? (
-                <p>Loading...</p>
-              ) : (
-                <table style={{ width: '100%', 'font-size': '0.85rem' }}>
-                  <thead>
-                    <tr style={{ 'border-bottom': '2px solid #e2e8f0' }}>
-                      <th style={{ 'text-align': 'left', padding: '8px' }}>User</th>
-                      <th style={{ 'text-align': 'left', padding: '8px' }}>Tokens</th>
-                      <th style={{ 'text-align': 'left', padding: '8px' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={requests()}>{(req) => (
-                      <tr style={{ 'border-bottom': '1px solid #e2e8f0' }}>
-                        <td style={{ padding: '8px' }}>{req.user_id}</td>
-                        <td style={{ padding: '8px' }}>{req.total_tokens || 0}</td>
-                        <td style={{ padding: '8px', color: req.status_code >= 400 ? '#ef4444' : '#22c55e' }}>{req.status_code}</td>
-                      </tr>
-                    )}</For>
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
+        <SummaryStrip
+          items={[
+            { label: 'Recent Requests', value: requestRows().length, hint: 'Loaded log rows' },
+            { label: 'Usage Windows', value: usageRows().length, hint: 'Daily aggregates for the last 7 days' },
+            { label: 'Metric Windows', value: metricRows().length, hint: 'Backend performance snapshots' },
+          ]}
+        />
 
-          <div style={{ background: 'white', padding: '20px', 'border-radius': '8px', 'box-shadow': '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 15px 0', 'font-size': '0.9rem', color: '#64748b' }}>Usage Stats (7 days)</h3>
-            <div style={{ 'max-height': '300px', overflow: 'auto' }}>
-              {usage.loading ? (
-                <p>Loading...</p>
-              ) : (
-                <table style={{ width: '100%', 'font-size': '0.85rem' }}>
-                  <thead>
-                    <tr style={{ 'border-bottom': '2px solid #e2e8f0' }}>
-                      <th style={{ 'text-align': 'left', padding: '8px' }}>Date</th>
-                      <th style={{ 'text-align': 'left', padding: '8px' }}>Requests</th>
-                      <th style={{ 'text-align': 'left', padding: '8px' }}>Tokens</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={usage()}>{(stat) => (
-                      <tr style={{ 'border-bottom': '1px solid #e2e8f0' }}>
-                        <td style={{ padding: '8px' }}>{stat.date}</td>
-                        <td style={{ padding: '8px' }}>{stat.total_requests}</td>
-                        <td style={{ padding: '8px' }}>{stat.total_tokens}</td>
-                      </tr>
-                    )}</For>
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
+        <div class="ui-section-grid">
+          <Panel title="Recent Requests" description="Latest request outcomes and token volume.">
+            <DataGrid
+              rows={requestRows()}
+              columns={[
+                { id: 'user', header: 'User', mono: true, cell: (row) => <span>{row.user_id}</span> },
+                { id: 'tokens', header: 'Tokens', mono: true, cell: (row) => <span>{row.total_tokens || 0}</span> },
+                {
+                  id: 'status',
+                  header: 'Status',
+                cell: (row) => <StatusBadge tone={row.status_code >= 400 ? 'danger' : 'success'}>{String(row.status_code)}</StatusBadge>,
+                },
+              ]}
+              getRowKey={(row) => row.id}
+              loading={requests.loading}
+              emptyMessage="No request analytics available."
+            />
+          </Panel>
+
+          <Panel title="Usage Stats" description="Daily request and token totals for the last 7 days.">
+            <DataGrid
+              rows={usageRows()}
+              columns={[
+                { id: 'date', header: 'Date', cell: (row) => <span>{row.date}</span> },
+                { id: 'requests', header: 'Requests', mono: true, cell: (row) => <span>{row.total_requests}</span> },
+                { id: 'tokens', header: 'Tokens', mono: true, cell: (row) => <span>{row.total_tokens}</span> },
+              ]}
+              getRowKey={(row) => `${row.user_id}-${row.backend_id}-${row.date}`}
+              loading={usage.loading}
+              emptyMessage="No usage data available."
+            />
+          </Panel>
         </div>
 
-        <div style={{ background: 'white', padding: '20px', 'border-radius': '8px', 'box-shadow': '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h3 style={{ margin: '0 0 15px 0', 'font-size': '0.9rem', color: '#64748b' }}>Backend Metrics (7 days)</h3>
-          <div style={{ 'max-height': '300px', overflow: 'auto' }}>
-            {metrics.loading ? (
-              <p>Loading...</p>
-            ) : (
-              <table style={{ width: '100%', 'font-size': '0.85rem' }}>
-                <thead>
-                  <tr style={{ 'border-bottom': '2px solid #e2e8f0' }}>
-                    <th style={{ 'text-align': 'left', padding: '8px' }}>Date</th>
-                    <th style={{ 'text-align': 'left', padding: '8px' }}>Backend</th>
-                    <th style={{ 'text-align': 'left', padding: '8px' }}>Requests</th>
-                    <th style={{ 'text-align': 'left', padding: '8px' }}>Avg Response (ms)</th>
-                    <th style={{ 'text-align': 'left', padding: '8px' }}>Success Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={metrics()}>{(metric) => (
-                    <tr style={{ 'border-bottom': '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '8px' }}>{metric.date}</td>
-                      <td style={{ padding: '8px' }}>{metric.backend_id}</td>
-                      <td style={{ padding: '8px' }}>{metric.total_requests}</td>
-                      <td style={{ padding: '8px' }}>{metric.avg_response_time_ms?.toFixed(1) || 0}</td>
-                      <td style={{ padding: '8px' }}>{(metric.success_rate * 100).toFixed(1)}%</td>
-                    </tr>
-                  )}</For>
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+        <Panel title="Backend Metrics" description="Response quality and performance windows per backend.">
+          <MetaCluster
+            items={[
+              { key: 'Window', value: 'Last 7 days' },
+              { key: 'Grouping', value: 'Per backend / per date' },
+            ]}
+          />
+          <DataGrid
+            rows={metricRows()}
+            columns={[
+              { id: 'date', header: 'Date', cell: (row) => <span>{row.date}</span> },
+              { id: 'backend', header: 'Backend', mono: true, cell: (row) => <span>{row.backend_id}</span> },
+              { id: 'requests', header: 'Requests', mono: true, cell: (row) => <span>{row.total_requests}</span> },
+              { id: 'latency', header: 'Avg Response', mono: true, cell: (row) => <span>{row.avg_response_time_ms?.toFixed(1) || 0}ms</span> },
+              {
+                id: 'success_rate',
+                header: 'Success Rate',
+                cell: (row) => (
+                  <StatusBadge tone={row.success_rate >= 0.95 ? 'success' : row.success_rate >= 0.8 ? 'warning' : 'danger'}>
+                    {`${(row.success_rate * 100).toFixed(1)}%`}
+                  </StatusBadge>
+                ),
+              },
+            ]}
+            getRowKey={(row) => `${row.backend_id}-${row.date}`}
+            loading={metrics.loading}
+            emptyMessage="No backend metrics available."
+          />
+          {!metrics.loading && metricRows().length === 0 && (
+            <EmptyState title="No metrics yet" description="Backend performance data will appear after requests have been logged." />
+          )}
+        </Panel>
       </div>
     </Layout>
   );

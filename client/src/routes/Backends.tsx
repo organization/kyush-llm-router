@@ -1,183 +1,224 @@
-import { Component, createResource, For, createSignal } from 'solid-js';
+import { createResource, createSignal, Show, type Component } from 'solid-js';
 import { api } from '../api/client';
-import type { Backend } from '../types';
 import { Layout } from '../components/Layout';
-import { EditModal } from '../components/EditModal';
+import type { Backend } from '../types';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  DataGrid,
+  EmptyState,
+  FormDialog,
+  PageHeader,
+  Panel,
+  StatusBadge,
+  TextField,
+} from '../ui';
+
+interface BackendFormState {
+  name: string;
+  base_url: string;
+  api_key: string;
+  is_active: boolean;
+}
+
+const emptyForm = (): BackendFormState => ({
+  name: '',
+  base_url: '',
+  api_key: '',
+  is_active: true,
+});
 
 export const Backends: Component = () => {
   const [backends, { refetch }] = createResource(() => api.backends.getAll());
-  const [showModal, setShowModal] = createSignal(false);
-  const [formData, setFormData] = createSignal({ name: '', base_url: '', api_key: '' });
+  const [dialogOpen, setDialogOpen] = createSignal(false);
+  const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [editingBackend, setEditingBackend] = createSignal<Backend | null>(null);
+  const [pendingDeleteBackend, setPendingDeleteBackend] = createSignal<Backend | null>(null);
+  const [form, setForm] = createSignal<BackendFormState>(emptyForm());
+  const [submitting, setSubmitting] = createSignal(false);
+  const [notice, setNotice] = createSignal<{ tone: 'success' | 'danger'; message: string } | null>(null);
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    const { name, base_url, api_key } = formData();
-    if (!name.trim() || !base_url.trim()) return;
-
-    await api.backends.create({ name: name.trim(), base_url: base_url.trim(), api_key: api_key.trim() || undefined });
-    setFormData({ name: '', base_url: '', api_key: '' });
-    setShowModal(false);
-    refetch();
-  };
-
-  const handleDelete = async (backendId: number) => {
-    if (!confirm('Are you sure you want to delete this backend?')) return;
-    await api.backends.delete(backendId);
-    refetch();
-  };
-
-  const handleEdit = (backend: Backend) => {
-    setEditingBackend(backend);
-  };
-
-  const handleUpdate = async (data: Record<string, any>) => {
-    if (!editingBackend()) return;
-    
-    if (!confirm('Are you sure you want to update this backend?')) return;
-
-    const updateData: Partial<Backend> = {};
-    if (data.name) updateData.name = data.name.trim();
-    if (data.base_url) updateData.base_url = data.base_url.trim();
-    if (data.api_key !== undefined) updateData.api_key = data.api_key.trim() || undefined;
-    if (data.is_active !== undefined) updateData.is_active = data.is_active;
-
-    await api.backends.update(editingBackend()!.id, updateData);
+  const openCreateDialog = () => {
     setEditingBackend(null);
-    refetch();
+    setForm(emptyForm());
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (backend: Backend) => {
+    setEditingBackend(backend);
+    setForm({
+      name: backend.name,
+      base_url: backend.base_url,
+      api_key: backend.api_key ?? '',
+      is_active: backend.is_active,
+    });
+    setDialogOpen(true);
+  };
+
+  const saveBackend = async (event: Event) => {
+    event.preventDefault();
+    const current = form();
+
+    if (!current.name.trim() || !current.base_url.trim()) {
+      setNotice({ tone: 'danger', message: 'Name and base URL are required.' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (editingBackend()) {
+        await api.backends.update(editingBackend()!.id, {
+          name: current.name.trim(),
+          base_url: current.base_url.trim(),
+          api_key: current.api_key.trim() || undefined,
+          is_active: current.is_active,
+        });
+        setNotice({ tone: 'success', message: 'Backend updated.' });
+      } else {
+        await api.backends.create({
+          name: current.name.trim(),
+          base_url: current.base_url.trim(),
+          api_key: current.api_key.trim() || undefined,
+        });
+        setNotice({ tone: 'success', message: 'Backend created.' });
+      }
+      setDialogOpen(false);
+      setEditingBackend(null);
+      setForm(emptyForm());
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Backend save failed.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const requestDelete = (backend: Backend) => {
+    setPendingDeleteBackend(backend);
+    setConfirmOpen(true);
+  };
+
+  const deleteBackend = async () => {
+    const backend = pendingDeleteBackend();
+    if (!backend) return;
+
+    setSubmitting(true);
+    try {
+      await api.backends.delete(backend.id);
+      setNotice({ tone: 'success', message: `${backend.name} deleted.` });
+      setConfirmOpen(false);
+      setPendingDeleteBackend(null);
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Backend deletion failed.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Layout>
-      <div style={{ padding: '30px' }}>
-        <div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'center', 'margin-bottom': '20px' }}>
-          <h2 style={{ margin: 0 }}>Backends</h2>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '6px', cursor: 'pointer' }}
+      <div class="ui-app-page">
+        <PageHeader
+          title="Backends"
+          description="Register upstream LLM targets, connection URLs, and activation state for routing."
+          actions={<Button variant="primary" onClick={openCreateDialog}>Add Backend</Button>}
+        />
+
+        <Show when={notice()}>
+          {(currentNotice) => <Alert tone={currentNotice().tone}>{currentNotice().message}</Alert>}
+        </Show>
+
+        <Panel title="Backend catalog" description="Operational list with overflow-safe URL presentation and compact actions.">
+          <Show
+            when={!backends.loading || (backends()?.length ?? 0) > 0}
+            fallback={<EmptyState title="Loading backends" description="Reading upstream routing targets from the admin API." />}
           >
-            Add Backend
-          </button>
-        </div>
+            <Show
+              when={(backends()?.length ?? 0) > 0}
+              fallback={<EmptyState title="No backends yet" description="Add a backend before granting permissions or routing requests." action={<Button variant="primary" onClick={openCreateDialog}>Add Backend</Button>} />}
+            >
+              <DataGrid
+                rows={backends() ?? []}
+                columns={[
+                  { id: 'id', header: 'ID', mono: true, cell: (backend) => <span>{backend.id}</span> },
+                  { id: 'name', header: 'Name', cell: (backend) => <span>{backend.name}</span> },
+                  {
+                    id: 'base_url',
+                    header: 'Base URL',
+                    class: 'ui-text-mono',
+                    cell: (backend) => <span title={backend.base_url}>{backend.base_url}</span>,
+                  },
+                  {
+                    id: 'status',
+                    header: 'Status',
+                    cell: (backend) => <StatusBadge tone={backend.is_active ? 'success' : 'warning'}>{backend.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
+                  },
+                ]}
+                getRowKey={(backend) => backend.id}
+                loading={backends.loading}
+                rowActions={(backend) => (
+                  <div class="ui-row-actions">
+                    <Button onClick={() => openEditDialog(backend)}>Edit</Button>
+                    <Button variant="danger" onClick={() => requestDelete(backend)}>Delete</Button>
+                  </div>
+                )}
+              />
+            </Show>
+          </Show>
+        </Panel>
 
-        {backends.loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table style={{ width: '100%', 'border-collapse': 'collapse', background: 'white', 'border-radius': '8px', overflow: 'hidden', 'box-shadow': '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <thead style={{ background: '#f8fafc' }}>
-              <tr>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>ID</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Name</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Base URL</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Status</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={backends()}>{(backend) => (
-                <tr style={{ 'border-bottom': '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '12px' }}>{backend.id}</td>
-                  <td style={{ padding: '12px' }}>{backend.name}</td>
-                  <td style={{ padding: '12px', 'font-family': 'monospace', 'font-size': '0.85rem' }}>{backend.base_url}</td>
-                  <td style={{ padding: '12px', color: backend.is_active ? '#22c55e' : '#ef4444' }}>
-                    {backend.is_active ? 'Active' : 'Inactive'}
-                  </td>
-                   <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
-                     <button
-                       onClick={() => handleEdit(backend)}
-                       style={{ padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                     >
-                       Edit
-                     </button>
-                     <button
-                       onClick={() => handleDelete(backend.id)}
-                       style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                     >
-                       Delete
-                     </button>
-                   </td>
-                </tr>
-              )}</For>
-            </tbody>
-          </table>
-        )}
+        <FormDialog
+          open={dialogOpen()}
+          onOpenChange={setDialogOpen}
+          title={editingBackend() ? 'Edit Backend' : 'Add Backend'}
+          description="Compact backend form with URL and optional credential fields."
+          footer={
+            <>
+              <Button onClick={() => setDialogOpen(false)} disabled={submitting()}>Cancel</Button>
+              <Button type="submit" form="backend-form" variant="primary" disabled={submitting()}>
+                {editingBackend() ? 'Save Changes' : 'Create Backend'}
+              </Button>
+            </>
+          }
+        >
+          <form id="backend-form" class="ui-form" onSubmit={(event) => void saveBackend(event)}>
+            <TextField label="Name" value={form().name} onInput={(event) => setForm((current) => ({ ...current, name: event.currentTarget.value }))} />
+            <TextField
+              label="Base URL"
+              value={form().base_url}
+              placeholder="https://api.openai.com/v1"
+              onInput={(event) => setForm((current) => ({ ...current, base_url: event.currentTarget.value }))}
+            />
+            <TextField
+              label="API Key"
+              value={form().api_key}
+              placeholder="Optional upstream API key"
+              onInput={(event) => setForm((current) => ({ ...current, api_key: event.currentTarget.value }))}
+            />
+            <Show when={editingBackend()}>
+              <Checkbox
+                label="Backend is active"
+                description="Inactive backends stay configured but are not selected for routing."
+                checked={form().is_active}
+                onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
+              />
+            </Show>
+          </form>
+        </FormDialog>
 
-        {showModal() && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'z-index': 1000 }}>
-            <div style={{ background: 'white', padding: '30px', 'border-radius': '8px', width: '500px' }}>
-              <h3 style={{ margin: '0 0 20px 0' }}>Add New Backend</h3>
-              <form onSubmit={handleSubmit}>
-                <div style={{ 'margin-bottom': '15px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Name *</label>
-                  <input
-                    type="text"
-                    value={formData().name}
-                    onInput={(e) => setFormData({ ...formData(), name: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px', 'box-sizing': 'border-box' }}
-                    required
-                  />
-                </div>
-                <div style={{ 'margin-bottom': '15px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Base URL *</label>
-                  <input
-                    type="text"
-                    value={formData().base_url}
-                    onInput={(e) => setFormData({ ...formData(), base_url: e.target.value })}
-                    placeholder="http://localhost:8000/v1"
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px', 'box-sizing': 'border-box' }}
-                    required
-                  />
-                </div>
-                <div style={{ 'margin-bottom': '20px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>API Key (optional)</label>
-                  <input
-                    type="text"
-                    value={formData().api_key}
-                    onInput={(e) => setFormData({ ...formData(), api_key: e.target.value })}
-                    placeholder="Backend API key if required"
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px', 'box-sizing': 'border-box' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '10px', 'justify-content': 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    Create
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {editingBackend() && (
-          <EditModal
-            isOpen={!!editingBackend()}
-            onClose={() => setEditingBackend(null)}
-            onSubmit={handleUpdate}
-            title="Edit Backend"
-            fields={[
-              { name: 'name', label: 'Name', type: 'text', required: true },
-              { name: 'base_url', label: 'Base URL', type: 'text', required: true },
-              { name: 'api_key', label: 'API Key', type: 'text', required: false },
-              { name: 'is_active', label: 'Active', type: 'checkbox', required: false },
-            ]}
-            initialValues={{
-              name: editingBackend()!.name,
-              base_url: editingBackend()!.base_url,
-              api_key: editingBackend()!.api_key || '',
-              is_active: editingBackend()!.is_active,
-            }}
-          />
-        )}
+        <ConfirmDialog
+          open={confirmOpen()}
+          onOpenChange={setConfirmOpen}
+          title="Delete backend"
+          description="Deleting a backend removes it from routing and any dependent permission mapping."
+          confirmLabel="Delete Backend"
+          tone="danger"
+          busy={submitting()}
+          onConfirm={() => void deleteBackend()}
+        />
       </div>
     </Layout>
   );

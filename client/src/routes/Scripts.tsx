@@ -1,134 +1,235 @@
-import { Component, createResource, For, createSignal } from 'solid-js';
+import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
 import { api } from '../api/client';
-import type { UserScript, ScriptType } from '../types';
 import { Layout } from '../components/Layout';
 import { ScriptEditor } from '../components/ScriptEditor';
+import type { ScriptType, UserScript } from '../types';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  CommandBar,
+  CommandBarGroup,
+  ConfirmDialog,
+  DataGrid,
+  EmptyState,
+  MetaCluster,
+  PageHeader,
+  Panel,
+  Select,
+  StatusBadge,
+  SummaryStrip,
+  Tabs,
+  TextField,
+} from '../ui';
+
+type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
+
+interface ScriptFormState {
+  id?: number;
+  name: string;
+  script_type: ScriptType;
+  target_user_id: string;
+  target_backend_id: string;
+  script_code: string;
+  is_active: boolean;
+}
+
+const defaultCode = `export async function onRequest(ctx) {
+  return ctx;
+}
+
+export async function onResponse(ctx) {
+  return ctx;
+}
+`;
+
+const emptyForm = (): ScriptFormState => ({
+  name: '',
+  script_type: 'per-user-backend',
+  target_user_id: '',
+  target_backend_id: '',
+  script_code: defaultCode,
+  is_active: true,
+});
+
+const scriptTypeLabels: Record<ScriptType, string> = {
+  'per-user-backend': 'Per User + Backend',
+  'per-backend': 'Per Backend',
+  'per-user': 'Per User',
+};
 
 export const Scripts: Component = () => {
   const [scripts, { refetch: refetchScripts }] = createResource(() => api.scripts.getAll());
   const [users, { refetch: refetchUsers }] = createResource(() => api.users.getAll());
   const [backends, { refetch: refetchBackends }] = createResource(() => api.backends.getAll());
-  const [showModal, setShowModal] = createSignal(false);
-  const [editingScript, setEditingScript] = createSignal<UserScript | null>(null);
-  const [formData, setFormData] = createSignal({
-    name: '',
-    script_type: 'per-user-backend' as ScriptType,
-    target_user_id: '',
-    target_backend_id: '',
-    script_code: '',
-    is_active: true,
-  });
-  const [showTestModal, setShowTestModal] = createSignal(false);
-  const [testScript, setTestScript] = createSignal<UserScript | null>(null);
+  const [form, setForm] = createSignal<ScriptFormState>(emptyForm());
+  const [selectedScriptId, setSelectedScriptId] = createSignal<number | null>(null);
+  const [pendingDeleteScript, setPendingDeleteScript] = createSignal<UserScript | null>(null);
+  const [confirmOpen, setConfirmOpen] = createSignal(false);
+  const [submitting, setSubmitting] = createSignal(false);
+  const [notice, setNotice] = createSignal<{ tone: NoticeTone; message: string } | null>(null);
   const [testResult, setTestResult] = createSignal<{ success: boolean; error?: string; executionTime?: number } | null>(null);
+  const [testing, setTesting] = createSignal(false);
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      script_type: 'per-user-backend',
-      target_user_id: '',
-      target_backend_id: '',
-      script_code: '',
-      is_active: true,
-    });
-    setEditingScript(null);
-  };
+  const userOptions = createMemo(() => (users() ?? []).map((user) => ({ value: String(user.id), label: user.name })));
+  const backendOptions = createMemo(() => (backends() ?? []).map((backend) => ({ value: String(backend.id), label: backend.name })));
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    const data = formData();
-    
-    let targetUserId: number | null = null;
-    let targetBackendId: number | null = null;
+  const activeCount = createMemo(() => (scripts() ?? []).filter((script) => script.is_active).length);
+  const selectedScript = createMemo(() => (scripts() ?? []).find((script) => script.id === selectedScriptId()) ?? null);
 
-    if (data.script_type === 'per-user-backend') {
-      if (!data.target_user_id || !data.target_backend_id) {
-        alert('Please select both user and backend');
-        return;
-      }
-      targetUserId = Number(data.target_user_id);
-      targetBackendId = Number(data.target_backend_id);
-    } else if (data.script_type === 'per-backend') {
-      if (!data.target_backend_id) {
-        alert('Please select backend');
-        return;
-      }
-      targetBackendId = Number(data.target_backend_id);
-    } else if (data.script_type === 'per-user') {
-      if (!data.target_user_id) {
-        alert('Please select user');
-        return;
-      }
-      targetUserId = Number(data.target_user_id);
+  const syncForm = (script?: UserScript | null) => {
+    if (!script) {
+      setSelectedScriptId(null);
+      setForm(emptyForm());
+      setTestResult(null);
+      return;
     }
 
-    if (editingScript()) {
-      await api.scripts.update(editingScript()!.id, {
-        name: data.name,
-        script_type: data.script_type,
-        target_user_id: targetUserId,
-        target_backend_id: targetBackendId,
-        script_code: data.script_code,
-        is_active: data.is_active,
-      });
-    } else {
-      await api.scripts.create({
-        name: data.name,
-        script_type: data.script_type,
-        target_user_id: targetUserId,
-        target_backend_id: targetBackendId,
-        script_code: data.script_code,
-        is_active: data.is_active,
-      });
-    }
-
-    resetForm();
-    setShowModal(false);
-    refetchScripts();
-    refetchUsers();
-    refetchBackends();
-  };
-
-  const handleEdit = (script: UserScript) => {
-    setEditingScript(script);
-    setFormData({
+    setSelectedScriptId(script.id);
+    setForm({
+      id: script.id,
       name: script.name,
       script_type: script.script_type,
-      target_user_id: script.target_user_id?.toString() || '',
-      target_backend_id: script.target_backend_id?.toString() || '',
+      target_user_id: script.target_user_id ? String(script.target_user_id) : '',
+      target_backend_id: script.target_backend_id ? String(script.target_backend_id) : '',
       script_code: script.script_code,
       is_active: script.is_active,
     });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this script?')) return;
-    await api.scripts.delete(id);
-    refetchScripts();
-  };
-
-  const handleToggleActive = async (script: UserScript) => {
-    if (script.is_active) {
-      await api.scripts.deactivate(script.id);
-    } else {
-      await api.scripts.activate(script.id);
-    }
-    refetchScripts();
-  };
-
-  const handleTest = async (script: UserScript) => {
-    setTestScript(script);
     setTestResult(null);
-    setShowTestModal(true);
+  };
+
+  const getTargetLabel = (script: Pick<UserScript, 'script_type' | 'target_user_id' | 'target_backend_id'>) => {
+    const user = (users() ?? []).find((item) => item.id === script.target_user_id);
+    const backend = (backends() ?? []).find((item) => item.id === script.target_backend_id);
+
+    if (script.script_type === 'per-user-backend') {
+      return {
+        primary: `${user?.name ?? 'Unknown user'} + ${backend?.name ?? 'Unknown backend'}`,
+        secondary: `${script.target_user_id ?? '-'} / ${script.target_backend_id ?? '-'}`,
+      };
+    }
+
+    if (script.script_type === 'per-user') {
+      return {
+        primary: user?.name ?? 'Unknown user',
+        secondary: `User ${script.target_user_id ?? '-'}`,
+      };
+    }
+
+    return {
+      primary: backend?.name ?? 'Unknown backend',
+      secondary: `Backend ${script.target_backend_id ?? '-'}`,
+    };
+  };
+
+  const validateForm = () => {
+    const current = form();
+    if (!current.name.trim()) return 'Script name is required.';
+    if (!current.script_code.trim()) return 'Script code is required.';
+    if (current.script_type === 'per-user-backend' && (!current.target_user_id || !current.target_backend_id)) {
+      return 'Select both a target user and backend.';
+    }
+    if (current.script_type === 'per-user' && !current.target_user_id) {
+      return 'Select a target user.';
+    }
+    if (current.script_type === 'per-backend' && !current.target_backend_id) {
+      return 'Select a target backend.';
+    }
+    return null;
+  };
+
+  const saveScript = async () => {
+    const error = validateForm();
+    if (error) {
+      setNotice({ tone: 'danger', message: error });
+      return;
+    }
+
+    const current = form();
+    const payload = {
+      name: current.name.trim(),
+      script_type: current.script_type,
+      target_user_id: current.target_user_id ? Number(current.target_user_id) : null,
+      target_backend_id: current.target_backend_id ? Number(current.target_backend_id) : null,
+      script_code: current.script_code,
+      is_active: current.is_active,
+    };
+
+    setSubmitting(true);
+    try {
+      if (current.id) {
+        const updated = await api.scripts.update(current.id, payload);
+        setNotice({ tone: 'success', message: 'Script updated.' });
+        syncForm(updated);
+      } else {
+        const created = await api.scripts.create(payload);
+        setNotice({ tone: 'success', message: 'Script created.' });
+        syncForm(created);
+      }
+      await refetchScripts();
+      await refetchUsers();
+      await refetchBackends();
+    } catch (saveError) {
+      setNotice({ tone: 'danger', message: saveError instanceof Error ? saveError.message : 'Script save failed.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleActive = async (script: UserScript) => {
+    try {
+      if (script.is_active) {
+        await api.scripts.deactivate(script.id);
+      } else {
+        await api.scripts.activate(script.id);
+      }
+      setNotice({ tone: 'success', message: `${script.name} ${script.is_active ? 'deactivated' : 'activated'}.` });
+      await refetchScripts();
+      if (selectedScriptId() === script.id) {
+        syncForm({ ...script, is_active: !script.is_active });
+      }
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Status update failed.' });
+    }
+  };
+
+  const requestDelete = (script: UserScript) => {
+    setPendingDeleteScript(script);
+    setConfirmOpen(true);
+  };
+
+  const deleteScript = async () => {
+    const script = pendingDeleteScript();
+    if (!script) return;
+
+    setSubmitting(true);
+    try {
+      await api.scripts.delete(script.id);
+      setNotice({ tone: 'success', message: `${script.name} deleted.` });
+      setConfirmOpen(false);
+      setPendingDeleteScript(null);
+      if (selectedScriptId() === script.id) {
+        syncForm(null);
+      }
+      await refetchScripts();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Script deletion failed.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const runTest = async () => {
-    const script = testScript();
-    if (!script) return;
+    const current = selectedScript();
+    if (!current) {
+      setNotice({ tone: 'warning', message: 'Save the script before running a test.' });
+      return;
+    }
 
+    setTesting(true);
+    setTestResult(null);
     try {
-      const result = await api.scripts.test(script.id, {
+      const result = await api.scripts.test(current.id, {
         user: users()?.[0] || undefined,
         backend: backends()?.[0] || undefined,
         request: {
@@ -145,311 +246,227 @@ export const Scripts: Component = () => {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       });
-    }
-  };
-
-  const getScriptTypeLabel = (type: ScriptType) => {
-    switch (type) {
-      case 'per-user-backend': return 'Per User + Backend';
-      case 'per-backend': return 'Per Backend';
-      case 'per-user': return 'Per User';
-      default: return type;
+    } finally {
+      setTesting(false);
     }
   };
 
   return (
     <Layout>
-      <div style={{ padding: '30px' }}>
-        <div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'center', 'margin-bottom': '20px' }}>
-          <h2 style={{ margin: 0 }}>User Scripts</h2>
-          <button
-            onClick={() => { resetForm(); setShowModal(true); }}
-            style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '6px', cursor: 'pointer' }}
+      <div class="ui-app-page">
+        <PageHeader
+          title="Scripts"
+          description="Create and maintain request and response middleware with compact editing, metadata, and test feedback."
+        />
+
+        <SummaryStrip
+          items={[
+            { label: 'Total Scripts', value: scripts()?.length ?? 0, hint: 'All stored middleware entries' },
+            { label: 'Active', value: activeCount(), hint: 'Currently applied during routing' },
+            { label: 'Users', value: users()?.length ?? 0, hint: 'Available test context identities' },
+          ]}
+        />
+
+        <Show when={notice()}>
+          {(currentNotice) => (
+            <Alert tone={currentNotice().tone === 'danger' ? 'danger' : currentNotice().tone === 'warning' ? 'warning' : currentNotice().tone === 'success' ? 'success' : 'info'}>
+              {currentNotice().message}
+            </Alert>
+          )}
+        </Show>
+
+        <CommandBar>
+          <CommandBarGroup>
+            <StatusBadge tone="info">{scripts.loading ? 'Syncing' : 'Ready'}</StatusBadge>
+            <StatusBadge tone="success">{`${activeCount()} active`}</StatusBadge>
+          </CommandBarGroup>
+        </CommandBar>
+
+        <div class="ui-split-panel">
+          <Panel
+            title="Script registry"
+            description="Select a script to edit, test, or change activation state."
+            actions={<Button onClick={() => void refetchScripts()}>Refresh</Button>}
+            bodyClass="ui-stack ui-stack--tight"
           >
-            Create Script
-          </button>
+            <Show
+              when={!scripts.loading || (scripts()?.length ?? 0) > 0}
+              fallback={<EmptyState title="Loading scripts" description="Reading middleware definitions and target mappings." />}
+            >
+              <Show
+                when={(scripts()?.length ?? 0) > 0}
+                fallback={<EmptyState title="No scripts yet" description="Create your first middleware script to intercept requests or responses." action={<Button variant="primary" onClick={() => syncForm(null)}>Create Script</Button>} />}
+              >
+                <DataGrid
+                  rows={scripts() ?? []}
+                  columns={[
+                    {
+                      id: 'name',
+                      header: 'Name',
+                      cell: (script) => <span>{script.name}</span>,
+                    },
+                    {
+                      id: 'type',
+                      header: 'Type',
+                      cell: (script) => <StatusBadge tone="info">{scriptTypeLabels[script.script_type]}</StatusBadge>,
+                    },
+                    {
+                      id: 'target',
+                      header: 'Target',
+                      cell: (script) => {
+                        const target = getTargetLabel(script);
+                        return (
+                          <div class="script-target">
+                            <p class="script-target__primary">{target.primary}</p>
+                            <p class="script-target__secondary">{target.secondary}</p>
+                          </div>
+                        );
+                      },
+                    },
+                    {
+                      id: 'status',
+                      header: 'Status',
+                      cell: (script) => <StatusBadge tone={script.is_active ? 'success' : 'warning'}>{script.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
+                    },
+                  ]}
+                  getRowKey={(script) => script.id}
+                  loading={scripts.loading}
+                  onRowClick={(script) => syncForm(script)}
+                  rowActions={(script) => (
+                    <div class="ui-row-actions">
+                      <Button onClick={() => void toggleActive(script)}>{script.is_active ? 'Disable' : 'Enable'}</Button>
+                      <Button variant="danger" onClick={() => requestDelete(script)}>Delete</Button>
+                    </div>
+                  )}
+                />
+              </Show>
+            </Show>
+          </Panel>
+
+          <Panel
+            title={form().id ? `Editing ${form().name}` : 'New script draft'}
+            description="Use the dense form and editor tabs to maintain routing middleware without leaving the page."
+            actions={
+              <div class="ui-chip-group">
+                <StatusBadge tone={form().is_active ? 'success' : 'warning'}>{form().is_active ? 'Active' : 'Draft'}</StatusBadge>
+                <Button variant="primary" onClick={() => void saveScript()} disabled={submitting()}>
+                  {form().id ? 'Save Script' : 'Create Script'}
+                </Button>
+                <Button onClick={() => syncForm(null)}>New Script</Button>
+                <Button onClick={() => syncForm(selectedScript())}>Reset</Button>
+              </div>
+            }
+            bodyClass="ui-stack"
+          >
+            <div class="ui-form__section">
+              <TextField label="Script name" value={form().name} onInput={(event) => setForm((current) => ({ ...current, name: event.currentTarget.value }))} />
+
+              <Select
+                label="Scope"
+                value={form().script_type}
+                onChange={(value) => setForm((current) => ({ ...current, script_type: value as ScriptType, target_user_id: '', target_backend_id: '' }))}
+                options={[
+                  { value: 'per-user-backend', label: scriptTypeLabels['per-user-backend'] },
+                  { value: 'per-user', label: scriptTypeLabels['per-user'] },
+                  { value: 'per-backend', label: scriptTypeLabels['per-backend'] },
+                ]}
+              />
+
+              <Show when={form().script_type !== 'per-backend'}>
+                <Select
+                  label="Target user"
+                  value={form().target_user_id}
+                  onChange={(value) => setForm((current) => ({ ...current, target_user_id: value }))}
+                  options={userOptions()}
+                  placeholder="Select user"
+                />
+              </Show>
+
+              <Show when={form().script_type !== 'per-user'}>
+                <Select
+                  label="Target backend"
+                  value={form().target_backend_id}
+                  onChange={(value) => setForm((current) => ({ ...current, target_backend_id: value }))}
+                  options={backendOptions()}
+                  placeholder="Select backend"
+                />
+              </Show>
+
+              <Checkbox
+                label="Script is active"
+                description="Inactive scripts remain editable but are skipped during routing."
+                checked={form().is_active}
+                onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
+              />
+            </div>
+
+            <MetaCluster
+              items={[
+                { key: 'Mode', value: form().id ? 'Saved script' : 'Unsaved draft' },
+                { key: 'User context', value: form().target_user_id || 'Not assigned' },
+                { key: 'Backend context', value: form().target_backend_id || 'Not assigned' },
+              ]}
+            />
+
+            <Tabs.Root defaultValue="editor">
+              <Tabs.List aria-label="Script workspace">
+                <Tabs.Trigger value="editor">Editor</Tabs.Trigger>
+                <Tabs.Trigger value="test">Test</Tabs.Trigger>
+              </Tabs.List>
+              <Tabs.Content value="editor">
+                <ScriptEditor
+                  value={form().script_code}
+                  path={form().id ? `inmemory://model/scripts/${form().id}.ts` : 'inmemory://model/scripts/draft.ts'}
+                  onChange={(value) => setForm((current) => ({ ...current, script_code: value }))}
+                />
+              </Tabs.Content>
+              <Tabs.Content value="test">
+                <div class="ui-stack">
+                  <p class="ui-copy">The test runner uses the first available user/backend as sample context and a mock chat completion request.</p>
+                  <div class="ui-row-actions">
+                    <Button variant="primary" onClick={() => void runTest()} disabled={testing()}>
+                      {testing() ? 'Running...' : 'Run Test'}
+                    </Button>
+                  </div>
+                  <Show
+                    when={testResult()}
+                    fallback={<EmptyState title="No test run yet" description="Save or select a script, then run the built-in test harness to inspect the result." />}
+                  >
+                    {(result) => (
+                      <Alert tone={result().success ? 'success' : 'danger'} title={result().success ? 'Test passed' : 'Test failed'}>
+                        {result().error ?? `Execution time: ${result().executionTime ?? 0}ms`}
+                      </Alert>
+                    )}
+                  </Show>
+                </div>
+              </Tabs.Content>
+            </Tabs.Root>
+          </Panel>
         </div>
 
-        <p style={{ color: '#64748b', 'margin-bottom': '20px' }}>
-          Create custom middleware scripts that run before requests are sent to backends (onRequest) 
-          and after responses are received (onResponse).
-        </p>
-
-        {scripts.loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table style={{ width: '100%', 'border-collapse': 'collapse', background: 'white', 'border-radius': '8px', overflow: 'hidden', 'box-shadow': '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <thead style={{ background: '#f8fafc' }}>
-              <tr>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Name</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Type</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Target</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Status</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Created At</th>
-                <th style={{ 'text-align': 'left', padding: '12px', 'border-bottom': '2px solid #e2e8f0' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={scripts()}>{(script) => {
-                const user = users()?.find(u => u.id === script.target_user_id);
-                const backend = backends()?.find(b => b.id === script.target_backend_id);
-
-                let targetText = '-';
-                if (script.script_type === 'per-user-backend') {
-                  targetText = `${user?.name || 'N/A'} + ${backend?.name || 'N/A'}`;
-                } else if (script.script_type === 'per-backend') {
-                  targetText = backend?.name || 'N/A';
-                } else if (script.script_type === 'per-user') {
-                  targetText = user?.name || 'N/A';
-                }
-
-                return (
-                  <tr style={{ 'border-bottom': '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '12px', 'font-weight': '500' }}>{script.name}</td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        background: script.script_type === 'per-user-backend' ? '#dbeafe' : script.script_type === 'per-backend' ? '#fef3c7' : '#d1fae5',
-                        color: script.script_type === 'per-user-backend' ? '#1e40af' : script.script_type === 'per-backend' ? '#92400e' : '#065f46',
-                        'border-radius': '4px',
-                        'font-size': '0.85rem'
-                      }}>
-                        {getScriptTypeLabel(script.script_type)}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px', color: '#64748b' }}>{targetText}</td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        background: script.is_active ? '#dcfce7' : '#fee2e2',
-                        color: script.is_active ? '#166534' : '#991b1b',
-                        'border-radius': '4px',
-                        'font-size': '0.85rem'
-                      }}>
-                        {script.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px' }}>{new Date(script.created_at).toLocaleString()}</td>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => handleTest(script)}
-                          style={{ padding: '4px 8px', background: '#8b5cf6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                        >
-                          Test
-                        </button>
-                        <button
-                          onClick={() => handleEdit(script)}
-                          style={{ padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleToggleActive(script)}
-                          style={{ padding: '4px 8px', background: script.is_active ? '#f59e0b' : '#10b981', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                        >
-                          {script.is_active ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(script.id)}
-                          style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer', 'font-size': '0.8rem' }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              }}</For>
-            </tbody>
-          </table>
-        )}
-
-        {showModal() && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'z-index': 1000 }}>
-            <div style={{ background: 'white', padding: '30px', 'border-radius': '8px', width: '800px', 'max-height': '90vh', overflow: 'auto' }}>
-              <h3 style={{ margin: '0 0 20px 0' }}>{editingScript() ? 'Edit Script' : 'Create Script'}</h3>
-              <form onSubmit={handleSubmit}>
-                <div style={{ 'margin-bottom': '15px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Name *</label>
-                  <input
-                    type="text"
-                    value={formData().name}
-                    onChange={(e) => setFormData({ ...formData(), name: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                    required
-                  />
-                </div>
-
-                <div style={{ 'margin-bottom': '15px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Script Type *</label>
-                  <select
-                    value={formData().script_type}
-                    onChange={(e) => setFormData({ ...formData(), script_type: e.target.value as ScriptType, target_user_id: '', target_backend_id: '' })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                    required
-                  >
-                    <option value="per-user-backend">Per User + Backend</option>
-                    <option value="per-backend">Per Backend</option>
-                    <option value="per-user">Per User</option>
-                  </select>
-                </div>
-
-                {formData().script_type === 'per-user-backend' && (
-                  <>
-                    <div style={{ 'margin-bottom': '15px' }}>
-                      <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Target User *</label>
-                      <select
-                        value={formData().target_user_id}
-                        onChange={(e) => setFormData({ ...formData(), target_user_id: e.target.value })}
-                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                        required
-                      >
-                        <option value="">Select a user</option>
-                        <For each={users()}>{(user) => (
-                          <option value={user.id}>{user.name}</option>
-                        )}</For>
-                      </select>
-                    </div>
-                    <div style={{ 'margin-bottom': '15px' }}>
-                      <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Target Backend *</label>
-                      <select
-                        value={formData().target_backend_id}
-                        onChange={(e) => setFormData({ ...formData(), target_backend_id: e.target.value })}
-                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                        required
-                      >
-                        <option value="">Select a backend</option>
-                        <For each={backends()}>{(backend) => (
-                          <option value={backend.id}>{backend.name}</option>
-                        )}</For>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {formData().script_type === 'per-backend' && (
-                  <div style={{ 'margin-bottom': '15px' }}>
-                    <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Target Backend *</label>
-                    <select
-                      value={formData().target_backend_id}
-                      onChange={(e) => setFormData({ ...formData(), target_backend_id: e.target.value })}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                      required
-                    >
-                      <option value="">Select a backend</option>
-                      <For each={backends()}>{(backend) => (
-                        <option value={backend.id}>{backend.name}</option>
-                      )}</For>
-                    </select>
-                  </div>
-                )}
-
-                {formData().script_type === 'per-user' && (
-                  <div style={{ 'margin-bottom': '15px' }}>
-                    <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Target User *</label>
-                    <select
-                      value={formData().target_user_id}
-                      onChange={(e) => setFormData({ ...formData(), target_user_id: e.target.value })}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px' }}
-                      required
-                    >
-                      <option value="">Select a user</option>
-                      <For each={users()}>{(user) => (
-                        <option value={user.id}>{user.name}</option>
-                      )}</For>
-                    </select>
-                  </div>
-                )}
-
-                <div style={{ 'margin-bottom': '15px' }}>
-                  <label style={{ display: 'block', 'margin-bottom': '5px', 'font-weight': 'bold' }}>Script Code *</label>
-                  <ScriptEditor
-                    value={formData().script_code}
-                    onChange={(value) => setFormData({ ...formData(), script_code: value })}
-                  />
-                </div>
-
-                <div style={{ 'margin-bottom': '20px' }}>
-                  <label style={{ display: 'flex', 'align-items': 'center', gap: '8px' }}>
-                    <input
-                      type="checkbox"
-                      checked={formData().is_active}
-                      onChange={(e) => setFormData({ ...formData(), is_active: e.target.checked })}
-                    />
-                    <span style={{ 'font-weight': 'bold' }}>Active</span>
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', 'justify-content': 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => { setShowModal(false); resetForm(); }}
-                    style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                  >
-                    {editingScript() ? 'Update' : 'Create'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {showTestModal() && testScript() && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'z-index': 1000 }}>
-            <div style={{ background: 'white', padding: '30px', 'border-radius': '8px', width: '600px' }}>
-              <h3 style={{ margin: '0 0 20px 0' }}>Test Script: {testScript()?.name}</h3>
-              
-              <div style={{ 'margin-bottom': '20px', padding: '15px', background: '#f8fafc', 'border-radius': '4px' }}>
-                <p style={{ margin: '0 0 10px 0', 'font-weight': 'bold' }}>Test Context:</p>
-                <p style={{ margin: 0, 'font-size': '0.9rem', color: '#64748b' }}>
-                  User: {users()?.[0]?.name || 'N/A'} | Backend: {backends()?.[0]?.name || 'N/A'}
-                </p>
-              </div>
-
-              {testResult() && (
-                <div style={{
-                  'margin-bottom': '20px',
-                  padding: '15px',
-                  background: testResult()!.success ? '#dcfce7' : '#fee2e2',
-                  'border-radius': '4px',
-                  color: testResult()!.success ? '#166534' : '#991b1b'
-                }}>
-                  <p style={{ margin: '0 0 5px 0', 'font-weight': 'bold' }}>
-                    {testResult()!.success ? '✓ Success' : '✗ Failed'}
-                  </p>
-                  {testResult()!.error && <p style={{ margin: 0, 'font-size': '0.9rem' }}>{testResult()!.error}</p>}
-                  {testResult()!.executionTime && (
-                    <p style={{ margin: '5px 0 0 0', 'font-size': '0.85rem' }}>
-                      Execution time: {testResult()!.executionTime}ms
-                    </p>
-                  )}
-                </div>
+        <ConfirmDialog
+          open={confirmOpen()}
+          onOpenChange={setConfirmOpen}
+          title="Delete script"
+          description="This permanently removes the middleware definition and its current target binding."
+          confirmLabel="Delete Script"
+          tone="danger"
+          busy={submitting()}
+          details={
+            <Show when={pendingDeleteScript()}>
+              {(script) => (
+                <MetaCluster
+                  items={[
+                    { key: 'Name', value: script().name },
+                    { key: 'Type', value: scriptTypeLabels[script().script_type] },
+                    { key: 'Target', value: getTargetLabel(script()).primary },
+                  ]}
+                />
               )}
-
-              <div style={{ display: 'flex', gap: '10px', 'justify-content': 'flex-end' }}>
-                <button
-                  onClick={() => { setShowTestModal(false); setTestResult(null); }}
-                  style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                >
-                  Close
-                </button>
-                <button
-                  onClick={runTest}
-                  style={{ padding: '8px 16px', background: '#8b5cf6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-                >
-                  Run Test
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            </Show>
+          }
+          onConfirm={() => void deleteScript()}
+        />
       </div>
     </Layout>
   );

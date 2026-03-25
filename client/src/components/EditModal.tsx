@@ -1,4 +1,5 @@
-import { Component, For, createSignal } from 'solid-js';
+import { For, createSignal, type Component } from 'solid-js';
+import { Button, Checkbox, FormDialog, TextField } from '../ui';
 
 type FieldType = 'text' | 'email' | 'checkbox';
 
@@ -13,85 +14,80 @@ interface FieldConfig {
 interface EditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Record<string, any>) => Promise<void>;
+  onSubmit: (data: Record<string, unknown>) => Promise<void>;
   title: string;
   fields: FieldConfig[];
-  initialValues: Record<string, any>;
+  initialValues: Record<string, unknown>;
 }
 
 export const EditModal: Component<EditModalProps> = (props) => {
   const [formData, setFormData] = createSignal(props.initialValues);
+  const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
+  const [submitting, setSubmitting] = createSignal(false);
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
+  const handleSubmit = async (event: Event) => {
+    event.preventDefault();
     const data = formData();
 
     for (const field of props.fields) {
       if (field.required && !data[field.name]) {
-        alert(`${field.label} is required`);
+        setErrorMessage(`${field.label} is required.`);
         return;
       }
     }
 
+    setErrorMessage(null);
+    setSubmitting(true);
     try {
       await props.onSubmit(data);
       props.onClose();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Update failed';
-      alert(message);
+      setErrorMessage(error instanceof Error ? error.message : 'Update failed.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (!props.isOpen) return null;
-
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'z-index': 1000 }}>
-      <div style={{ background: 'white', padding: '30px', 'border-radius': '8px', width: '400px' }}>
-        <h3 style={{ margin: '0 0 20px 0' }}>{props.title}</h3>
-        <form onSubmit={handleSubmit}>
-          <For each={props.fields}>{(field) => (
-            <div style={{ 'margin-bottom': field.type === 'checkbox' ? '20px' : '15px' }}>
-              <label style={{ display: field.type === 'checkbox' ? 'flex' : 'block', 'align-items': field.type === 'checkbox' ? 'center' : 'flex-start', gap: '8px', 'margin-bottom': field.type === 'checkbox' ? 0 : '5px', 'font-weight': 'bold' }}>
-                {field.type === 'checkbox' ? (
-                  <input
-                    type="checkbox"
-                    checked={formData()[field.name] || false}
-                    onChange={(e) => setFormData({ ...formData(), [field.name]: e.target.checked })}
-                    style={{ width: '18px', height: '18px' }}
-                  />
-                ) : null}
-                {field.label}
-                {field.required && <span style={{ color: 'red' }}>*</span>}
-              </label>
-              {field.type !== 'checkbox' && (
-                <input
-                  type={field.type}
-                  value={formData()[field.name] || ''}
-                  onInput={(e) => setFormData({ ...formData(), [field.name]: e.target.value })}
-                  placeholder={field.placeholder}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', 'border-radius': '4px', 'box-sizing': 'border-box' }}
-                  required={field.required}
-                />
-              )}
-            </div>
-          )}</For>
-          <div style={{ display: 'flex', gap: '10px', 'justify-content': 'flex-end' }}>
-            <button
-              type="button"
-              onClick={props.onClose}
-              style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', 'border-radius': '4px', cursor: 'pointer' }}
-            >
-              Update
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <FormDialog
+      open={props.isOpen}
+      onOpenChange={(open) => {
+        if (!open) props.onClose();
+      }}
+      title={props.title}
+      footer={
+        <>
+          <Button onClick={props.onClose} disabled={submitting()}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" form="legacy-edit-form" disabled={submitting()}>
+            Update
+          </Button>
+        </>
+      }
+      class="ui-dialog__content--compact"
+    >
+      <form id="legacy-edit-form" class="ui-form" onSubmit={(event) => void handleSubmit(event)}>
+        <For each={props.fields}>
+          {(field) =>
+            field.type === 'checkbox' ? (
+              <Checkbox
+                label={field.label}
+                checked={Boolean(formData()[field.name])}
+                onChange={(checked) => setFormData({ ...formData(), [field.name]: checked })}
+              />
+            ) : (
+              <TextField
+                label={field.label}
+                value={String(formData()[field.name] ?? '')}
+                placeholder={field.placeholder}
+                onInput={(event) => setFormData({ ...formData(), [field.name]: event.currentTarget.value })}
+              />
+            )
+          }
+        </For>
+        {errorMessage() && <p class="ui-field__error">{errorMessage()}</p>}
+      </form>
+    </FormDialog>
   );
 };

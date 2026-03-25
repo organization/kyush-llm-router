@@ -1,10 +1,13 @@
 import { MonacoEditor } from 'solid-monaco';
-import { createSignal, onMount } from 'solid-js';
+import { createSignal, onCleanup, onMount } from 'solid-js';
+
+const THEME_STORAGE_KEY = 'kyush-theme';
 
 interface ScriptEditorProps {
   value: string;
   onChange: (value: string) => void;
   readonly?: boolean;
+  path?: string;
 }
 
 export function ScriptEditor(props: ScriptEditorProps) {
@@ -19,6 +22,12 @@ export function ScriptEditor(props: ScriptEditorProps) {
 export async function onRequest(ctx) {
   // Example: Add custom header
   // ctx.request.headers['X-Custom-Header'] = 'value';
+
+  // Example: Edit body
+  // if (typeof ctx.request.body === 'object') {
+  //  if (typeof ctx.request.body['chat_template_kwargs'] !== 'object') {
+  //    ctx.request.body['chat_template_kwargs'] = {};
+  //  }
   
   // Example: Log request
   // console.log('Request:', ctx.request.method, ctx.request.path);
@@ -48,31 +57,46 @@ export async function onResponse(ctx) {
 }
 `;
 
-  const [editorValue, setEditorValue] = createSignal(props.value || defaultCode);
+  const [editorTheme, setEditorTheme] = createSignal<'vs' | 'vs-dark'>('vs-dark');
 
   onMount(() => {
-    if (props.value) {
-      setEditorValue(props.value);
-    }
+    const root = document.documentElement;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const syncTheme = () => {
+      const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+      const explicitTheme = root.dataset.theme;
+      const preferredTheme = storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : explicitTheme;
+      const isDark = preferredTheme ? preferredTheme === 'dark' : mediaQuery.matches;
+      setEditorTheme(isDark ? 'vs-dark' : 'vs');
+    };
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+
+    mediaQuery.addEventListener('change', syncTheme);
+    syncTheme();
+
+    onCleanup(() => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', syncTheme);
+    });
   });
 
-  const handleChange = (value: string) => {
-    setEditorValue(value);
-    props.onChange(value);
-  };
-
   return (
-    <div style={{ height: '600px', width: '100%' }}>
+    <div class="script-editor">
       <MonacoEditor
         language="typescript"
-        value={editorValue()}
-        onChange={handleChange}
-        theme="vs-dark"
+        value={props.value || defaultCode}
+        path={props.path}
+        onChange={(value) => props.onChange(value)}
+        theme={editorTheme()}
         options={{
           minimap: { enabled: false },
           fontSize: 14,
           wordWrap: 'on',
           automaticLayout: true,
+          readOnly: props.readonly,
           scrollBeyondLastLine: false,
           padding: { top: 16, bottom: 16 },
         }}
