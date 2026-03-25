@@ -15,7 +15,7 @@
     "openai",
     "proxy"
   ],
-  "author": "",
+  "author": "Kyush",
   "license": "MIT",
   "workspaces": [
     "server",

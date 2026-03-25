@@ -9,11 +9,11 @@ node_modules/
 dist/
 
 # Database files
-**/*.db
 data/*.db
+**/*.db
 
 # Agent Session log
 session-*.md
 
 # User defined
-memo.md
+nosync
