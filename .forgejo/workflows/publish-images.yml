@@ -1,0 +1,100 @@
+name: Publish Container Images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish-images:
+    runs-on: docker
+    env:
+      REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - name: Check out repository
+        uses: https://data.forgejo.org/actions/checkout@v4
+
+      - name: Derive registry metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          registry="${GITHUB_SERVER_URL#https://}"
+          registry="${registry#http://}"
+          owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          repo="$(printf '%s' "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')"
+          ref_name="$(printf '%s' "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')"
+          short_sha="$(printf '%s' "${GITHUB_SHA}" | cut -c1-12)"
+
+          echo "registry=${registry}" >> "$GITHUB_OUTPUT"
+          echo "owner=${owner}" >> "$GITHUB_OUTPUT"
+          echo "repo=${repo}" >> "$GITHUB_OUTPUT"
+          echo "ref_name=${ref_name}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Forgejo container registry
+        shell: bash
+        env:
+          REGISTRY: ${{ steps.meta.outputs.registry }}
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.FORGEJO_PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${REGISTRY_PASSWORD}" ]; then
+            echo "FORGEJO_PACKAGES_TOKEN secret is required to push images." >&2
+            exit 1
+          fi
+
+          printf '%s' "${REGISTRY_PASSWORD}" | docker login "${REGISTRY}" --username "${REGISTRY_USERNAME}" --password-stdin
+
+      - name: Build and push images
+        shell: bash
+        env:
+          REGISTRY: ${{ steps.meta.outputs.registry }}
+          OWNER: ${{ steps.meta.outputs.owner }}
+          IMAGE: ${{ steps.meta.outputs.registry }}/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.repo }}
+          REF_NAME: ${{ steps.meta.outputs.ref_name }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          REPOSITORY_URL: ${{ env.REPOSITORY_URL }}
+        run: |
+          set -euo pipefail
+
+          tags=()
+          tags+=("${IMAGE}:sha-${SHORT_SHA}")
+
+          if [ "${GITHUB_REF_TYPE}" = "branch" ]; then
+            tags+=("${IMAGE}:branch-${REF_NAME}")
+            if [ "${GITHUB_REF_NAME}" = "main" ]; then
+              tags+=("${IMAGE}:latest")
+            fi
+          fi
+
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tags+=("${IMAGE}:${REF_NAME}")
+          fi
+
+          docker_args=(
+            build
+            .
+            --file Dockerfile
+            --target app
+            --label "org.opencontainers.image.source=${REPOSITORY_URL}"
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+          )
+
+          for tag in "${tags[@]}"; do
+            docker_args+=(--tag "${tag}")
+          done
+
+          docker "${docker_args[@]}"
+
+          for tag in "${tags[@]}"; do
+            docker push "${tag}"
+          done
+
+          # The single OCI image contains the public API and the admin dashboard runtime.

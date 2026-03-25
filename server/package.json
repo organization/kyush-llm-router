@@ -4,7 +4,7 @@
   "description": "LLM Router Server",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-schemas.mjs",
     "start": "node dist/server/src/index.js",
     "dev": "tsx watch src",
     "typecheck": "tsc --noEmit",

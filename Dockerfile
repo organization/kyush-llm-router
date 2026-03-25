@@ -24,7 +24,7 @@ COPY scripts ./scripts
 
 RUN pnpm build
 
-FROM node:${NODE_VERSION}-bookworm-slim AS server
+FROM node:${NODE_VERSION}-bookworm-slim AS app
 
 WORKDIR /app
 
@@ -41,6 +41,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/server/package.json ./server/package.json
 COPY --from=build /app/server/dist ./server/dist
+COPY --from=build /app/client/dist ./client/dist
 COPY --from=build /app/database ./database
 
 RUN mkdir -p /data
@@ -48,16 +49,3 @@ RUN mkdir -p /data
 EXPOSE 3000
 
 CMD ["node", "server/dist/server/src/index.js"]
-
-FROM nginx:1.28-alpine AS admin-gateway
-
-COPY docker/admin-nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/client/dist /usr/share/nginx/html
-
-EXPOSE 80
-
-FROM nginx:1.28-alpine AS public-gateway
-
-COPY docker/public-nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80

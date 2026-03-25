@@ -24,7 +24,7 @@ function AuthenticatedApp() {
       }
     >
       <Show when={auth.session()?.authenticated} fallback={<LoginGate />}>
-        <Router>
+        <Router base="/dashboard">
           <Route path="/" component={Dashboard} />
           <Route path="/users" component={Users} />
           <Route path="/backends" component={Backends} />

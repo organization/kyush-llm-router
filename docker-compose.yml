@@ -1,14 +1,14 @@
 services:
-  server:
+  app:
     build:
       context: .
-      target: server
+      target: app
     environment:
       NODE_ENV: production
       SERVER_PORT: 3000
       DB_DIR: /data
       TZ: ${TZ:-UTC}
-      CORS_ORIGINS: http://localhost:3002,http://127.0.0.1:3002
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       ADMIN_AUTH_MODE: ${ADMIN_AUTH_MODE:-both}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
@@ -23,39 +23,11 @@ services:
       ADMIN_TRUSTED_PROXY_IPS: ${ADMIN_TRUSTED_PROXY_IPS:-}
     volumes:
       - router-data:/data
+    ports:
+      - "3000:3000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  public-gateway:
-    build:
-      context: .
-      target: public-gateway
-    depends_on:
-      - server
-    ports:
-      - "3000:80"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  admin-gateway:
-    build:
-      context: .
-      target: admin-gateway
-    depends_on:
-      - server
-    ports:
-      - "127.0.0.1:3002:80"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

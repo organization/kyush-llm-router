@@ -27,10 +27,23 @@ const router: Router = Router();
 const oidcStateStore = new Map<string, { next: string; expiresAt: number }>();
 
 function isSafeNextPath(value?: string): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/api/')) {
-    return '/';
+  if (!value || value === '/') {
+    return '/dashboard';
   }
-  return value;
+
+  if (!value.startsWith('/') || value.startsWith('//')) {
+    return '/dashboard';
+  }
+
+  if (value.startsWith('/admin/') || value === '/admin') {
+    return '/dashboard';
+  }
+
+  if (value === '/dashboard' || value.startsWith('/dashboard/')) {
+    return value;
+  }
+
+  return '/dashboard';
 }
 
 function buildSessionResponse(req: AdminRequest): AdminSessionResponse {
@@ -120,7 +133,7 @@ router.get('/oidc/start', async (req: Request, res: Response) => {
   }
 
   const state = generateOpaqueToken('oidc_state');
-  const next = isSafeNextPath(typeof req.query.next === 'string' ? req.query.next : '/');
+  const next = isSafeNextPath(typeof req.query.next === 'string' ? req.query.next : '/dashboard');
   oidcStateStore.set(state, { next, expiresAt: Date.now() + 10 * 60 * 1000 });
 
   try {
