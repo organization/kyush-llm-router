@@ -60,8 +60,12 @@ pnpm run bench      # 벤치마크 실행
 
 ## Detailed Docs
 
-- [docs/server.md](docs/server.md) — 서버 구조, 서비스, 모델, 의존성
+클라이언트 중심
 - [docs/client.md](docs/client.md) — 클라이언트 구조, 라우트, 컴포넌트
+- [docs/frontend-design.md](docs/frontend-design.md) — 프론트엔드 디자인 가이드
+
+서버 중심
+- [docs/server.md](docs/server.md) — 서버 구조, 서비스, 모델, 의존성
 - [docs/database.md](docs/database.md) — DB 테이블 스키마 전체
 - [docs/api.md](docs/api.md) — API 엔드포인트 레퍼런스
 - [docs/scripts.md](docs/scripts.md) — Script Engine 사용법, 타입, 예제

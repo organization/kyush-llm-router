@@ -7,7 +7,8 @@
     "build": "pnpm -r build",
     "start": "pnpm --parallel start",
     "test": "pnpm -r --filter server test",
-    "bench": "pnpm -r --filter server run bench"
+    "bench": "pnpm -r --filter server run bench",
+    "storybook": "pnpm -r --filter client storybook"
   },
   "keywords": [
     "llm",
