@@ -48,11 +48,13 @@ client/src/
 ## Dev And Production
 
 - 개발 서버 포트: `3002`
+- 개발 브라우저 진입 경로: `http://localhost:3002/dashboard`
 - 개발 API 프록시: `/admin` -> `http://localhost:3000`
 - 운영에서는 Express 서버가 빌드된 `client/dist`를 직접 서빙한다
 - 운영 브라우저 진입 경로: `http://<host>:3000/dashboard`
 
 SPA는 `/dashboard`를 라우터 base로 사용하고, 관리자 API는 계속 `/admin/**`로 호출한다.
+관리자 라우트는 route-level lazy loading을 사용하고, `Scripts` 화면의 Monaco editor는 editor 영역에서만 지연 로딩된다.
 
 ## Admin Auth Notes
 

@@ -1,8 +1,14 @@
-import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
+import { createMemo, createResource, createSignal, lazy, Show, Suspense, type Component } from 'solid-js';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
-import { ScriptEditor } from '../components/ScriptEditor';
-import { Play, Plus, Power, PowerOff, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-solid';
+import Play from 'lucide-solid/icons/play';
+import Plus from 'lucide-solid/icons/plus';
+import Power from 'lucide-solid/icons/power';
+import PowerOff from 'lucide-solid/icons/power-off';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
+import RotateCcw from 'lucide-solid/icons/rotate-ccw';
+import Save from 'lucide-solid/icons/save';
+import Trash2 from 'lucide-solid/icons/trash-2';
 import type { ScriptType, UserScript } from '../types';
 import {
   Alert,
@@ -25,6 +31,7 @@ import {
 } from '../ui';
 
 type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
+const ScriptEditor = lazy(() => import('../components/ScriptEditor').then((module) => ({ default: module.ScriptEditor })));
 
 interface ScriptFormState {
   id?: number;
@@ -471,11 +478,13 @@ export const Scripts: Component = () => {
                 <Tabs.Trigger value="test">Test</Tabs.Trigger>
               </Tabs.List>
               <Tabs.Content value="editor">
-                <ScriptEditor
-                  value={form().script_code}
-                  path={form().id ? `inmemory://model/scripts/${form().id}.ts` : 'inmemory://model/scripts/draft.ts'}
-                  onChange={(value) => setForm((current) => ({ ...current, script_code: value }))}
-                />
+                <Suspense fallback={<Panel title="Loading Editor" description="Preparing the Monaco runtime for this script." class="script-editor__fallback-panel" />}>
+                  <ScriptEditor
+                    value={form().script_code}
+                    path={form().id ? `inmemory://model/scripts/${form().id}.ts` : 'inmemory://model/scripts/draft.ts'}
+                    onChange={(value) => setForm((current) => ({ ...current, script_code: value }))}
+                  />
+                </Suspense>
               </Tabs.Content>
               <Tabs.Content value="test">
                 <div class="ui-stack">

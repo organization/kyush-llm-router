@@ -1,5 +1,5 @@
 import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
-import { RefreshCcw } from 'lucide-solid';
+import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import type { RequestLog } from '../types';

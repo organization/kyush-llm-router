@@ -1,5 +1,10 @@
 import { createMemo, createResource, createSignal, For, Show, type Component } from 'solid-js';
-import { Copy, KeyRound, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-solid';
+import Copy from 'lucide-solid/icons/copy';
+import Ellipsis from 'lucide-solid/icons/ellipsis';
+import KeyRound from 'lucide-solid/icons/key-round';
+import Pencil from 'lucide-solid/icons/pencil';
+import Plus from 'lucide-solid/icons/plus';
+import Trash2 from 'lucide-solid/icons/trash-2';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import type { User } from '../types';
@@ -262,7 +267,7 @@ export const Users: Component = () => {
                     <DropdownMenu.Root>
                       <DropdownMenu.Trigger as={Button} class="ui-button--icon" aria-label="More actions">
                         <span class="ui-button__icon" aria-hidden="true">
-                          <MoreHorizontal />
+                          <Ellipsis />
                         </span>
                         <span class="ui-button__label">More</span>
                       </DropdownMenu.Trigger>

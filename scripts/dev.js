@@ -62,7 +62,7 @@ async function main() {
   log(colors.green, '===============================================');
   log(colors.green, 'Development servers started:');
   log(colors.green, `  - Express API Server: http://localhost:3000`);
-  log(colors.green, `  - Vite Admin Dashboard: http://localhost:3001`);
+  log(colors.green, `  - Vite Admin Dashboard: http://localhost:3002/dashboard`);
   log(colors.green, '===============================================');
   log(colors.yellow, 'Press Ctrl+C to stop all servers');
 

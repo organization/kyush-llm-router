@@ -53,6 +53,8 @@ pnpm test           # 서버 테스트 실행
 pnpm run bench      # 벤치마크 실행
 ```
 
+개발 시 관리자 UI는 `http://localhost:3002/dashboard` 로 접속하고, 운영에서는 `http://<host>:3000/dashboard` 를 사용한다.
+
 ## Environment Variables
 
 | Variable | Default | Description |

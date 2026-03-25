@@ -1,7 +1,8 @@
-import { MonacoEditor } from 'solid-monaco';
-import { createSignal, onCleanup, onMount } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
+import { createSignal, lazy, onCleanup, onMount, Suspense } from 'solid-js';
 
 const THEME_STORAGE_KEY = 'kyush-theme';
+const MonacoEditor = lazy(() => import('solid-monaco').then((module) => ({ default: module.MonacoEditor })));
 
 interface ScriptEditorProps {
   value: string;
@@ -85,22 +86,36 @@ export async function onResponse(ctx) {
 
   return (
     <div class="script-editor">
-      <MonacoEditor
-        language="typescript"
-        value={props.value || defaultCode}
-        path={props.path}
-        onChange={(value) => props.onChange(value)}
-        theme={editorTheme()}
-        options={{
-          minimap: { enabled: false },
-          fontSize: 14,
-          wordWrap: 'on',
-          automaticLayout: true,
-          readOnly: props.readonly,
-          scrollBeyondLastLine: false,
-          padding: { top: 16, bottom: 16 },
-        }}
-      />
+      <Suspense
+        fallback={
+          <div class="script-editor__loading" role="status" aria-live="polite">
+            <div class="script-editor__skeleton script-editor__skeleton--toolbar" />
+            <div class="script-editor__skeleton script-editor__skeleton--line" />
+            <div class="script-editor__skeleton script-editor__skeleton--line script-editor__skeleton--short" />
+            <div class="script-editor__skeleton script-editor__skeleton--line" />
+            <div class="script-editor__skeleton script-editor__skeleton--line script-editor__skeleton--medium" />
+            <p class="script-editor__loading-copy">Loading editor runtime...</p>
+          </div>
+        }
+      >
+        <Dynamic
+          component={MonacoEditor}
+          language="typescript"
+          value={props.value || defaultCode}
+          path={props.path}
+          onChange={(value: string) => props.onChange(value)}
+          theme={editorTheme()}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 14,
+            wordWrap: 'on',
+            automaticLayout: true,
+            readOnly: props.readonly,
+            scrollBeyondLastLine: false,
+            padding: { top: 16, bottom: 16 },
+          }}
+        />
+      </Suspense>
     </div>
   );
 }

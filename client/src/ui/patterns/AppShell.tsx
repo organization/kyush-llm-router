@@ -1,5 +1,14 @@
 import { A, useLocation } from '@solidjs/router';
-import { ChartColumn, FileCode, LayoutDashboard, LogOut, Logs, Moon, Server, ShieldCheck, Sun, Users } from 'lucide-solid';
+import ChartColumn from 'lucide-solid/icons/chart-column';
+import FileCode from 'lucide-solid/icons/file-code';
+import LayoutDashboard from 'lucide-solid/icons/layout-dashboard';
+import LogOut from 'lucide-solid/icons/log-out';
+import Logs from 'lucide-solid/icons/logs';
+import Moon from 'lucide-solid/icons/moon';
+import Server from 'lucide-solid/icons/server';
+import ShieldCheck from 'lucide-solid/icons/shield-check';
+import Sun from 'lucide-solid/icons/sun';
+import Users from 'lucide-solid/icons/users';
 import { For, createMemo, createSignal, onCleanup, onMount, type JSX, type ParentComponent } from 'solid-js';
 import SnakegroundBg from '../../components/SnakegroundBg';
 import { useAuth } from '../../auth';

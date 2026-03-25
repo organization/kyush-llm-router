@@ -1,5 +1,7 @@
 import { createResource, createSignal, Show, type Component } from 'solid-js';
-import { Pencil, Plus, Trash2 } from 'lucide-solid';
+import Pencil from 'lucide-solid/icons/pencil';
+import Plus from 'lucide-solid/icons/plus';
+import Trash2 from 'lucide-solid/icons/trash-2';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import type { Backend } from '../types';

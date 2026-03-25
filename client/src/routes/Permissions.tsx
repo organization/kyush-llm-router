@@ -1,5 +1,6 @@
 import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
-import { Plus, ShieldMinus } from 'lucide-solid';
+import Plus from 'lucide-solid/icons/plus';
+import ShieldMinus from 'lucide-solid/icons/shield-minus';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import {
