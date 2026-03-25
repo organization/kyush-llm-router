@@ -5,6 +5,7 @@ import { cn } from '../lib/cn';
 interface TextFieldProps extends ParentProps {
   label: string;
   value?: string;
+  type?: string;
   placeholder?: string;
   description?: string;
   errorMessage?: string;
@@ -29,6 +30,7 @@ export function TextField(props: TextFieldProps) {
           ) : (
             <KTextField.Input
               class="ui-input"
+              type={props.type ?? 'text'}
               value={props.value}
               placeholder={props.placeholder}
               onInput={props.onInput as JSX.EventHandlerUnion<HTMLInputElement, InputEvent>}

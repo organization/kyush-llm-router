@@ -1,29 +1,89 @@
-import type { User, Backend, Permission, RequestLogPage, UsageStats, BackendMetrics, UserScript, CreateScriptData, UpdateScriptData } from '../types';
+import type {
+  User,
+  Backend,
+  Permission,
+  RequestLogPage,
+  UsageStats,
+  BackendMetrics,
+  UserScript,
+  CreateScriptData,
+  UpdateScriptData,
+  AdminApiTokenSummary,
+  AdminSessionResponse,
+} from '../types';
 
-const API_BASE = '/api';
+const API_BASE = '';
+let csrfToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+export function setAdminCsrfToken(nextToken: string | null) {
+  csrfToken = nextToken;
+}
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
 
 async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const isUnsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes((options.method ?? 'GET').toUpperCase());
+  const nextHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> | undefined),
+  };
+
+  if (isUnsafeMethod && url.startsWith('/admin') && csrfToken) {
+    nextHeaders['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(url, {
     ...options,
+    credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
+      ...nextHeaders,
     },
   });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
-  }
 
   if (response.status === 204) {
     return {} as T;
   }
 
-  return response.json();
+  const payload = await response.json().catch(() => ({ error: 'Request failed' }));
+
+  if (!response.ok) {
+    if (response.status === 401 && !url.endsWith('/admin/auth/session')) {
+      unauthorizedHandler?.();
+    }
+    throw new ApiError(response.status, payload.error || `HTTP ${response.status}`);
+  }
+
+  return payload;
 }
 
 export const api = {
+  auth: {
+    getSession: (): Promise<AdminSessionResponse> => fetchJson<AdminSessionResponse>(`${API_BASE}/admin/auth/session`),
+    login: (username: string, password: string): Promise<AdminSessionResponse> =>
+      fetchJson<AdminSessionResponse>(`${API_BASE}/admin/auth/login`, { method: 'POST', body: JSON.stringify({ username, password }) }),
+    logout: (): Promise<void> => fetchJson<void>(`${API_BASE}/admin/auth/logout`, { method: 'POST' }),
+    beginOidc: (next: string = window.location.pathname) => {
+      const search = new URLSearchParams({ next });
+      window.location.href = `${API_BASE}/admin/auth/oidc/start?${search.toString()}`;
+    },
+    getTokens: (): Promise<AdminApiTokenSummary[]> => fetchJson<AdminApiTokenSummary[]>(`${API_BASE}/admin/auth/tokens`),
+    createToken: (name: string, expiresInDays?: number): Promise<{ token: string; record: AdminApiTokenSummary }> =>
+      fetchJson(`${API_BASE}/admin/auth/tokens`, { method: 'POST', body: JSON.stringify({ name, expiresInDays }) }),
+    deleteToken: (id: number): Promise<void> => fetchJson<void>(`${API_BASE}/admin/auth/tokens/${id}`, { method: 'DELETE' }),
+  },
   users: {
     getAll: (): Promise<User[]> => fetchJson<User[]>(`${API_BASE}/admin/users`),
     getById: (id: number): Promise<User> => fetchJson<User>(`${API_BASE}/admin/users/${id}`),

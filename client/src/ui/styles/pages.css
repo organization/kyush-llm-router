@@ -49,6 +49,17 @@
   white-space: nowrap;
 }
 
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+}
+
+.auth-screen__panel {
+  width: min(520px, 100%);
+}
+
 @media (max-width: 960px) {
   .script-editor {
     min-height: 520px;

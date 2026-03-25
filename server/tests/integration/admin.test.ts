@@ -1,17 +1,22 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import request from 'supertest';
 import { createTestApp } from '../utils/testApp';
+import { createAdminClient } from '../utils/adminClient';
 
 let app: ReturnType<typeof createTestApp>;
+let admin: Awaited<ReturnType<typeof createAdminClient>>;
 
 beforeAll(() => {
   app = createTestApp();
 });
 
+beforeAll(async () => {
+  admin = await createAdminClient(app);
+});
+
 describe('Admin API - User Management', () => {
   describe('GET /admin/users', () => {
     it('should return empty array initially', async () => {
-      const response = await request(app).get('/admin/users');
+      const response = await admin.get('/admin/users');
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
     });
@@ -20,7 +25,7 @@ describe('Admin API - User Management', () => {
   describe('POST /admin/users', () => {
     it('should create a new user', async () => {
       const userData = { name: 'Test User', email: 'test@example.com' };
-      const response = await request(app).post('/admin/users').send(userData);
+      const response = await admin.post('/admin/users').send(userData);
       
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('id');
@@ -31,7 +36,7 @@ describe('Admin API - User Management', () => {
     });
 
     it('should return 400 if name is missing', async () => {
-      const response = await request(app).post('/admin/users').send({ email: 'test@example.com' });
+      const response = await admin.post('/admin/users').send({ email: 'test@example.com' });
       
       expect(response.status).toBe(400);
       expect(response.body).toHaveProperty('error');
@@ -42,12 +47,12 @@ describe('Admin API - User Management', () => {
     let userId: number;
     
     beforeAll(async () => {
-      const response = await request(app).post('/admin/users').send({ name: 'User for Get' });
+      const response = await admin.post('/admin/users').send({ name: 'User for Get' });
       userId = response.body.id;
     });
 
     it('should return a user by id', async () => {
-      const response = await request(app).get(`/admin/users/${userId}`);
+      const response = await admin.get(`/admin/users/${userId}`);
       
       expect(response.status).toBe(200);
       expect(response.body.id).toBe(userId);
@@ -55,7 +60,7 @@ describe('Admin API - User Management', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const response = await request(app).get('/admin/users/99999');
+      const response = await admin.get('/admin/users/99999');
       
       expect(response.status).toBe(404);
       expect(response.body).toHaveProperty('error');
@@ -66,12 +71,12 @@ describe('Admin API - User Management', () => {
     let userId: number;
     
     beforeAll(async () => {
-      const response = await request(app).post('/admin/users').send({ name: 'User for Update' });
+      const response = await admin.post('/admin/users').send({ name: 'User for Update' });
       userId = response.body.id;
     });
 
     it('should update user', async () => {
-      const response = await request(app)
+      const response = await admin
         .put(`/admin/users/${userId}`)
         .send({ name: 'Updated Name', email: 'updated@example.com' });
       
@@ -81,7 +86,7 @@ describe('Admin API - User Management', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const response = await request(app).put('/admin/users/99999').send({ name: 'Test' });
+      const response = await admin.put('/admin/users/99999').send({ name: 'Test' });
       
       expect(response.status).toBe(404);
     });
@@ -92,13 +97,13 @@ describe('Admin API - User Management', () => {
     let oldApiKey: string;
     
     beforeAll(async () => {
-      const response = await request(app).post('/admin/users').send({ name: 'User for Key Regen' });
+      const response = await admin.post('/admin/users').send({ name: 'User for Key Regen' });
       userId = response.body.id;
       oldApiKey = response.body.api_key;
     });
 
     it('should regenerate API key', async () => {
-      const response = await request(app).post(`/admin/users/${userId}/regenerate-api-key`);
+      const response = await admin.post(`/admin/users/${userId}/regenerate-api-key`);
       
       expect(response.status).toBe(200);
       expect(response.body.api_key).toMatch(/^sk-/);
@@ -110,18 +115,18 @@ describe('Admin API - User Management', () => {
     let userId: number;
     
     beforeAll(async () => {
-      const response = await request(app).post('/admin/users').send({ name: 'User for Delete' });
+      const response = await admin.post('/admin/users').send({ name: 'User for Delete' });
       userId = response.body.id;
     });
 
     it('should delete a user', async () => {
-      const response = await request(app).delete(`/admin/users/${userId}`);
+      const response = await admin.delete(`/admin/users/${userId}`);
       
       expect(response.status).toBe(204);
     });
 
     it('should return 404 for already deleted user', async () => {
-      const response = await request(app).delete(`/admin/users/${userId}`);
+      const response = await admin.delete(`/admin/users/${userId}`);
       
       expect(response.status).toBe(404);
     });
@@ -131,7 +136,7 @@ describe('Admin API - User Management', () => {
 describe('Admin API - Backend Management', () => {
   describe('GET /admin/backends', () => {
     it('should return empty array initially', async () => {
-      const response = await request(app).get('/admin/backends');
+      const response = await admin.get('/admin/backends');
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
     });
@@ -144,7 +149,7 @@ describe('Admin API - Backend Management', () => {
         base_url: 'http://localhost:8000/v1',
         api_key: 'backend-key-123'
       };
-      const response = await request(app).post('/admin/backends').send(backendData);
+      const response = await admin.post('/admin/backends').send(backendData);
       
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('id');
@@ -154,7 +159,7 @@ describe('Admin API - Backend Management', () => {
     });
 
     it('should return 400 if name or base_url is missing', async () => {
-      const response = await request(app).post('/admin/backends').send({ name: 'Test' });
+      const response = await admin.post('/admin/backends').send({ name: 'Test' });
       
       expect(response.status).toBe(400);
       expect(response.body).toHaveProperty('error');
@@ -165,7 +170,7 @@ describe('Admin API - Backend Management', () => {
     let backendId: number;
     
     beforeAll(async () => {
-      const response = await request(app).post('/admin/backends').send({ 
+      const response = await admin.post('/admin/backends').send({ 
         name: 'Backend for Get', 
         base_url: 'http://localhost:8001/v1' 
       });
@@ -173,14 +178,14 @@ describe('Admin API - Backend Management', () => {
     });
 
     it('should return a backend by id', async () => {
-      const response = await request(app).get(`/admin/backends/${backendId}`);
+      const response = await admin.get(`/admin/backends/${backendId}`);
       
       expect(response.status).toBe(200);
       expect(response.body.id).toBe(backendId);
     });
 
     it('should return 404 for non-existent backend', async () => {
-      const response = await request(app).get('/admin/backends/99999');
+      const response = await admin.get('/admin/backends/99999');
       
       expect(response.status).toBe(404);
     });
@@ -190,7 +195,7 @@ describe('Admin API - Backend Management', () => {
     let backendId: number;
     
     beforeAll(async () => {
-      const response = await request(app).post('/admin/backends').send({ 
+      const response = await admin.post('/admin/backends').send({ 
         name: 'Backend for Update', 
         base_url: 'http://localhost:8002/v1' 
       });
@@ -198,7 +203,7 @@ describe('Admin API - Backend Management', () => {
     });
 
     it('should update backend', async () => {
-      const response = await request(app)
+      const response = await admin
         .put(`/admin/backends/${backendId}`)
         .send({ name: 'Updated Backend', is_active: false });
       
@@ -208,7 +213,7 @@ describe('Admin API - Backend Management', () => {
     });
 
     it('should return 404 for non-existent backend', async () => {
-      const response = await request(app).put('/admin/backends/99999').send({ name: 'Test' });
+      const response = await admin.put('/admin/backends/99999').send({ name: 'Test' });
       
       expect(response.status).toBe(404);
     });
@@ -218,7 +223,7 @@ describe('Admin API - Backend Management', () => {
     let backendId: number;
     
     beforeAll(async () => {
-      const response = await request(app).post('/admin/backends').send({ 
+      const response = await admin.post('/admin/backends').send({ 
         name: 'Backend for Delete', 
         base_url: 'http://localhost:8003/v1' 
       });
@@ -226,13 +231,13 @@ describe('Admin API - Backend Management', () => {
     });
 
     it('should delete a backend', async () => {
-      const response = await request(app).delete(`/admin/backends/${backendId}`);
+      const response = await admin.delete(`/admin/backends/${backendId}`);
       
       expect(response.status).toBe(204);
     });
 
     it('should return 404 for already deleted backend', async () => {
-      const response = await request(app).delete(`/admin/backends/${backendId}`);
+      const response = await admin.delete(`/admin/backends/${backendId}`);
       
       expect(response.status).toBe(404);
     });
@@ -244,10 +249,10 @@ describe('Admin API - Permission Management', () => {
   let backendId: number;
 
   beforeAll(async () => {
-    const userResponse = await request(app).post('/admin/users').send({ name: 'User for Permission' });
+    const userResponse = await admin.post('/admin/users').send({ name: 'User for Permission' });
     userId = userResponse.body.id;
     
-    const backendResponse = await request(app).post('/admin/backends').send({ 
+    const backendResponse = await admin.post('/admin/backends').send({ 
       name: 'Backend for Permission', 
       base_url: 'http://localhost:8004/v1' 
     });
@@ -256,7 +261,7 @@ describe('Admin API - Permission Management', () => {
 
   describe('GET /admin/permissions', () => {
     it('should return empty array initially', async () => {
-      const response = await request(app).get('/admin/permissions');
+      const response = await admin.get('/admin/permissions');
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
     });
@@ -264,7 +269,7 @@ describe('Admin API - Permission Management', () => {
 
   describe('POST /admin/permissions', () => {
     it('should create a new permission', async () => {
-      const response = await request(app)
+      const response = await admin
         .post('/admin/permissions')
         .send({ user_id: userId, backend_id: backendId });
       
@@ -275,7 +280,7 @@ describe('Admin API - Permission Management', () => {
     });
 
     it('should return 409 if permission already exists', async () => {
-      const response = await request(app)
+      const response = await admin
         .post('/admin/permissions')
         .send({ user_id: userId, backend_id: backendId });
       
@@ -284,7 +289,7 @@ describe('Admin API - Permission Management', () => {
     });
 
     it('should return 400 if user_id or backend_id is missing', async () => {
-      const response = await request(app).post('/admin/permissions').send({ user_id: userId });
+      const response = await admin.post('/admin/permissions').send({ user_id: userId });
       
       expect(response.status).toBe(400);
     });
@@ -292,7 +297,7 @@ describe('Admin API - Permission Management', () => {
 
   describe('GET /admin/permissions/user/:userId', () => {
     it('should return permissions for user', async () => {
-      const response = await request(app).get(`/admin/permissions/user/${userId}`);
+      const response = await admin.get(`/admin/permissions/user/${userId}`);
       
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
@@ -302,7 +307,7 @@ describe('Admin API - Permission Management', () => {
 
   describe('GET /admin/permissions/backend/:backendId', () => {
     it('should return permissions for backend', async () => {
-      const response = await request(app).get(`/admin/permissions/backend/${backendId}`);
+      const response = await admin.get(`/admin/permissions/backend/${backendId}`);
       
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
@@ -312,14 +317,14 @@ describe('Admin API - Permission Management', () => {
 
   describe('DELETE /admin/permissions', () => {
     it('should delete a permission', async () => {
-      const response = await request(app)
+      const response = await admin
         .delete(`/admin/permissions?user_id=${userId}&backend_id=${backendId}`);
       
       expect(response.status).toBe(204);
     });
 
     it('should return 404 for already deleted permission', async () => {
-      const response = await request(app)
+      const response = await admin
         .delete(`/admin/permissions?user_id=${userId}&backend_id=${backendId}`);
       
       expect(response.status).toBe(404);

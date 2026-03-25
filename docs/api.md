@@ -9,7 +9,7 @@
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | 서버 상태 확인 (status, timestamp) |
-| GET | `/admin/health` | Admin 라우터 상태 확인 (status, timestamp) |
+| GET | `/admin/health` | 관리자 인증이 필요한 Admin 라우터 상태 확인 (status, timestamp) |
 
 ## OpenAI-Compatible Proxy (인증 필요)
 
@@ -20,7 +20,26 @@
 | POST | `/v1/chat/completions` | Chat completions 프록시 (스크립트 적용, 분석 로깅) |
 | GET | `/v1/models` | 사용 가능한 모델 목록 |
 
+`/v1/**`는 기존 사용자 API 키 인증을 유지하며 관리자 인증과 분리된다.
+
 ## Admin API
+
+`/admin/**`는 기본적으로 관리자 인증이 필요하다. 브라우저는 세션 쿠키, 자동화는 `Authorization: Bearer <admin_api_token>` 방식으로 접근한다.
+
+세션 기반 요청에서 `POST`, `PUT`, `DELETE`를 호출할 때는 `GET /admin/auth/session`에서 받은 CSRF 토큰을 `X-CSRF-Token` 헤더로 함께 보내야 한다.
+
+### Auth
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/auth/session` | 현재 관리자 로그인 상태, principal, auth mode, CSRF 토큰 조회 |
+| POST | `/admin/auth/login` | ENV 관리자 계정 로그인 후 세션 쿠키 발급 |
+| POST | `/admin/auth/logout` | 현재 관리자 세션 종료 |
+| GET | `/admin/auth/oidc/start` | OIDC 로그인 시작 |
+| GET | `/admin/auth/oidc/callback` | OIDC code exchange 후 세션 생성, 관리자 화면으로 redirect |
+| GET | `/admin/auth/tokens` | 현재 관리자 principal이 발급한 API 토큰 목록 조회 |
+| POST | `/admin/auth/tokens` | 새 관리자 API 토큰 발급 |
+| DELETE | `/admin/auth/tokens/:id` | 관리자 API 토큰 폐기 |
 
 ### Users
 
@@ -51,7 +70,7 @@
 | GET | `/admin/permissions/user/:userId` | 사용자별 권한 조회 |
 | GET | `/admin/permissions/backend/:backendId` | 백엔드별 권한 조회 |
 | POST | `/admin/permissions` | 권한 부여 (user_id, backend_id) |
-| DELETE | `/admin/permissions?user_id=X&backend_id=Y` | 권한 삭제 |
+| DELETE | `/admin/permissions?user_id=X&backend_id=Y` | 권한 해제 |
 
 ### Scripts
 
@@ -77,3 +96,7 @@
 | GET | `/admin/analytics/metrics` | backendId, days | 백엔드 성능 메트릭 |
 
 상세 로그는 `users.detail_logging=1` 또는 `backends.detail_logging=1`일 때만 request/response header/body가 저장된다.
+
+참고:
+- 관리자 인증과 세션/토큰 정책은 [docs/admin-auth.md](./admin-auth.md) 참고
+- OpenID Connect 설정은 [docs/oidc.md](./oidc.md) 참고

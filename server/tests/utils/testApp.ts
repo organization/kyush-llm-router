@@ -2,11 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import { initDb } from '../../src/config/database';
 import { initAnalyticsDb } from '../../src/config/analytics-db';
+import adminAuthRoutes from '../../src/routes/admin-auth';
 import adminRoutes from '../../src/routes/admin';
 import apiRoutes from '../../src/routes/api';
 import analyticsRoutes from '../../src/routes/analytics';
 import { initRequestLogsDb } from '../../src/config/request-logs-db';
 import { getUtcTimestamp } from '../../src/utils/time';
+import { requireAdminAccess, requireSessionCsrf } from '../../src/utils/adminAuth';
 
 export function createTestApp() {
   // Initialize both databases
@@ -19,9 +21,10 @@ export function createTestApp() {
   app.use(cors());
   app.use(express.json());
   
-  app.use('/admin', adminRoutes);
+  app.use('/admin/auth', adminAuthRoutes);
+  app.use('/admin/analytics', requireAdminAccess, requireSessionCsrf, analyticsRoutes);
+  app.use('/admin', requireAdminAccess, requireSessionCsrf, adminRoutes);
   app.use('/v1', apiRoutes);
-  app.use('/admin/analytics', analyticsRoutes);
   
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: getUtcTimestamp() });

@@ -107,3 +107,36 @@ export type UpdateScriptData = {
   script_code?: string;
   is_active?: boolean;
 };
+
+export type AdminAuthMode = 'env' | 'oidc' | 'both';
+
+export type AdminPrincipal = {
+  provider: 'env' | 'oidc';
+  subject: string;
+  username?: string;
+  email?: string;
+  displayName: string;
+};
+
+export type AdminSessionResponse = {
+  authenticated: boolean;
+  authMode: AdminAuthMode;
+  csrfToken: string | null;
+  principal: AdminPrincipal | null;
+};
+
+export type AdminApiTokenSummary = {
+  id: number;
+  name: string;
+  provider: 'env' | 'oidc';
+  subject: string;
+  username?: string;
+  email?: string;
+  display_name: string;
+  token_prefix: string;
+  expires_at: string;
+  last_used_at?: string;
+  revoked_at?: string;
+  created_at: string;
+  updated_at: string;
+};

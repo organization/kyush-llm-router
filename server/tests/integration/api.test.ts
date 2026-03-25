@@ -3,9 +3,11 @@ import request from 'supertest';
 import { createTestApp } from '../utils/testApp';
 import { initDb } from '../../src/config/database';
 import { RequestLogService } from '../../src/services/RequestLogService';
+import { createAdminClient } from '../utils/adminClient';
 
 describe('Auth & Proxy API', () => {
   let app: ReturnType<typeof createTestApp>;
+  let admin: Awaited<ReturnType<typeof createAdminClient>>;
   let userApiKey: string;
   let backendId: number;
 
@@ -16,19 +18,23 @@ describe('Auth & Proxy API', () => {
   });
 
   beforeAll(async () => {
+    admin = await createAdminClient(app);
+  });
+
+  beforeAll(async () => {
     // Create a user
-    const userResponse = await request(app).post('/admin/users').send({ name: 'Test User for API' });
+    const userResponse = await admin.post('/admin/users').send({ name: 'Test User for API' });
     userApiKey = userResponse.body.api_key;
     
     // Create a backend
-    const backendResponse = await request(app).post('/admin/backends').send({ 
+    const backendResponse = await admin.post('/admin/backends').send({ 
       name: 'Backend for API Test', 
       base_url: 'http://localhost:8005/v1' 
     });
     backendId = backendResponse.body.id;
     
     // Grant permission
-    await request(app)
+    await admin
       .post('/admin/permissions')
       .send({ user_id: userResponse.body.id, backend_id: backendId });
   });
@@ -82,7 +88,7 @@ describe('Auth & Proxy API', () => {
   describe('GET /v1/models without permission', () => {
     it('should return 403 for user without backend permission', async () => {
       // Create a user without permissions
-      const userResponse = await request(app).post('/admin/users').send({ name: 'User Without Permission' });
+      const userResponse = await admin.post('/admin/users').send({ name: 'User Without Permission' });
       const invalidApiKey = userResponse.body.api_key;
       
       const response = await request(app)
@@ -106,7 +112,7 @@ describe('Auth & Proxy API', () => {
         });
       
       // Check analytics
-      const analyticsResponse = await request(app).get('/admin/analytics/requests?limit=10');
+      const analyticsResponse = await admin.get('/admin/analytics/requests?limit=10');
       
       expect(analyticsResponse.status).toBe(200);
       expect(Array.isArray(analyticsResponse.body.rows)).toBe(true);
@@ -145,8 +151,8 @@ describe('Auth & Proxy API', () => {
         created_at: '2026-03-20T10:00:00.000Z',
       });
 
-      const firstPage = await request(app).get('/admin/analytics/requests?limit=1&offset=0&q=cross-month-test-marker');
-      const secondPage = await request(app).get('/admin/analytics/requests?limit=1&offset=1&q=cross-month-test-marker');
+      const firstPage = await admin.get('/admin/analytics/requests?limit=1&offset=0&q=cross-month-test-marker');
+      const secondPage = await admin.get('/admin/analytics/requests?limit=1&offset=1&q=cross-month-test-marker');
 
       expect(firstPage.status).toBe(200);
       expect(secondPage.status).toBe(200);

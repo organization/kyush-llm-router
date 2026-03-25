@@ -60,3 +60,44 @@ CREATE INDEX IF NOT EXISTS idx_user_scripts_type ON user_scripts(script_type);
 CREATE INDEX IF NOT EXISTS idx_user_scripts_active ON user_scripts(is_active);
 CREATE INDEX IF NOT EXISTS idx_user_scripts_target_user ON user_scripts(target_user_id);
 CREATE INDEX IF NOT EXISTS idx_user_scripts_target_backend ON user_scripts(target_backend_id);
+
+-- Admin sessions table
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_token_hash TEXT UNIQUE NOT NULL,
+    provider TEXT NOT NULL CHECK(provider IN ('env', 'oidc')),
+    subject TEXT NOT NULL,
+    username TEXT,
+    email TEXT,
+    display_name TEXT NOT NULL,
+    csrf_token TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    last_used_at TEXT,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_subject ON admin_sessions(subject);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+
+-- Admin API tokens table
+CREATE TABLE IF NOT EXISTS admin_api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    provider TEXT NOT NULL CHECK(provider IN ('env', 'oidc')),
+    subject TEXT NOT NULL,
+    username TEXT,
+    email TEXT,
+    display_name TEXT NOT NULL,
+    token_prefix TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    last_used_at TEXT,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_subject ON admin_api_tokens(subject);
+CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_expires_at ON admin_api_tokens(expires_at);

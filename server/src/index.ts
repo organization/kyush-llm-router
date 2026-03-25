@@ -4,8 +4,10 @@ import dotenv from 'dotenv';
 import path from 'path';
 
 import adminRoutes from './routes/admin';
+import adminAuthRoutes from './routes/admin-auth';
 import apiRoutes from './routes/api';
 import analyticsRoutes from './routes/analytics';
+import { requireAdminAccess, requireSessionCsrf } from './utils/adminAuth';
 import { logger } from './utils/logger';
 import { getUtcTimestamp } from './utils/time';
 
@@ -18,7 +20,7 @@ export function createServer(): Application {
 
   const corsOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-    : ['http://localhost:5173', 'http://localhost:3001'];
+    : ['http://localhost:5173', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3002'];
 
   app.use(cors({
     origin: corsOrigins,
@@ -26,9 +28,10 @@ export function createServer(): Application {
   }));
   app.use(express.json());
 
-  app.use('/admin', adminRoutes);
+  app.use('/admin/auth', adminAuthRoutes);
+  app.use('/admin/analytics', requireAdminAccess, requireSessionCsrf, analyticsRoutes);
+  app.use('/admin', requireAdminAccess, requireSessionCsrf, adminRoutes);
   app.use('/v1', apiRoutes);
-  app.use('/admin/analytics', analyticsRoutes);
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: getUtcTimestamp() });

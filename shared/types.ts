@@ -181,6 +181,39 @@ export interface UpdateScriptData {
   is_active?: boolean;
 }
 
+export type AdminAuthMode = 'env' | 'oidc' | 'both';
+
+export interface AdminPrincipal {
+  provider: 'env' | 'oidc';
+  subject: string;
+  username?: string;
+  email?: string;
+  displayName: string;
+}
+
+export interface AdminSessionResponse {
+  authenticated: boolean;
+  authMode: AdminAuthMode;
+  csrfToken: string | null;
+  principal: AdminPrincipal | null;
+}
+
+export interface AdminApiTokenSummary {
+  id: number;
+  name: string;
+  provider: 'env' | 'oidc';
+  subject: string;
+  username?: string;
+  email?: string;
+  display_name: string;
+  token_prefix: string;
+  expires_at: string;
+  last_used_at?: string;
+  revoked_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 /**
  * Serializable script context data that can be transferred across isolate boundaries
  * via structured clone ({ copy: true }).

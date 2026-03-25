@@ -83,6 +83,26 @@
 .nav-rail__footer {
   margin-top: auto;
   display: grid;
+  gap: var(--space-3);
+}
+
+.nav-rail__session {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2);
+  background: var(--color-bg-elevated);
+}
+
+.nav-rail__session-name,
+.nav-rail__session-meta {
+  margin: 0;
+}
+
+.nav-rail__session-meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-rail__theme-toggle {

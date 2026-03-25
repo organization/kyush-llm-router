@@ -49,9 +49,15 @@ EXPOSE 3000
 
 CMD ["node", "server/dist/server/src/index.js"]
 
-FROM nginx:1.28-alpine AS client
+FROM nginx:1.28-alpine AS admin-gateway
 
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/admin-nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/client/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+FROM nginx:1.28-alpine AS public-gateway
+
+COPY docker/public-nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

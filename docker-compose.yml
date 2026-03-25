@@ -3,14 +3,24 @@ services:
     build:
       context: .
       target: server
-    ports:
-      - "3000:3000"
     environment:
       NODE_ENV: production
       SERVER_PORT: 3000
       DB_DIR: /data
       TZ: ${TZ:-UTC}
       CORS_ORIGINS: http://localhost:3002,http://127.0.0.1:3002
+      ADMIN_AUTH_MODE: ${ADMIN_AUTH_MODE:-both}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-change-me}
+      ADMIN_SESSION_TTL_HOURS: ${ADMIN_SESSION_TTL_HOURS:-12}
+      ADMIN_API_TOKEN_TTL_DAYS: ${ADMIN_API_TOKEN_TTL_DAYS:-30}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_ALLOWED_EMAILS: ${OIDC_ALLOWED_EMAILS:-}
+      ADMIN_TRUSTED_PROXY_IPS: ${ADMIN_TRUSTED_PROXY_IPS:-}
     volumes:
       - router-data:/data
     restart: unless-stopped
@@ -20,14 +30,29 @@ services:
       timeout: 10s
       retries: 3
 
-  client:
+  public-gateway:
     build:
       context: .
-      target: client
+      target: public-gateway
     depends_on:
       - server
     ports:
-      - "3002:80"
+      - "3000:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  admin-gateway:
+    build:
+      context: .
+      target: admin-gateway
+    depends_on:
+      - server
+    ports:
+      - "127.0.0.1:3002:80"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]

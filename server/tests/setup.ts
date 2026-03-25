@@ -7,6 +7,11 @@ const TEST_DB_DIR = path.join(__dirname, '..', 'data', `test-db-${workerId}`);
 
 process.env.DB_DIR = TEST_DB_DIR;
 process.env.TZ = 'Asia/Seoul';
+process.env.ADMIN_AUTH_MODE = 'env';
+process.env.ADMIN_USERNAME = 'admin';
+process.env.ADMIN_PASSWORD_HASH = 'sha256$5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
+process.env.ADMIN_SESSION_SECRET = 'test-admin-session-secret';
+process.env.ADMIN_SESSION_TTL_HOURS = '12';
 
 beforeAll(() => {
   if (fs.existsSync(TEST_DB_DIR)) {
