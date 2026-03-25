@@ -3,8 +3,8 @@ import { UserModel } from '../models/User';
 import { BackendModel } from '../models/Backend';
 import { PermissionModel } from '../models/Permission';
 import scriptRoutes from './scripts';
-import { generateApiKey } from '../utils/apiKey';
 import { CreateUserData, CreateBackendData, CreatePermissionData, UpdateUserData, UpdateBackendData } from '../../../shared/types';
+import { getUtcTimestamp } from '../utils/time';
 
 const router: Router = Router();
 
@@ -18,7 +18,7 @@ router.get('/users', (req: Request, res: Response) => {
 });
 
 router.post('/users', (req: Request, res: Response) => {
-  const { name, email } = req.body as CreateUserData;
+  const { name, email, detail_logging } = req.body as CreateUserData;
 
   if (!name) {
     res.status(400).json({ error: 'Name is required' });
@@ -28,6 +28,7 @@ router.post('/users', (req: Request, res: Response) => {
   const user = UserModel.create({
     name,
     email,
+    detail_logging,
   });
 
   const updatedUser = UserModel.regenerateApiKey(user.id);
@@ -59,8 +60,8 @@ router.put('/users/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { name, email, is_active } = req.body as UpdateUserData;
-  const updatedUser = UserModel.update(id, { name, email, is_active });
+  const { name, email, is_active, detail_logging } = req.body as UpdateUserData;
+  const updatedUser = UserModel.update(id, { name, email, is_active, detail_logging });
 
   res.json(updatedUser);
 });
@@ -103,14 +104,14 @@ router.get('/backends', (req: Request, res: Response) => {
 });
 
 router.post('/backends', (req: Request, res: Response) => {
-  const { name, base_url, api_key } = req.body as CreateBackendData;
+  const { name, base_url, api_key, detail_logging } = req.body as CreateBackendData;
 
   if (!name || !base_url) {
     res.status(400).json({ error: 'Name and base_url are required' });
     return;
   }
 
-  const backend = BackendModel.create({ name, base_url, api_key });
+  const backend = BackendModel.create({ name, base_url, api_key, detail_logging });
   res.status(201).json(backend);
 });
 
@@ -135,8 +136,8 @@ router.put('/backends/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { name, base_url, api_key, is_active } = req.body as UpdateBackendData;
-  const updatedBackend = BackendModel.update(id, { name, base_url, api_key, is_active });
+  const { name, base_url, api_key, is_active, detail_logging } = req.body as UpdateBackendData;
+  const updatedBackend = BackendModel.update(id, { name, base_url, api_key, is_active, detail_logging });
 
   res.json(updatedBackend);
 });
@@ -213,7 +214,7 @@ router.delete('/permissions', (req: Request, res: Response) => {
 // ============ Health Check ============
 
 router.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: getUtcTimestamp() });
 });
 
 export default router;

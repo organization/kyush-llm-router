@@ -7,6 +7,7 @@ import adminRoutes from './routes/admin';
 import apiRoutes from './routes/api';
 import analyticsRoutes from './routes/analytics';
 import { logger } from './utils/logger';
+import { getUtcTimestamp } from './utils/time';
 
 dotenv.config({
   quiet: true,
@@ -30,7 +31,7 @@ export function createServer(): Application {
   app.use('/admin/analytics', analyticsRoutes);
 
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', timestamp: getUtcTimestamp() });
   });
 
   app.use((req, res) => {

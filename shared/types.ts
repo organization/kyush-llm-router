@@ -4,6 +4,7 @@ export interface User {
   name: string;
   email?: string;
   is_active: boolean;
+  detail_logging: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -14,6 +15,7 @@ export interface Backend {
   base_url: string;
   api_key?: string;
   is_active: boolean;
+  detail_logging: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -28,12 +30,14 @@ export interface Permission {
 export interface CreateUserData {
   name: string;
   email?: string;
+  detail_logging?: boolean;
 }
 
 export interface CreateBackendData {
   name: string;
   base_url: string;
   api_key?: string;
+  detail_logging?: boolean;
 }
 
 export interface CreatePermissionData {
@@ -45,6 +49,7 @@ export interface UpdateUserData {
   name?: string;
   email?: string;
   is_active?: boolean;
+  detail_logging?: boolean;
 }
 
 export interface UpdateBackendData {
@@ -52,6 +57,7 @@ export interface UpdateBackendData {
   base_url?: string;
   api_key?: string;
   is_active?: boolean;
+  detail_logging?: boolean;
 }
 
 export interface RequestLog {
@@ -67,6 +73,12 @@ export interface RequestLog {
   status_code: number;
   response_time_ms?: number;
   error_message?: string;
+  detail_logged: boolean;
+  local_date: string;
+  request_headers?: string;
+  request_body?: string;
+  response_headers?: string;
+  response_body?: string;
   created_at: string;
 }
 

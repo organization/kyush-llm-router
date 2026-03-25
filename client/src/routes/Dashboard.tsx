@@ -7,7 +7,7 @@ export const Dashboard: Component = () => {
   const [data, { refetch }] = createResource(async () => ({
     users: await api.users.getAll(),
     backends: await api.backends.getAll(),
-    recentRequests: await api.analytics.getRequests(10),
+    recentRequests: await api.analytics.getRequests({ limit: 10 }),
   }));
 
   return (
@@ -38,6 +38,11 @@ export const Dashboard: Component = () => {
                 id: 'status',
                 header: 'Status',
                 cell: (request) => <StatusBadge tone={request.status_code >= 400 ? 'danger' : 'success'}>{String(request.status_code)}</StatusBadge>,
+              },
+              {
+                id: 'detail_logged',
+                header: 'Detail',
+                cell: (request) => <StatusBadge tone={request.detail_logged ? 'warning' : 'neutral'}>{request.detail_logged ? 'Verbose' : 'Meta'}</StatusBadge>,
               },
               { id: 'time', header: 'Time', cell: (request) => <span>{new Date(request.created_at).toLocaleString()}</span> },
             ]}

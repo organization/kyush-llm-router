@@ -14,11 +14,18 @@ router.get('/usage', (req: Request, res: Response) => {
 });
 
 router.get('/requests', (req: Request, res: Response) => {
-  const { limit, offset } = req.query;
-  const result = AnalyticsService.getRequestLogs(
-    limit ? Number(limit) : 100,
-    offset ? Number(offset) : 0
-  );
+  const { month, date, limit, offset, q, userId, backendId, endpoint, detailLogged } = req.query;
+  const result = AnalyticsService.getRequestLogs({
+    month: typeof month === 'string' ? month : undefined,
+    date: typeof date === 'string' ? date : undefined,
+    limit: limit ? Number(limit) : 100,
+    offset: offset ? Number(offset) : 0,
+    q: typeof q === 'string' ? q : undefined,
+    userId: userId ? Number(userId) : undefined,
+    backendId: backendId ? Number(backendId) : undefined,
+    endpoint: typeof endpoint === 'string' ? endpoint : undefined,
+    detailLogged: detailLogged === undefined ? undefined : detailLogged === '1' || detailLogged === 'true',
+  });
   res.json(result);
 });
 

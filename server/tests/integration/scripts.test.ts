@@ -249,7 +249,7 @@ export const onResponse = (context) => {
         .send({ is_active: false });
       
       expect(response.status).toBe(200);
-      expect(response.body.is_active).toBe(0);
+      expect(response.body.is_active).toBe(false);
     });
 
     it('should return 404 for non-existent script', async () => {

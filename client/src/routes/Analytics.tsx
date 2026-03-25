@@ -4,7 +4,7 @@ import { Layout } from '../components/Layout';
 import { DataGrid, EmptyState, MetaCluster, PageHeader, Panel, StatusBadge, SummaryStrip } from '../ui';
 
 export const Analytics: Component = () => {
-  const [requests] = createResource(() => api.analytics.getRequests(50));
+  const [requests] = createResource(() => api.analytics.getRequests({ limit: 50 }));
   const [usage] = createResource(() => api.analytics.getUsage(undefined, undefined, 7));
   const [metrics] = createResource(() => api.analytics.getMetrics(undefined, 7));
 
@@ -38,7 +38,12 @@ export const Analytics: Component = () => {
                 {
                   id: 'status',
                   header: 'Status',
-                cell: (row) => <StatusBadge tone={row.status_code >= 400 ? 'danger' : 'success'}>{String(row.status_code)}</StatusBadge>,
+                  cell: (row) => <StatusBadge tone={row.status_code >= 400 ? 'danger' : 'success'}>{String(row.status_code)}</StatusBadge>,
+                },
+                {
+                  id: 'detail',
+                  header: 'Detail',
+                  cell: (row) => <StatusBadge tone={row.detail_logged ? 'warning' : 'neutral'}>{row.detail_logged ? 'Verbose' : 'Meta'}</StatusBadge>,
                 },
               ]}
               getRowKey={(row) => row.id}

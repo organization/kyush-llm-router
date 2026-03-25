@@ -5,11 +5,14 @@ import { initAnalyticsDb } from '../../src/config/analytics-db';
 import adminRoutes from '../../src/routes/admin';
 import apiRoutes from '../../src/routes/api';
 import analyticsRoutes from '../../src/routes/analytics';
+import { initRequestLogsDb } from '../../src/config/request-logs-db';
+import { getUtcTimestamp } from '../../src/utils/time';
 
 export function createTestApp() {
   // Initialize both databases
   initDb();
   initAnalyticsDb();
+  initRequestLogsDb();
   
   const app = express();
   
@@ -21,7 +24,7 @@ export function createTestApp() {
   app.use('/admin/analytics', analyticsRoutes);
   
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', timestamp: getUtcTimestamp() });
   });
   
   // Error handling middleware

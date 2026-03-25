@@ -23,6 +23,7 @@ interface BackendFormState {
   base_url: string;
   api_key: string;
   is_active: boolean;
+  detail_logging: boolean;
 }
 
 const emptyForm = (): BackendFormState => ({
@@ -30,6 +31,7 @@ const emptyForm = (): BackendFormState => ({
   base_url: '',
   api_key: '',
   is_active: true,
+  detail_logging: false,
 });
 
 export const Backends: Component = () => {
@@ -55,6 +57,7 @@ export const Backends: Component = () => {
       base_url: backend.base_url,
       api_key: backend.api_key ?? '',
       is_active: backend.is_active,
+      detail_logging: backend.detail_logging,
     });
     setDialogOpen(true);
   };
@@ -76,6 +79,7 @@ export const Backends: Component = () => {
           base_url: current.base_url.trim(),
           api_key: current.api_key.trim() || undefined,
           is_active: current.is_active,
+          detail_logging: current.detail_logging,
         });
         setNotice({ tone: 'success', message: 'Backend updated.' });
       } else {
@@ -83,6 +87,7 @@ export const Backends: Component = () => {
           name: current.name.trim(),
           base_url: current.base_url.trim(),
           api_key: current.api_key.trim() || undefined,
+          detail_logging: current.detail_logging,
         });
         setNotice({ tone: 'success', message: 'Backend created.' });
       }
@@ -160,6 +165,11 @@ export const Backends: Component = () => {
                     cell: (backend) => <span title={backend.base_url}>{backend.base_url}</span>,
                   },
                   {
+                    id: 'detail_logging',
+                    header: 'Detail Log',
+                    cell: (backend) => <StatusBadge tone={backend.detail_logging ? 'warning' : 'neutral'}>{backend.detail_logging ? 'On' : 'Off'}</StatusBadge>,
+                  },
+                  {
                     id: 'status',
                     header: 'Status',
                     cell: (backend) => <StatusBadge tone={backend.is_active ? 'success' : 'warning'}>{backend.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
@@ -214,6 +224,12 @@ export const Backends: Component = () => {
                 onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
               />
             </Show>
+            <Checkbox
+              label="Enable detailed logging"
+              description="When enabled, proxied request and response headers/bodies are stored for this backend."
+              checked={form().detail_logging}
+              onChange={(checked) => setForm((current) => ({ ...current, detail_logging: checked }))}
+            />
           </form>
         </FormDialog>
 

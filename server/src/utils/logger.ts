@@ -1,3 +1,5 @@
+import { getUtcTimestamp } from './time';
+
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -9,7 +11,7 @@ const colors = {
 };
 
 export function log(level: 'log' | 'debug' | 'info' | 'warn' | 'error', message: string, meta?: unknown): void {
-  const timestamp = new Date().toISOString();
+  const timestamp = getUtcTimestamp();
   const levelColor = {
     log: colors.blue,
     debug: colors.gray,

@@ -1,19 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-
-const CORE_DB_PATH = process.env.CORE_DB_PATH || path.join(process.cwd(), 'data', 'core.db');
+import { ensureDir, getCoreDbPath } from './db-paths';
 
 let db: Database.Database;
 
 export function getDb(): Database.Database {
   if (!db) {
-    const dataDir = path.dirname(CORE_DB_PATH);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
+    const coreDbPath = getCoreDbPath();
+    ensureDir(path.dirname(coreDbPath));
 
-    db = new Database(CORE_DB_PATH);
+    db = new Database(coreDbPath);
     db.pragma('foreign_keys = ON');
 
     const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'schema.sql');
@@ -29,12 +26,10 @@ export function initDb(): Database.Database {
     db.close();
   }
   
-  const dataDir = path.dirname(CORE_DB_PATH);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
+  const coreDbPath = getCoreDbPath();
+  ensureDir(path.dirname(coreDbPath));
 
-  db = new Database(CORE_DB_PATH);
+  db = new Database(coreDbPath);
   db.pragma('foreign_keys = ON');
 
   const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'schema.sql');

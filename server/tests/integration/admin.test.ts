@@ -204,7 +204,7 @@ describe('Admin API - Backend Management', () => {
       
       expect(response.status).toBe(200);
       expect(response.body.name).toBe('Updated Backend');
-      expect(response.body.is_active).toBe(0);
+      expect(response.body.is_active).toBe(false);
     });
 
     it('should return 404 for non-existent backend', async () => {

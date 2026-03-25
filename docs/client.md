@@ -14,10 +14,10 @@ client/src/
     index.ts                # TypeScript 타입 정의
   routes/
     Dashboard.tsx           # 홈 — 요약 카드 (사용자 수, 활성 백엔드, 최근 요청) + 최근 요청 테이블
-    Users.tsx               # 사용자 관리 — CRUD, API 키 발급/재발급, 활성화 토글
-    Backends.tsx            # 백엔드 관리 — CRUD (name, base_url, api_key)
+    Users.tsx               # 사용자 관리 — CRUD, API 키 발급/재발급, 활성화/상세 로깅 토글
+    Backends.tsx            # 백엔드 관리 — CRUD (name, base_url, api_key, detail_logging)
     Permissions.tsx         # 권한 관리 — user-backend 매핑
-    Analytics.tsx           # 분석 — 요청 로그, 사용량 통계, 백엔드 메트릭
+    Analytics.tsx           # 분석 — 월별 요청 로그, 사용량 통계, 백엔드 메트릭
     Scripts.tsx             # 스크립트 관리 — CRUD, 테스트, 활성화/비활성화
   components/
     Layout.tsx              # 사이드바 네비게이션 + 메인 콘텐츠 레이아웃
@@ -54,3 +54,8 @@ CSS 프레임워크 없음. 인라인 `style` props 사용.
 ## Dev Server
 
 포트: 3002 (vite.config.ts), API 프록시: `/api` → `http://localhost:3000`
+
+## Analytics Notes
+
+- 요청 로그 조회는 월별 request_logs 파일을 대상으로 한다.
+- analytics API 클라이언트는 `month`, `date`, `q`, `limit`, `offset` 등 필터를 지원한다.

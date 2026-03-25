@@ -4,6 +4,7 @@ export type User = {
   name: string;
   email?: string;
   is_active: boolean;
+  detail_logging: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -14,6 +15,7 @@ export type Backend = {
   base_url: string;
   api_key?: string;
   is_active: boolean;
+  detail_logging: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -38,6 +40,12 @@ export type RequestLog = {
   status_code: number;
   response_time_ms?: number;
   error_message?: string;
+  detail_logged: boolean;
+  local_date: string;
+  request_headers?: string;
+  request_body?: string;
+  response_headers?: string;
+  response_body?: string;
   created_at: string;
 };
 

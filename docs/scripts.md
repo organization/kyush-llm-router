@@ -33,6 +33,10 @@ interface ScriptContextData {
 }
 ```
 
+참고:
+- `request.body`, `response.body`는 직렬화 가능한 값이며 보통 JSON 객체로 전달된다.
+- 스크립트가 body를 수정하면 라우터가 업스트림 전송 전에 최종 body를 기준으로 직렬화하고 `content-length`를 다시 계산한다.
+
 ## Example
 
 ```javascript

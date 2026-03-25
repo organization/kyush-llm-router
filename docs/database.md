@@ -1,8 +1,8 @@
 # Database Schema
 
-두 개의 SQLite 데이터베이스를 사용한다. 설정 데이터는 `core.db`, 운영 데이터는 `analytics.db`에 저장된다.
+DB는 `DB_DIR` 하위에 분리 저장된다.
 
-스키마 원본: [database/schema.sql](../database/schema.sql), [database/analytics-schema.sql](../database/analytics-schema.sql)
+스키마 원본: [database/schema.sql](../database/schema.sql), [database/analytics-schema.sql](../database/analytics-schema.sql), [database/request-logs-schema.sql](../database/request-logs-schema.sql)
 
 ---
 
@@ -17,6 +17,7 @@
 | name | TEXT | NOT NULL |
 | email | TEXT | |
 | is_active | BOOLEAN | DEFAULT 1 |
+| detail_logging | INTEGER | DEFAULT 0 |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
@@ -31,6 +32,7 @@ Indexes: `idx_users_api_key(api_key)`
 | base_url | TEXT | NOT NULL |
 | api_key | TEXT | |
 | is_active | BOOLEAN | DEFAULT 1 |
+| detail_logging | INTEGER | DEFAULT 0 |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
@@ -68,29 +70,11 @@ Indexes: `idx_user_scripts_type`, `idx_user_scripts_active`, `idx_user_scripts_t
 
 ## Analytics Database (analytics.db)
 
-### request_logs
+### usage_stats
 
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
-| user_id | INTEGER | NOT NULL |
-| backend_id | INTEGER | NOT NULL |
-| endpoint | TEXT | NOT NULL |
-| request_model | TEXT | |
-| response_model | TEXT | |
-| prompt_tokens | INTEGER | |
-| completion_tokens | INTEGER | |
-| total_tokens | INTEGER | |
-| status_code | INTEGER | |
-| response_time_ms | INTEGER | |
-| error_message | TEXT | |
-| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
-
-Indexes: `idx_request_logs_user`, `idx_request_logs_backend`, `idx_request_logs_date(created_at)`, `idx_request_logs_user_backend`
-
-### usage_stats
-
-일별 집계 테이블.
+일별 집계 테이블. 날짜 경계는 `TZ`, 저장 timestamp는 UTC 기준.
 
 | Column | Type | Constraints |
 |--------|------|-------------|
@@ -121,3 +105,33 @@ Indexes: `idx_usage_stats_user`, `idx_usage_stats_date`
 
 Unique: `(backend_id, date)`
 Indexes: `idx_backend_metrics_backend`, `idx_backend_metrics_date`
+
+## Monthly Request Logs (`request_logs/request_logs_YYYY-MM.db`)
+
+월별 상세 요청 로그는 별도 SQLite 파일에 저장된다.
+
+### request_logs
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| user_id | INTEGER | NOT NULL |
+| backend_id | INTEGER | NOT NULL |
+| endpoint | TEXT | NOT NULL |
+| request_model | TEXT | |
+| response_model | TEXT | |
+| prompt_tokens | INTEGER | |
+| completion_tokens | INTEGER | |
+| total_tokens | INTEGER | |
+| status_code | INTEGER | |
+| response_time_ms | INTEGER | |
+| error_message | TEXT | |
+| detail_logged | INTEGER | DEFAULT 0 |
+| local_date | TEXT | `TZ` 기준 `YYYY-MM-DD` |
+| request_headers | TEXT | JSON 문자열 |
+| request_body | TEXT | JSON 또는 raw 문자열 |
+| response_headers | TEXT | JSON 문자열 |
+| response_body | TEXT | JSON 또는 raw 문자열 |
+| created_at | TEXT | UTC ISO timestamp |
+
+Indexes: `created_at`, `local_date`, `user_id`, `backend_id`, `endpoint`, `detail_logged`

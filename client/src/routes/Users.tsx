@@ -28,12 +28,14 @@ interface UserFormState {
   name: string;
   email: string;
   is_active: boolean;
+  detail_logging: boolean;
 }
 
 const emptyForm = (): UserFormState => ({
   name: '',
   email: '',
   is_active: true,
+  detail_logging: false,
 });
 
 const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 5)}...`;
@@ -73,6 +75,7 @@ export const Users: Component = () => {
       name: user.name,
       email: user.email ?? '',
       is_active: user.is_active,
+      detail_logging: user.detail_logging,
     });
     setDialogOpen(true);
   };
@@ -93,12 +96,14 @@ export const Users: Component = () => {
           name: current.name.trim(),
           email: current.email.trim() || undefined,
           is_active: current.is_active,
+          detail_logging: current.detail_logging,
         });
         setNotice({ tone: 'success', message: 'User updated.' });
       } else {
         await api.users.create({
           name: current.name.trim(),
           email: current.email.trim() || undefined,
+          detail_logging: current.detail_logging,
         });
         setNotice({ tone: 'success', message: 'User created.' });
       }
@@ -238,6 +243,11 @@ export const Users: Component = () => {
                     ),
                   },
                   {
+                    id: 'detail_logging',
+                    header: 'Detail Log',
+                    cell: (user) => <StatusBadge tone={user.detail_logging ? 'warning' : 'neutral'}>{user.detail_logging ? 'On' : 'Off'}</StatusBadge>,
+                  },
+                  {
                     id: 'status',
                     header: 'Status',
                     cell: (user) => <StatusBadge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
@@ -309,6 +319,12 @@ export const Users: Component = () => {
                 onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
               />
             </Show>
+            <Checkbox
+              label="Enable detailed logging"
+              description="When enabled, proxied request and response headers/bodies are stored for this user."
+              checked={form().detail_logging}
+              onChange={(checked) => setForm((current) => ({ ...current, detail_logging: checked }))}
+            />
           </form>
         </FormDialog>
 

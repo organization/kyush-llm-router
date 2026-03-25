@@ -1,33 +1,31 @@
 import { beforeAll, afterAll } from 'vitest';
-import { execSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 
-// Test database paths
-const TEST_CORE_DB_PATH = path.join(__dirname, '..', 'data', 'test-core.db');
-const TEST_ANALYTICS_DB_PATH = path.join(__dirname, '..', 'data', 'test-analytics.db');
+const workerId = process.env.VITEST_POOL_ID || process.env.VITEST_WORKER_ID || String(process.pid);
+const TEST_DB_DIR = path.join(__dirname, '..', 'data', `test-db-${workerId}`);
 
-// Set environment variables for test databases
-process.env.CORE_DB_PATH = TEST_CORE_DB_PATH;
-process.env.ANALYTICS_DB_PATH = TEST_ANALYTICS_DB_PATH;
+process.env.DB_DIR = TEST_DB_DIR;
+process.env.TZ = 'Asia/Seoul';
 
-// Clear test databases before all tests
 beforeAll(() => {
-  try {
-    execSync(`rm -f "${TEST_CORE_DB_PATH}" "${TEST_ANALYTICS_DB_PATH}"`, { stdio: 'ignore' });
-  } catch (e) {
-    // Ignore errors if files don't exist
+  if (fs.existsSync(TEST_DB_DIR)) {
+    fs.rmSync(TEST_DB_DIR, { recursive: true, force: true });
   }
 });
 
-// Clean up after all tests
-afterAll(() => {
-  import('../src/config/database').then(({ closeDb }) => closeDb()).catch(() => {});
-  import('../src/config/analytics-db').then(({ closeAnalyticsDb }) => closeAnalyticsDb()).catch(() => {});
-  
-  // Remove test databases
-  try {
-    execSync(`rm -f "${TEST_CORE_DB_PATH}" "${TEST_ANALYTICS_DB_PATH}"`, { stdio: 'ignore' });
-  } catch (e) {
-    // Ignore errors
+afterAll(async () => {
+  const [{ closeDb }, { closeAnalyticsDb }, { closeRequestLogsDbs }] = await Promise.all([
+    import('../src/config/database'),
+    import('../src/config/analytics-db'),
+    import('../src/config/request-logs-db'),
+  ]);
+
+  closeDb();
+  closeAnalyticsDb();
+  closeRequestLogsDbs();
+
+  if (fs.existsSync(TEST_DB_DIR)) {
+    fs.rmSync(TEST_DB_DIR, { recursive: true, force: true });
   }
 });

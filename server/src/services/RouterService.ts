@@ -2,6 +2,22 @@ import { Backend } from '../../../shared/types';
 import { BackendModel } from '../models/Backend';
 
 export class RouterService {
+  private static prepareRequestBody(body?: unknown): string | Uint8Array | ArrayBuffer | undefined {
+    if (body === undefined || body === null) {
+      return undefined;
+    }
+
+    if (typeof body === 'string') {
+      return body;
+    }
+
+    if (body instanceof Uint8Array || body instanceof ArrayBuffer) {
+      return body;
+    }
+
+    return JSON.stringify(body);
+  }
+
   static selectBackend(allowedBackendIds: number[]): Backend | null {
     if (allowedBackendIds.length === 0) {
       return null;
@@ -25,7 +41,7 @@ export class RouterService {
     method: string,
     headers: Record<string, string>,
     body?: unknown
-  ): Promise<{ status: number; data: unknown }> {
+  ): Promise<{ status: number; data: unknown; headers: Record<string, string> }> {
     let backendPath = path;
     if (backend.base_url.includes('/v1')) {
       backendPath = path.replace(/^\/v1/, '');
@@ -37,6 +53,11 @@ export class RouterService {
       'Content-Type': 'application/json',
       ...headers,
     };
+    const preparedBody = this.prepareRequestBody(body);
+
+    // Always let fetch/undici compute Content-Length from the final outgoing body.
+    delete fetchHeaders['content-length'];
+    delete fetchHeaders['Content-Length'];
 
     if (backend.api_key) {
       fetchHeaders['Authorization'] = `Bearer ${backend.api_key}`;
@@ -46,14 +67,16 @@ export class RouterService {
       const response = await fetch(backendUrl, {
         method,
         headers: fetchHeaders,
-        body: body ? JSON.stringify(body) : undefined,
+        body: preparedBody,
       });
 
       const data = await response.json().catch(() => ({}));
+      const responseHeaders = Object.fromEntries(response.headers.entries());
 
       return {
         status: response.status,
         data,
+        headers: responseHeaders,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -108,6 +131,7 @@ export class RouterService {
       return {
         status: 502,
         data: detailedError,
+        headers: {},
       };
     }
   }

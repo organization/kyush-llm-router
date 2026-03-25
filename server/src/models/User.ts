@@ -1,10 +1,12 @@
 import { getDb } from '../config/database';
 import { User, CreateUserData, UpdateUserData } from '../../../shared/types';
 import { generateApiKey } from '../utils/apiKey';
+import { getUtcTimestamp } from '../utils/time';
 
 export class UserModel {
   static asUser(row: any): User {
     row.is_active = !!row.is_active;
+    row.detail_logging = !!row.detail_logging;
     return row as User;
   }
 
@@ -27,10 +29,12 @@ export class UserModel {
 
   static create(data: CreateUserData): User {
     const apiKey = `sk-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    const timestamp = getUtcTimestamp();
+    const detailLogging = data.detail_logging ?? false;
     const stmt = getDb().prepare(
-      'INSERT INTO users (api_key, name, email) VALUES (?, ?, ?)'
+      'INSERT INTO users (api_key, name, email, detail_logging, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
     );
-    const result = stmt.run(apiKey, data.name, data.email || null);
+    const result = stmt.run(apiKey, data.name, data.email || null, detailLogging ? 1 : 0, timestamp, timestamp);
     
     return {
       id: result.lastInsertRowid as number,
@@ -38,8 +42,9 @@ export class UserModel {
       name: data.name,
       email: data.email,
       is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      detail_logging: detailLogging,
+      created_at: timestamp,
+      updated_at: timestamp,
     };
   }
 
@@ -59,12 +64,17 @@ export class UserModel {
       updates.push('is_active = ?');
       values.push(data.is_active ? 1 : 0);
     }
+    if (data.detail_logging !== undefined) {
+      updates.push('detail_logging = ?');
+      values.push(data.detail_logging ? 1 : 0);
+    }
 
     if (updates.length === 0) {
       return this.findById(id);
     }
 
-    updates.push('updated_at = CURRENT_TIMESTAMP');
+    updates.push('updated_at = ?');
+    values.push(getUtcTimestamp());
     values.push(id);
 
     getDb().prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
@@ -77,7 +87,7 @@ export class UserModel {
   }
 
   static deactivate(id: number): boolean {
-    const result = getDb().prepare('UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const result = getDb().prepare('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?').run(getUtcTimestamp(), id);
     return result.changes > 0;
   }
 
@@ -86,7 +96,7 @@ export class UserModel {
     if (!user) return null;
 
     const newApiKey = generateApiKey();
-    getDb().prepare('UPDATE users SET api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newApiKey, id);
+    getDb().prepare('UPDATE users SET api_key = ?, updated_at = ? WHERE id = ?').run(newApiKey, getUtcTimestamp(), id);
     return newApiKey;
   }
 }

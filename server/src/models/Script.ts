@@ -1,5 +1,6 @@
 import { getDb } from '../config/database';
 import { UserScript, CreateScriptData, UpdateScriptData } from '../../../shared/types';
+import { getUtcTimestamp } from '../utils/time';
 
 export class ScriptModel {
   static asUserScript(row: any): UserScript {
@@ -34,8 +35,9 @@ export class ScriptModel {
 
   static create(data: CreateScriptData): UserScript {
     try {
+      const timestamp = getUtcTimestamp();
       const stmt = getDb().prepare(
-        'INSERT INTO user_scripts (name, script_type, target_user_id, target_backend_id, script_code, is_active) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO user_scripts (name, script_type, target_user_id, target_backend_id, script_code, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       );
       const isActive = data.is_active ?? true;
       const result = stmt.run(
@@ -44,7 +46,9 @@ export class ScriptModel {
         data.target_user_id ?? null,
         data.target_backend_id ?? null,
         data.script_code,
-        isActive ? 1 : 0
+        isActive ? 1 : 0,
+        timestamp,
+        timestamp
       );
 
       return {
@@ -55,8 +59,8 @@ export class ScriptModel {
         target_backend_id: data.target_backend_id ?? null,
         script_code: data.script_code,
         is_active: isActive,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: timestamp,
+        updated_at: timestamp,
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
@@ -99,7 +103,8 @@ export class ScriptModel {
       return this.findById(id);
     }
 
-    updates.push('updated_at = CURRENT_TIMESTAMP');
+    updates.push('updated_at = ?');
+    values.push(getUtcTimestamp());
     values.push(id);
 
     getDb().prepare(`UPDATE user_scripts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
@@ -112,12 +117,12 @@ export class ScriptModel {
   }
 
   static activate(id: number): boolean {
-    const result = getDb().prepare('UPDATE user_scripts SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const result = getDb().prepare('UPDATE user_scripts SET is_active = 1, updated_at = ? WHERE id = ?').run(getUtcTimestamp(), id);
     return result.changes > 0;
   }
 
   static deactivate(id: number): boolean {
-    const result = getDb().prepare('UPDATE user_scripts SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const result = getDb().prepare('UPDATE user_scripts SET is_active = 0, updated_at = ? WHERE id = ?').run(getUtcTimestamp(), id);
     return result.changes > 0;
   }
 

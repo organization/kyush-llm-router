@@ -22,7 +22,7 @@ scripts/         개발 스크립트
 - Server: `server/src/index.ts`
 - Client: `client/src/index.tsx`
 - Shared types: `shared/types.ts`
-- DB schema: `database/schema.sql`, `database/analytics-schema.sql`
+- DB schema: `database/schema.sql`, `database/analytics-schema.sql`, `database/request-logs-schema.sql`
 
 ## Key Concepts
 
@@ -36,7 +36,7 @@ Client → Auth → Script(onRequest) → RouterService → Backend → Script(o
 
 **Script Engine**: isolated-vm 샌드박스에서 JS 실행. 3가지 타입: per-user, per-backend, per-user-backend
 
-**Database**: core.db (users, backends, permissions, user_scripts) + analytics.db (request_logs, usage_stats, backend_metrics)
+**Database**: `DB_DIR` 하위에 `core.db` (users, backends, permissions, user_scripts), `analytics.db` (usage_stats, backend_metrics), `request_logs/request_logs_YYYY-MM.db` (상세 요청 로그)
 
 ## Development
 
@@ -53,8 +53,8 @@ pnpm run bench      # 벤치마크 실행
 |----------|---------|-------------|
 | `SERVER_PORT` | 3000 | Express 서버 포트 |
 | `CLIENT_PORT` | 3001 | Vite 개발 서버 포트 |
-| `CORE_DB_PATH` | ./data/core.db | Core DB 경로 |
-| `ANALYTICS_DB_PATH` | ./data/analytics.db | Analytics DB 경로 |
+| `DB_DIR` | ./data | DB 루트 경로 (`core.db`, `analytics.db`, `request_logs/` 생성 위치) |
+| `TZ` | UTC | 일/월 경계 계산용 타임존. 저장 timestamp는 UTC |
 | `ADMIN_PASSWORD` | (필수) | 어드민 비밀번호 |
 | `CORS_ORIGINS` | localhost origins | 허용 CORS 오리진 |
 

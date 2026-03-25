@@ -1,31 +1,14 @@
 import { getAnalyticsDb } from '../config/analytics-db';
 import { RequestLog } from '../../../shared/types';
+import { RequestLogInsert, RequestLogQuery, RequestLogService } from './RequestLogService';
+import { getLocalDateKey } from '../utils/time';
+
+type AnalyticsLogInput = RequestLogInsert;
 
 export class AnalyticsService {
-  static logRequest(logData: Omit<RequestLog, 'id' | 'created_at'>): void {
+  static logRequest(logData: AnalyticsLogInput): void {
     try {
-      const db = getAnalyticsDb();
-      const stmt = db.prepare(`
-        INSERT INTO request_logs (
-          user_id, backend_id, endpoint, request_model, response_model,
-          prompt_tokens, completion_tokens, total_tokens,
-          status_code, response_time_ms, error_message
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      stmt.run(
-        logData.user_id,
-        logData.backend_id,
-        logData.endpoint,
-        logData.request_model || null,
-        logData.response_model || null,
-        logData.prompt_tokens || null,
-        logData.completion_tokens || null,
-        logData.total_tokens || null,
-        logData.status_code,
-        logData.response_time_ms || null,
-        logData.error_message || null
-      );
+      RequestLogService.logRequest(logData);
 
       this.updateUsageStats(logData.user_id, logData.backend_id, logData.total_tokens || 0);
       this.updateBackendMetrics(logData.backend_id, logData);
@@ -36,7 +19,7 @@ export class AnalyticsService {
 
   private static updateUsageStats(userId: number, backendId: number, tokens: number): void {
     const db = getAnalyticsDb();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateKey();
 
     const upsertStmt = db.prepare(`
       INSERT INTO usage_stats (user_id, backend_id, date, total_requests, total_tokens)
@@ -50,9 +33,9 @@ export class AnalyticsService {
     upsertStmt.run(userId, backendId, today, tokens, tokens);
   }
 
-  private static updateBackendMetrics(backendId: number, logData: Omit<RequestLog, 'id' | 'created_at'>): void {
+  private static updateBackendMetrics(backendId: number, logData: AnalyticsLogInput): void {
     const db = getAnalyticsDb();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateKey();
     const isSuccess = logData.status_code >= 200 && logData.status_code < 300;
 
     const existing = db.prepare(
@@ -99,17 +82,14 @@ export class AnalyticsService {
     }
   }
 
-  static getRequestLogs(limit: number = 100, offset: number = 0): RequestLog[] {
-    const db = getAnalyticsDb();
-    return db.prepare(`
-      SELECT * FROM request_logs ORDER BY created_at DESC LIMIT ? OFFSET ?
-    `).all(limit, offset) as RequestLog[];
+  static getRequestLogs(query: RequestLogQuery = {}): RequestLog[] {
+    return RequestLogService.getRequestLogs(query);
   }
 
   static getUsageStats(userId?: number, backendId?: number, days: number = 30): unknown[] {
     const db = getAnalyticsDb();
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const endDate = getLocalDateKey();
+    const startDate = getLocalDateKey(new Date(Date.now() - days * 24 * 60 * 60 * 1000));
 
     let query = `
       SELECT * FROM usage_stats 
@@ -133,8 +113,8 @@ export class AnalyticsService {
 
   static getBackendMetrics(backendId?: number, days: number = 30): unknown[] {
     const db = getAnalyticsDb();
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const endDate = getLocalDateKey();
+    const startDate = getLocalDateKey(new Date(Date.now() - days * 24 * 60 * 60 * 1000));
 
     let query = `
       SELECT * FROM backend_metrics 

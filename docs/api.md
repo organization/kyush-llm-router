@@ -28,7 +28,7 @@
 | GET | `/admin/users` | 전체 사용자 목록 |
 | POST | `/admin/users` | 사용자 생성 (API 키 자동 발급) |
 | GET | `/admin/users/:id` | 사용자 조회 |
-| PUT | `/admin/users/:id` | 사용자 수정 (name, email, is_active) |
+| PUT | `/admin/users/:id` | 사용자 수정 (name, email, is_active, detail_logging) |
 | DELETE | `/admin/users/:id` | 사용자 삭제 |
 | POST | `/admin/users/:id/regenerate-api-key` | API 키 재발급 |
 
@@ -37,7 +37,7 @@
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/backends` | 전체 백엔드 목록 |
-| POST | `/admin/backends` | 백엔드 생성 (name, base_url, api_key) |
+| POST | `/admin/backends` | 백엔드 생성 (name, base_url, api_key, detail_logging) |
 | GET | `/admin/backends/:id` | 백엔드 조회 |
 | PUT | `/admin/backends/:id` | 백엔드 수정 |
 | DELETE | `/admin/backends/:id` | 백엔드 삭제 |
@@ -72,5 +72,7 @@
 | Method | Path | Query Params | Description |
 |--------|------|-------------|-------------|
 | GET | `/admin/analytics/usage` | userId, backendId, days | 사용량 통계 |
-| GET | `/admin/analytics/requests` | limit, offset | 요청 로그 (페이지네이션) |
+| GET | `/admin/analytics/requests` | month, date, limit, offset, q, userId, backendId, endpoint, detailLogged | 월별 상세 요청 로그 조회 |
 | GET | `/admin/analytics/metrics` | backendId, days | 백엔드 성능 메트릭 |
+
+상세 로그는 `users.detail_logging=1` 또는 `backends.detail_logging=1`일 때만 request/response header/body가 저장된다.

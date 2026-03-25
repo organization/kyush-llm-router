@@ -8,8 +8,10 @@
 server/src/
   index.ts              # Express 앱 팩토리 (CORS, 라우트 설정, health 엔드포인트)
   config/
+    db-paths.ts         # DB_DIR 기준 파일 경로 계산
     database.ts         # Core SQLite 연결 및 스키마 초기화
     analytics-db.ts     # Analytics SQLite 연결 및 스키마 초기화
+    request-logs-db.ts  # 월별 request_logs SQLite 연결 및 스키마 초기화
   models/
     User.ts             # 사용자 CRUD (create, findById, findByApiKey, update, delete, regenerateApiKey)
     Backend.ts          # 백엔드 CRUD (create, findById, findAll, activate/deactivate)
@@ -23,13 +25,15 @@ server/src/
     scripts.ts          # Script 관리 엔드포인트
     analytics.ts        # Analytics 조회 엔드포인트
   services/
-    RouterService.ts    # 백엔드 선택 (랜덤 로드밸런싱) 및 HTTP 요청 포워딩
-    AnalyticsService.ts # 요청 로깅, 일별 사용량/메트릭 집계
+    RouterService.ts    # 백엔드 선택 (랜덤 로드밸런싱), HTTP 요청 포워딩, body/content-length 정규화
+    AnalyticsService.ts # 일별 사용량/메트릭 집계
+    RequestLogService.ts # 월별 request_logs 기록/조회
     ScriptEngine.ts     # 스크립트 체인 오케스트레이션 (onRequest/onResponse 훅 적용)
     ScriptExecutor.ts   # isolated-vm 기반 스크립트 컴파일/실행 (5s timeout, 50MB memory)
   utils/
     apiKey.ts           # API 키 생성 (sk-{timestamp}-{random}, crypto.randomBytes)
     logger.ts           # 컬러 콘솔 로거
+    time.ts             # TZ 기준 날짜/월 계산, UTC timestamp 생성
 ```
 
 ## Request Flow
@@ -40,9 +44,15 @@ Client → auth.ts (API 키 검증, 권한 로드)
        → ScriptEngine.applyOnRequestScripts (요청 변조)
        → RouterService.forwardRequest (백엔드 프록시)
        → ScriptEngine.applyOnResponseScripts (응답 변조)
-       → AnalyticsService.logRequest (로깅)
+       → AnalyticsService.logRequest (집계 + 월별 request_logs 기록)
        → Response
 ```
+
+## Time & Storage
+
+- DB 루트는 `DB_DIR`로 설정한다. 파일은 `core.db`, `analytics.db`, `request_logs/request_logs_YYYY-MM.db` 구조로 생성된다.
+- 일/월 경계 계산은 `TZ` 기준으로 수행한다.
+- 저장되는 timestamp 문자열은 UTC ISO 형식으로 통일한다.
 
 ## Dependencies
 

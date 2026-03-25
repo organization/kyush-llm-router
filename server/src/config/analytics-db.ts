@@ -1,19 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-
-const ANALYTICS_DB_PATH = process.env.ANALYTICS_DB_PATH || path.join(process.cwd(), 'data', 'analytics.db');
+import { ensureDir, getAnalyticsDbPath } from './db-paths';
 
 let db: Database.Database;
 
 export function getAnalyticsDb(): Database.Database {
   if (!db) {
-    const dataDir = path.dirname(ANALYTICS_DB_PATH);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
+    const analyticsDbPath = getAnalyticsDbPath();
+    ensureDir(path.dirname(analyticsDbPath));
 
-    db = new Database(ANALYTICS_DB_PATH);
+    db = new Database(analyticsDbPath);
     db.pragma('foreign_keys = ON');
 
     const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'analytics-schema.sql');
@@ -29,12 +26,10 @@ export function initAnalyticsDb(): Database.Database {
     db.close();
   }
   
-  const dataDir = path.dirname(ANALYTICS_DB_PATH);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
+  const analyticsDbPath = getAnalyticsDbPath();
+  ensureDir(path.dirname(analyticsDbPath));
 
-  db = new Database(ANALYTICS_DB_PATH);
+  db = new Database(analyticsDbPath);
   db.pragma('foreign_keys = ON');
 
   const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'analytics-schema.sql');

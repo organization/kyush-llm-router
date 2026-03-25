@@ -27,7 +27,7 @@ export const api = {
   users: {
     getAll: (): Promise<User[]> => fetchJson<User[]>(`${API_BASE}/admin/users`),
     getById: (id: number): Promise<User> => fetchJson<User>(`${API_BASE}/admin/users/${id}`),
-    create: (data: { name: string; email?: string }): Promise<User> =>
+    create: (data: { name: string; email?: string; detail_logging?: boolean }): Promise<User> =>
       fetchJson<User>(`${API_BASE}/admin/users`, { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: Partial<User>): Promise<User> =>
       fetchJson<User>(`${API_BASE}/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -40,7 +40,7 @@ export const api = {
   backends: {
     getAll: (): Promise<Backend[]> => fetchJson<Backend[]>(`${API_BASE}/admin/backends`),
     getById: (id: number): Promise<Backend> => fetchJson<Backend>(`${API_BASE}/admin/backends/${id}`),
-    create: (data: { name: string; base_url: string; api_key?: string }): Promise<Backend> =>
+    create: (data: { name: string; base_url: string; api_key?: string; detail_logging?: boolean }): Promise<Backend> =>
       fetchJson<Backend>(`${API_BASE}/admin/backends`, { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: Partial<Backend>): Promise<Backend> =>
       fetchJson<Backend>(`${API_BASE}/admin/backends/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -85,8 +85,19 @@ export const api = {
       params.append('days', String(days));
       return fetchJson<UsageStats[]>(`${API_BASE}/admin/analytics/usage?${params}`);
     },
-    getRequests: (limit: number = 100, offset: number = 0): Promise<RequestLog[]> =>
-      fetchJson<RequestLog[]>(`${API_BASE}/admin/analytics/requests?limit=${limit}&offset=${offset}`),
+    getRequests: (params: { limit?: number; offset?: number; month?: string; date?: string; q?: string; userId?: number; backendId?: number; endpoint?: string; detailLogged?: boolean } = {}): Promise<RequestLog[]> => {
+      const search = new URLSearchParams();
+      search.set('limit', String(params.limit ?? 100));
+      search.set('offset', String(params.offset ?? 0));
+      if (params.month) search.set('month', params.month);
+      if (params.date) search.set('date', params.date);
+      if (params.q) search.set('q', params.q);
+      if (params.userId) search.set('userId', String(params.userId));
+      if (params.backendId) search.set('backendId', String(params.backendId));
+      if (params.endpoint) search.set('endpoint', params.endpoint);
+      if (params.detailLogged !== undefined) search.set('detailLogged', params.detailLogged ? '1' : '0');
+      return fetchJson<RequestLog[]>(`${API_BASE}/admin/analytics/requests?${search}`);
+    },
     getMetrics: (backendId?: number, days: number = 30): Promise<BackendMetrics[]> => {
       const params = new URLSearchParams();
       if (backendId) params.append('backendId', String(backendId));

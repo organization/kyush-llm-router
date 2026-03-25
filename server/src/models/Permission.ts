@@ -1,5 +1,6 @@
 import { getDb } from '../config/database';
 import { Permission, CreatePermissionData } from '../../../shared/types';
+import { getUtcTimestamp } from '../utils/time';
 
 export class PermissionModel {
   static findAll(): Permission[] {
@@ -20,16 +21,17 @@ export class PermissionModel {
 
   static create(data: CreatePermissionData): Permission {
     try {
+      const timestamp = getUtcTimestamp();
       const stmt = getDb().prepare(
-        'INSERT INTO permissions (user_id, backend_id) VALUES (?, ?)'
+        'INSERT INTO permissions (user_id, backend_id, created_at) VALUES (?, ?, ?)'
       );
-      const result = stmt.run(data.user_id, data.backend_id);
+      const result = stmt.run(data.user_id, data.backend_id, timestamp);
 
       return {
         id: result.lastInsertRowid as number,
         user_id: data.user_id,
         backend_id: data.backend_id,
-        created_at: new Date().toISOString(),
+        created_at: timestamp,
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {

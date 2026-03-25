@@ -9,6 +9,17 @@ const router: Router = Router();
 
 router.use(authenticate);
 
+function normalizeHeaders(headers: Request['headers']): Record<string, string> {
+  return Object.entries(headers).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (Array.isArray(value)) {
+      acc[key] = value.join(', ');
+    } else if (typeof value === 'string') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
 router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response) => {
   const startTime = Date.now();
   const user = req.user!;
@@ -27,14 +38,18 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
 
   try {
     const { model, messages, ...rest } = req.body;
+    const detailLoggingEnabled = user.detail_logging || backend.detail_logging;
 
     const execContext = {
       user: { id: user.id, name: user.name, email: user.email },
       backend: { id: backend.id, name: backend.name, base_url: backend.base_url },
       request: {
         method: 'POST',
-        path: '/v1/chat/completions',
-        headers: { 'Content-Type': 'application/json' },
+        path: req.path,
+        headers: {
+          ...normalizeHeaders(req.headers),
+          'content-type': req.get('content-type') || 'application/json',
+        },
         body: req.body,
         isStream: req.body.stream === true,
       },
@@ -62,7 +77,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
 
     const responseContext = {
       status: response.status,
-      headers: {},
+      headers: response.headers,
       body: response.data,
       isStream: req.body.stream === true,
     };
@@ -86,6 +101,12 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       status_code: response.status,
       response_time_ms: responseTime,
       error_message: response.status >= 400 ? JSON.stringify(response.data) : undefined,
+      detail_logged: detailLoggingEnabled,
+      request_headers: detailLoggingEnabled ? modifiedContext.request.headers : undefined,
+      request_body: detailLoggingEnabled ? modifiedContext.request.body : undefined,
+      response_headers: detailLoggingEnabled ? response.headers : undefined,
+      response_body: detailLoggingEnabled ? response.data : undefined,
+      local_date: undefined,
     });
 
     if (response.status >= 400) {
@@ -110,6 +131,12 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       status_code: 502,
       response_time_ms: responseTime,
       error_message: errorMsg,
+      detail_logged: user.detail_logging || backend.detail_logging,
+      request_headers: user.detail_logging || backend.detail_logging ? normalizeHeaders(req.headers) : undefined,
+      request_body: user.detail_logging || backend.detail_logging ? req.body : undefined,
+      response_headers: undefined,
+      response_body: undefined,
+      local_date: undefined,
     });
 
     logger.error(`Request failed for user ${user.id}: ${errorMsg}`);
