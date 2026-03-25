@@ -9,6 +9,7 @@
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | 서버 상태 확인 (status, timestamp) |
+| GET | `/admin/health` | Admin 라우터 상태 확인 (status, timestamp) |
 
 ## OpenAI-Compatible Proxy (인증 필요)
 
@@ -65,7 +66,7 @@
 | DELETE | `/admin/scripts/:id` | 스크립트 삭제 |
 | POST | `/admin/scripts/:id/activate` | 스크립트 활성화 |
 | POST | `/admin/scripts/:id/deactivate` | 스크립트 비활성화 |
-| POST | `/admin/scripts/:id/test` | 스크립트 테스트 실행 |
+| POST | `/admin/scripts/:id/test` | 스크립트 테스트 실행 (`request` 필수, `user`/`backend` 선택) |
 
 ### Analytics
 

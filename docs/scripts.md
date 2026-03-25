@@ -18,7 +18,7 @@ isolated-vm 기반 JavaScript 샌드박스에서 요청/응답을 조작하는 �
 
 ### onResponse
 
-백엔드 응답 수신 후 실행. context를 수정하여 응답을 변조할 수 있다.
+백엔드 응답 수신 후 실행. 현재 구현에서는 응답 컨텍스트를 검사하거나 로그/부가 처리를 수행하는 용도로 실행되며, 훅이 반환한 변경 내용이 최종 HTTP 응답에 다시 반영되지는 않는다.
 
 ## Script Context
 
@@ -36,6 +36,7 @@ interface ScriptContextData {
 참고:
 - `request.body`, `response.body`는 직렬화 가능한 값이며 보통 JSON 객체로 전달된다.
 - 스크립트가 body를 수정하면 라우터가 업스트림 전송 전에 최종 body를 기준으로 직렬화하고 `content-length`를 다시 계산한다.
+- `response` 필드는 실제 프록시 요청의 `onResponse` 단계에서 채워진다. `/admin/scripts/:id/test` 는 훅 존재 여부와 실행 가능성 확인용에 가깝다.
 
 ## Example
 
