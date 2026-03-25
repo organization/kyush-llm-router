@@ -12,7 +12,6 @@ interface FilterState {
   userId: string;
   backendId: string;
   endpoint: string;
-  detailLogged: string;
 }
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
@@ -24,8 +23,33 @@ const emptyFilters = (): FilterState => ({
   userId: '',
   backendId: '',
   endpoint: '',
-  detailLogged: '',
 });
+
+function extractAssistantPreview(responseBody?: string): string {
+  if (!responseBody) return '-';
+
+  try {
+    const parsed = JSON.parse(responseBody) as {
+      choices?: Array<{
+        message?: {
+          content?: unknown;
+        };
+      }>;
+    };
+    const content = parsed.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') return '-';
+
+    const normalized = content
+      .replace(/\r/g, '')
+      .replace(/\n+/g, ' ')
+      .trim();
+
+    if (!normalized) return '-';
+    return normalized.length > 50 ? `${normalized.slice(0, 50)}...` : normalized;
+  } catch {
+    return '-';
+  }
+}
 
 function prettyPrint(value?: string): string {
   if (!value) return '';
@@ -61,7 +85,6 @@ export const DetailLogs: Component = () => {
         userId: params.userId ? Number(params.userId) : undefined,
         backendId: params.backendId ? Number(params.backendId) : undefined,
         endpoint: params.endpoint || undefined,
-        detailLogged: params.detailLogged === '' ? undefined : params.detailLogged === 'true',
       })
   );
 
@@ -71,6 +94,13 @@ export const DetailLogs: Component = () => {
   const pageCount = createMemo(() => Math.max(1, Math.ceil(totalRows() / pageSize())));
   const rangeStart = createMemo(() => (totalRows() === 0 ? 0 : (page() - 1) * pageSize() + 1));
   const rangeEnd = createMemo(() => Math.min(totalRows(), page() * pageSize()));
+  const assistantPreviewById = createMemo(() => {
+    const previews = new Map<number, string>();
+    for (const row of requestRows()) {
+      previews.set(row.id, extractAssistantPreview(row.response_body));
+    }
+    return previews;
+  });
   const selectedLog = createMemo<RequestLog | undefined>(() => requestRows().find((row) => row.id === selectedLogId()));
   const selectedLogHasConversation = createMemo(() =>
     selectedLog() ? hasRenderableConversation(selectedLog()!.request_body, selectedLog()!.response_body) : false
@@ -89,12 +119,6 @@ export const DetailLogs: Component = () => {
   const endpointOptions = [
     { value: '', label: 'All endpoints' },
     { value: '/v1/chat/completions', label: '/v1/chat/completions' },
-  ];
-
-  const detailOptions = [
-    { value: '', label: 'All logs' },
-    { value: 'true', label: 'Verbose only' },
-    { value: 'false', label: 'Metadata only' },
   ];
 
   const resetFilters = () => {
@@ -150,7 +174,6 @@ export const DetailLogs: Component = () => {
             <Select label="User" value={filters().userId} options={userOptions()} onChange={(value) => updateFilter('userId', value)} />
             <Select label="Backend" value={filters().backendId} options={backendOptions()} onChange={(value) => updateFilter('backendId', value)} />
             <Select label="Endpoint" value={filters().endpoint} options={endpointOptions} onChange={(value) => updateFilter('endpoint', value)} />
-            <Select label="Detail" value={filters().detailLogged} options={detailOptions} onChange={(value) => updateFilter('detailLogged', value)} />
             <Button onClick={resetFilters}>Reset</Button>
           </CommandBarGroup>
         </CommandBar>
@@ -158,21 +181,33 @@ export const DetailLogs: Component = () => {
         <div class="ui-section-grid">
           <Panel title="Log Results" description="Monthly request log rows. Select one to inspect full payload snapshots.">
             <DataGrid
+              tableLayout="fixed"
               rows={requestRows()}
               columns={[
-                { id: 'id', header: 'ID', mono: true, cell: (row) => <span>{row.id}</span> },
-                { id: 'created_at', header: 'UTC Time', cell: (row) => <span>{new Date(row.created_at).toLocaleString()}</span> },
-                { id: 'user_id', header: 'User', mono: true, cell: (row) => <span>{row.user_id}</span> },
-                { id: 'backend_id', header: 'Backend', mono: true, cell: (row) => <span>{row.backend_id}</span> },
-                { id: 'request_model', header: 'Model', truncate: true, cell: (row) => <span title={row.request_model ?? '-'}>{row.request_model || '-'}</span> },
+                { id: 'id', header: 'ID', width: '48px', mono: true, cell: (row) => <span>{row.id}</span> },
+                { id: 'created_at', header: 'UTC Time', width: '148px', cell: (row) => <span>{new Date(row.created_at).toLocaleString()}</span> },
+                { id: 'user_id', header: 'User', width: '40px', mono: true, cell: (row) => <span>{row.user_id}</span> },
+                { id: 'backend_id', header: 'Backend', width: '56px', mono: true, cell: (row) => <span>{row.backend_id}</span> },
+                { id: 'request_model', header: 'Model', width: '120px', truncate: true, cell: (row) => <span title={row.request_model ?? '-'}>{row.request_model || '-'}</span> },
+                {
+                  id: 'assistant_preview',
+                  header: 'Assistant',
+                  class: 'detail-logs__assistant-column',
+                  cell: (row) => {
+                    const preview = assistantPreviewById().get(row.id) ?? '-';
+                    return <span title={preview}>{preview}</span>;
+                  },
+                },
                 {
                   id: 'status_code',
                   header: 'Status',
+                  width: '48px',
                   cell: (row) => <StatusBadge tone={row.status_code >= 400 ? 'danger' : 'success'}>{String(row.status_code)}</StatusBadge>,
                 },
                 {
                   id: 'detail_logged',
                   header: 'Detail',
+                  width: '68px',
                   cell: (row) => <StatusBadge tone={row.detail_logged ? 'warning' : 'neutral'}>{row.detail_logged ? 'Verbose' : 'Meta'}</StatusBadge>,
                 },
               ]}

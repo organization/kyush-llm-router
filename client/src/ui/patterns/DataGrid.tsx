@@ -31,6 +31,7 @@ export interface DataGridProps<T> {
   getRowKey: (row: T) => string | number;
   mode?: DataMode;
   density?: DataDensity;
+  tableLayout?: 'auto' | 'fixed';
   loading?: boolean;
   error?: string | null;
   emptyMessage?: string;
@@ -98,7 +99,10 @@ export function DataGrid<T>(props: DataGridProps<T>) {
   return (
     <div class={cn('ui-data-grid', props.density === 'regular' && 'ui-data-grid--regular')}>
       <div class="ui-data-grid__shell">
-        <table class="ui-data-grid__table">
+        <table
+          class="ui-data-grid__table"
+          style={{ 'table-layout': props.tableLayout ?? 'auto' }}
+        >
           <thead>
             <tr>
               <Show when={props.onToggleRowSelection}>
