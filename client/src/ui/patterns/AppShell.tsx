@@ -1,16 +1,18 @@
 import { A, useLocation } from '@solidjs/router';
+import { ChartColumn, FileCode, LayoutDashboard, Moon, Server, ShieldCheck, Sun, Users } from 'lucide-solid';
 import { For, createMemo, createSignal, onCleanup, onMount, type JSX, type ParentComponent } from 'solid-js';
+import SnakegroundBg from '../../components/SnakegroundBg';
 import { Button } from '../primitives/Button';
 import { cn } from '../lib/cn';
 import type { ThemeMode } from '../tokens';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', shortLabel: 'DB' },
-  { path: '/users', label: 'Users', shortLabel: 'US' },
-  { path: '/backends', label: 'Backends', shortLabel: 'BE' },
-  { path: '/permissions', label: 'Permissions', shortLabel: 'PM' },
-  { path: '/analytics', label: 'Analytics', shortLabel: 'AN' },
-  { path: '/scripts', label: 'Scripts', shortLabel: 'SC' },
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/users', label: 'Users', icon: Users },
+  { path: '/backends', label: 'Backends', icon: Server },
+  { path: '/permissions', label: 'Permissions', icon: ShieldCheck },
+  { path: '/analytics', label: 'Analytics', icon: ChartColumn },
+  { path: '/scripts', label: 'Scripts', icon: FileCode },
 ];
 
 interface AppShellProps {
@@ -73,6 +75,8 @@ export const AppShell: ParentComponent<AppShellProps> = (props) => {
 
   return (
     <div class="app-shell">
+      <SnakegroundBg />
+
       <aside class="nav-rail">
         <div class="nav-rail__brand">
           <div class="nav-rail__brand-mark">KR</div>
@@ -87,7 +91,7 @@ export const AppShell: ParentComponent<AppShellProps> = (props) => {
             {(item) => (
               <A href={item.path} class={cn('nav-rail__link', location.pathname === item.path && 'nav-rail__link--active')}>
                 <span class="nav-rail__link-mark" aria-hidden="true">
-                  {item.shortLabel}
+                  <item.icon />
                 </span>
                 <span>{item.label}</span>
               </A>
@@ -97,6 +101,7 @@ export const AppShell: ParentComponent<AppShellProps> = (props) => {
 
         <div class="nav-rail__footer">
           <Button class="nav-rail__theme-toggle" onClick={toggleTheme}>
+            {resolvedTheme() === 'dark' ? <Sun /> : <Moon />}
             {resolvedTheme() === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </Button>
         </div>

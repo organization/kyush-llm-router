@@ -2,6 +2,7 @@ import { createMemo, createResource, createSignal, Show, type Component } from '
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import { ScriptEditor } from '../components/ScriptEditor';
+import { Play, Plus, Power, PowerOff, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-solid';
 import type { ScriptType, UserScript } from '../types';
 import {
   Alert,
@@ -286,7 +287,12 @@ export const Scripts: Component = () => {
           <Panel
             title="Script registry"
             description="Select a script to edit, test, or change activation state."
-            actions={<Button onClick={() => void refetchScripts()}>Refresh</Button>}
+            actions={
+              <Button onClick={() => void refetchScripts()}>
+                <RefreshCw />
+                Refresh
+              </Button>
+            }
             bodyClass="ui-stack ui-stack--tight"
           >
             <Show
@@ -295,7 +301,18 @@ export const Scripts: Component = () => {
             >
               <Show
                 when={(scripts()?.length ?? 0) > 0}
-                fallback={<EmptyState title="No scripts yet" description="Create your first middleware script to intercept requests or responses." action={<Button variant="primary" onClick={() => syncForm(null)}>Create Script</Button>} />}
+                fallback={
+                  <EmptyState
+                    title="No scripts yet"
+                    description="Create your first middleware script to intercept requests or responses."
+                    action={
+                      <Button variant="primary" onClick={() => syncForm(null)}>
+                        <Plus />
+                        Create Script
+                      </Button>
+                    }
+                  />
+                }
               >
                 <DataGrid
                   rows={scripts() ?? []}
@@ -334,8 +351,14 @@ export const Scripts: Component = () => {
                   onRowClick={(script) => syncForm(script)}
                   rowActions={(script) => (
                     <div class="ui-row-actions">
-                      <Button onClick={() => void toggleActive(script)}>{script.is_active ? 'Disable' : 'Enable'}</Button>
-                      <Button variant="danger" onClick={() => requestDelete(script)}>Delete</Button>
+                      <Button onClick={() => void toggleActive(script)}>
+                        {script.is_active ? <PowerOff /> : <Power />}
+                        {script.is_active ? 'Disable' : 'Enable'}
+                      </Button>
+                      <Button variant="danger" onClick={() => requestDelete(script)}>
+                        <Trash2 />
+                        Delete
+                      </Button>
                     </div>
                   )}
                 />
@@ -350,10 +373,17 @@ export const Scripts: Component = () => {
               <div class="ui-chip-group">
                 <StatusBadge tone={form().is_active ? 'success' : 'warning'}>{form().is_active ? 'Active' : 'Draft'}</StatusBadge>
                 <Button variant="primary" onClick={() => void saveScript()} disabled={submitting()}>
+                  <Save />
                   {form().id ? 'Save Script' : 'Create Script'}
                 </Button>
-                <Button onClick={() => syncForm(null)}>New Script</Button>
-                <Button onClick={() => syncForm(selectedScript())}>Reset</Button>
+                <Button onClick={() => syncForm(null)}>
+                  <Plus />
+                  New Script
+                </Button>
+                <Button onClick={() => syncForm(selectedScript())}>
+                  <RotateCcw />
+                  Reset
+                </Button>
               </div>
             }
             bodyClass="ui-stack"
@@ -425,6 +455,7 @@ export const Scripts: Component = () => {
                   <p class="ui-copy">The test runner uses the first available user/backend as sample context and a mock chat completion request.</p>
                   <div class="ui-row-actions">
                     <Button variant="primary" onClick={() => void runTest()} disabled={testing()}>
+                      <Play />
                       {testing() ? 'Running...' : 'Run Test'}
                     </Button>
                   </div>
