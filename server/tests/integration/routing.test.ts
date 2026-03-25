@@ -289,6 +289,44 @@ describe('OpenAI Compatible Backend Integration', () => {
       expect(response.body).toHaveProperty('choices');
       expect(response.body.usage).toHaveProperty('total_tokens');
     });
+
+    it('should replace router Authorization with backend API key for upstream requests', async () => {
+      let receivedAuthorization: string | undefined;
+      const { server, port } = createMockBackend({
+        onRequest: (req) => {
+          receivedAuthorization = req.headers.authorization;
+        },
+      });
+      mockServer = server;
+      mockPort = port;
+
+      const userResponse = await request(app).post('/admin/users').send({ name: 'Auth Rewrite User 6-6' });
+      const userApiKey = userResponse.body.api_key;
+      const userId = userResponse.body.id;
+
+      const backendResponse = await request(app).post('/admin/backends').send({
+        name: 'Auth Rewrite Backend 6-6',
+        base_url: `http://localhost:${mockPort}`,
+        api_key: 'upstream-secret-key',
+      });
+      const backendId = backendResponse.body.id;
+
+      await request(app)
+        .post('/admin/permissions')
+        .send({ user_id: userId, backend_id: backendId });
+
+      const response = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send({
+          model: 'mock-model',
+          messages: [{ role: 'user', content: 'Hello' }],
+        });
+
+      expect(response.status).toBe(200);
+      expect(receivedAuthorization).toBe('Bearer upstream-secret-key');
+      expect(receivedAuthorization).not.toBe(`Bearer ${userApiKey}`);
+    });
   });
 
   describe('Scenario 7: Models endpoint routing', () => {
@@ -349,6 +387,42 @@ describe('OpenAI Compatible Backend Integration', () => {
 
       expect(response.status).toBe(403);
       expect(response.body.error).toBe('No backends available for your account');
+    });
+
+    it('should not forward router Authorization when backend API key is absent', async () => {
+      let receivedAuthorization: string | undefined;
+      const { server, port } = createMockBackend({
+        onRequest: (req) => {
+          receivedAuthorization = req.headers.authorization;
+        },
+      });
+      mockServer = server;
+      mockPort = port;
+
+      const userResponse = await request(app).post('/admin/users').send({ name: 'No Upstream Auth User 7-7' });
+      const userApiKey = userResponse.body.api_key;
+      const userId = userResponse.body.id;
+
+      const backendResponse = await request(app).post('/admin/backends').send({
+        name: 'No Upstream Auth Backend 7-7',
+        base_url: `http://localhost:${port}`,
+      });
+      const backendId = backendResponse.body.id;
+
+      await request(app)
+        .post('/admin/permissions')
+        .send({ user_id: userId, backend_id: backendId });
+
+      const response = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send({
+          model: 'mock-model',
+          messages: [{ role: 'user', content: 'Hello' }],
+        });
+
+      expect(response.status).toBe(200);
+      expect(receivedAuthorization).toBeUndefined();
     });
   });
 });

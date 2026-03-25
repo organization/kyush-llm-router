@@ -4,6 +4,7 @@ import { Users } from './routes/Users';
 import { Backends } from './routes/Backends';
 import { Permissions } from './routes/Permissions';
 import { Analytics } from './routes/Analytics';
+import { DetailLogs } from './routes/DetailLogs';
 import { Scripts } from './routes/Scripts';
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
       <Route path="/backends" component={Backends} />
       <Route path="/permissions" component={Permissions} />
       <Route path="/analytics" component={Analytics} />
+      <Route path="/detail-logs" component={DetailLogs} />
       <Route path="/scripts" component={Scripts} />
     </Router>
   );

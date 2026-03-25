@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import { createTestApp } from '../utils/testApp';
 import { initDb } from '../../src/config/database';
+import { RequestLogService } from '../../src/services/RequestLogService';
 
 describe('Auth & Proxy API', () => {
   let app: ReturnType<typeof createTestApp>;
@@ -116,6 +117,40 @@ describe('Auth & Proxy API', () => {
       );
       
       expect(loggedRequest).toBeDefined();
+    });
+
+    it('should paginate across months when month/date are not specified', async () => {
+      RequestLogService.logRequest({
+        user_id: 9991,
+        backend_id: 9991,
+        endpoint: '/v1/chat/completions',
+        request_model: 'cross-month-test-model',
+        status_code: 200,
+        detail_logged: false,
+        error_message: 'cross-month-test-marker',
+        local_date: '2026-02-20',
+        created_at: '2026-02-20T10:00:00.000Z',
+      });
+
+      RequestLogService.logRequest({
+        user_id: 9992,
+        backend_id: 9992,
+        endpoint: '/v1/chat/completions',
+        request_model: 'cross-month-test-model',
+        status_code: 200,
+        detail_logged: false,
+        error_message: 'cross-month-test-marker',
+        local_date: '2026-03-20',
+        created_at: '2026-03-20T10:00:00.000Z',
+      });
+
+      const firstPage = await request(app).get('/admin/analytics/requests?limit=1&offset=0&q=cross-month-test-marker');
+      const secondPage = await request(app).get('/admin/analytics/requests?limit=1&offset=1&q=cross-month-test-marker');
+
+      expect(firstPage.status).toBe(200);
+      expect(secondPage.status).toBe(200);
+      expect(firstPage.body[0].user_id).toBe(9992);
+      expect(secondPage.body[0].user_id).toBe(9991);
     });
   });
 });

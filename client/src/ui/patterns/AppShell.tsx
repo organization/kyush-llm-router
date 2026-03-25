@@ -1,5 +1,5 @@
 import { A, useLocation } from '@solidjs/router';
-import { ChartColumn, FileCode, LayoutDashboard, Moon, Server, ShieldCheck, Sun, Users } from 'lucide-solid';
+import { ChartColumn, FileCode, LayoutDashboard, Logs, Moon, Server, ShieldCheck, Sun, Users } from 'lucide-solid';
 import { For, createMemo, createSignal, onCleanup, onMount, type JSX, type ParentComponent } from 'solid-js';
 import SnakegroundBg from '../../components/SnakegroundBg';
 import { IconButton } from '../primitives/IconButton';
@@ -12,6 +12,7 @@ const navItems = [
   { path: '/backends', label: 'Backends', icon: Server },
   { path: '/permissions', label: 'Permissions', icon: ShieldCheck },
   { path: '/analytics', label: 'Analytics', icon: ChartColumn },
+  { path: '/detail-logs', label: 'Detail Logs', icon: Logs },
   { path: '/scripts', label: 'Scripts', icon: FileCode },
 ];
 

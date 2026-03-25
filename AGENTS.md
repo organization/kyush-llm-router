@@ -26,7 +26,7 @@ scripts/         개발 스크립트
 
 ## Key Concepts
 
-**인증**: `Authorization: Bearer <api_key>` → `auth.ts` 미들웨어 → 사용자 식별 + 권한 로드
+**인증**: `Authorization: Bearer <api_key>` → `auth.ts` 미들웨어 → 사용자 식별 + 권한 로드. 이 키는 라우터 접속용이며, 업스트림 요청에는 전달되지 않는다. 업스트림 `Authorization`은 `backends.api_key`가 있을 때만 해당 값으로 주입된다.
 
 **요청 흐름**:
 ```
@@ -37,6 +37,8 @@ Client → Auth → Script(onRequest) → RouterService → Backend → Script(o
 **Script Engine**: isolated-vm 샌드박스에서 JS 실행. 3가지 타입: per-user, per-backend, per-user-backend
 
 **Database**: `DB_DIR` 하위에 `core.db` (users, backends, permissions, user_scripts), `analytics.db` (usage_stats, backend_metrics), `request_logs/request_logs_YYYY-MM.db` (상세 요청 로그)
+
+**상세 로그 조회**: `month` 또는 `date`를 지정하면 해당 월 DB 1개만 조회한다. 둘 다 없으면 최신 월부터 월별 DB를 순차 조회하며 `offset`/`limit`을 적용한다.
 
 ## Development
 

@@ -45,6 +45,51 @@ function normalizeRequestLog(row: any): RequestLog {
   return row as RequestLog;
 }
 
+function buildWhereClause(query: RequestLogQuery): { whereClause: string; params: unknown[] } {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+
+  if (query.date) {
+    clauses.push('local_date = ?');
+    params.push(query.date);
+  }
+  if (query.userId) {
+    clauses.push('user_id = ?');
+    params.push(query.userId);
+  }
+  if (query.backendId) {
+    clauses.push('backend_id = ?');
+    params.push(query.backendId);
+  }
+  if (query.endpoint) {
+    clauses.push('endpoint = ?');
+    params.push(query.endpoint);
+  }
+  if (query.detailLogged !== undefined) {
+    clauses.push('detail_logged = ?');
+    params.push(query.detailLogged ? 1 : 0);
+  }
+  if (query.q) {
+    const like = `%${query.q}%`;
+    clauses.push(`(
+      endpoint LIKE ?
+      OR COALESCE(request_model, '') LIKE ?
+      OR COALESCE(response_model, '') LIKE ?
+      OR COALESCE(error_message, '') LIKE ?
+      OR COALESCE(request_headers, '') LIKE ?
+      OR COALESCE(request_body, '') LIKE ?
+      OR COALESCE(response_headers, '') LIKE ?
+      OR COALESCE(response_body, '') LIKE ?
+    )`);
+    params.push(like, like, like, like, like, like, like, like);
+  }
+
+  return {
+    whereClause: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '',
+    params,
+  };
+}
+
 function getQueryMonth(query: RequestLogQuery): string {
   if (query.date) {
     return getMonthKeyFromDateString(query.date);
@@ -111,54 +156,55 @@ export class RequestLogService {
   }
 
   static getRequestLogs(query: RequestLogQuery = {}): RequestLog[] {
-    const db = getRequestLogsDb(getQueryMonth(query));
-    const clauses: string[] = [];
-    const params: unknown[] = [];
-
-    if (query.date) {
-      clauses.push('local_date = ?');
-      params.push(query.date);
-    }
-    if (query.userId) {
-      clauses.push('user_id = ?');
-      params.push(query.userId);
-    }
-    if (query.backendId) {
-      clauses.push('backend_id = ?');
-      params.push(query.backendId);
-    }
-    if (query.endpoint) {
-      clauses.push('endpoint = ?');
-      params.push(query.endpoint);
-    }
-    if (query.detailLogged !== undefined) {
-      clauses.push('detail_logged = ?');
-      params.push(query.detailLogged ? 1 : 0);
-    }
-    if (query.q) {
-      const like = `%${query.q}%`;
-      clauses.push(`(
-        endpoint LIKE ?
-        OR COALESCE(request_model, '') LIKE ?
-        OR COALESCE(response_model, '') LIKE ?
-        OR COALESCE(error_message, '') LIKE ?
-        OR COALESCE(request_headers, '') LIKE ?
-        OR COALESCE(request_body, '') LIKE ?
-        OR COALESCE(response_headers, '') LIKE ?
-        OR COALESCE(response_body, '') LIKE ?
-      )`);
-      params.push(like, like, like, like, like, like, like, like);
-    }
-
-    const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
     const limit = clampLimit(query.limit);
-    const offset = Math.max(0, query.offset || 0);
+    let offset = Math.max(0, query.offset || 0);
+    const { whereClause, params } = buildWhereClause(query);
 
-    return db.prepare(`
-      SELECT * FROM request_logs
-      ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(...params, limit, offset).map(normalizeRequestLog);
+    if (query.month || query.date) {
+      const db = getRequestLogsDb(getQueryMonth(query));
+      return db.prepare(`
+        SELECT * FROM request_logs
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+      `).all(...params, limit, offset).map(normalizeRequestLog);
+    }
+
+    const months = listRequestLogMonths();
+    const results: RequestLog[] = [];
+
+    for (const month of months) {
+      if (results.length >= limit) {
+        break;
+      }
+
+      const db = getRequestLogsDb(month);
+      const remaining = limit - results.length;
+      const rows = db.prepare(`
+        SELECT * FROM request_logs
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+      `).all(...params, remaining, offset).map(normalizeRequestLog);
+
+      if (rows.length > 0) {
+        results.push(...rows);
+        offset = 0;
+        continue;
+      }
+
+      const matchedInMonth = db.prepare(`
+        SELECT COUNT(*) as count FROM request_logs
+        ${whereClause}
+      `).get(...params) as { count: number };
+
+      if (matchedInMonth.count <= offset) {
+        offset -= matchedInMonth.count;
+      } else {
+        offset = 0;
+      }
+    }
+
+    return results;
   }
 }

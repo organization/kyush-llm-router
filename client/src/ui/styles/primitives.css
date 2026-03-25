@@ -115,7 +115,7 @@
 }
 
 .ui-textarea {
-  min-height: 88px;
+  min-height: 400px;
   padding-top: var(--space-3);
   padding-bottom: var(--space-3);
   resize: vertical;

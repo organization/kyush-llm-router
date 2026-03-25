@@ -2,6 +2,7 @@ import express from 'express';
 
 export interface MockBackendOptions {
   port?: number;
+  onRequest?: (req: express.Request) => void;
   chatResponse?: Partial<{
     id: string;
     model: string;
@@ -18,6 +19,7 @@ export interface MockBackendOptions {
 export function createMockBackend(options: MockBackendOptions = {}) {
   const {
     port = 0,
+    onRequest,
     chatResponse = {
       id: 'mock-1',
       model: 'mock-model',
@@ -31,10 +33,12 @@ export function createMockBackend(options: MockBackendOptions = {}) {
   app.use(express.json());
 
   app.post('/v1/chat/completions', (req, res) => {
+    onRequest?.(req);
     res.json(chatResponse);
   });
 
   app.get('/v1/models', (req, res) => {
+    onRequest?.(req);
     res.json({ data: modelsResponse });
   });
 
