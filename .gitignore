@@ -9,6 +9,12 @@ node_modules/
 dist/
 client/storybook-static/
 
+# Environment files
+.env
+**/.env
+.env.local
+**/.env.local
+
 # Database files
 data/*.db
 **/*.db
