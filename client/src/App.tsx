@@ -7,7 +7,6 @@ import { Panel } from './ui';
 const Dashboard = lazy(() => import('./routes/Dashboard').then((module) => ({ default: module.Dashboard })));
 const Users = lazy(() => import('./routes/Users').then((module) => ({ default: module.Users })));
 const Backends = lazy(() => import('./routes/Backends').then((module) => ({ default: module.Backends })));
-const Permissions = lazy(() => import('./routes/Permissions').then((module) => ({ default: module.Permissions })));
 const Analytics = lazy(() => import('./routes/Analytics').then((module) => ({ default: module.Analytics })));
 const DetailLogs = lazy(() => import('./routes/DetailLogs').then((module) => ({ default: module.DetailLogs })));
 const Models = lazy(() => import('./routes/Models').then((module) => ({ default: module.Models })));
@@ -39,7 +38,6 @@ function AuthenticatedApp() {
             <Route path="/" component={Dashboard} />
             <Route path="/users" component={Users} />
             <Route path="/backends" component={Backends} />
-            <Route path="/permissions" component={Permissions} />
             <Route path="/analytics" component={Analytics} />
             <Route path="/models" component={Models} />
             <Route path="/detail-logs" component={DetailLogs} />

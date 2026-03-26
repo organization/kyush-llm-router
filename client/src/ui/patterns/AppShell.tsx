@@ -7,7 +7,6 @@ import Logs from 'lucide-solid/icons/logs';
 import Network from 'lucide-solid/icons/network';
 import Moon from 'lucide-solid/icons/moon';
 import Server from 'lucide-solid/icons/server';
-import ShieldCheck from 'lucide-solid/icons/shield-check';
 import Sun from 'lucide-solid/icons/sun';
 import Users from 'lucide-solid/icons/users';
 import { For, createMemo, createSignal, onCleanup, onMount, type JSX, type ParentComponent } from 'solid-js';
@@ -21,7 +20,6 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/users', label: 'Users', icon: Users },
   { path: '/backends', label: 'Backends', icon: Server },
-  { path: '/permissions', label: 'Permissions', icon: ShieldCheck },
   { path: '/analytics', label: 'Analytics', icon: ChartColumn },
   { path: '/models', label: 'Models', icon: Network },
   { path: '/detail-logs', label: 'Detail Logs', icon: Logs },
