@@ -141,6 +141,11 @@
   align-items: start;
 }
 
+.ui-split-panel > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .pub-bg-canvas-wrap {
   position: fixed;
   top: -50%;
