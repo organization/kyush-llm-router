@@ -1,9 +1,33 @@
-import * as ivm from 'isolated-vm';
+import ivmImport from 'isolated-vm';
+import type { Context, Isolate, Reference } from 'isolated-vm';
 import { ScriptContextData } from '../../../shared/types';
 import { logger } from '../utils/logger';
 
 const SCRIPT_TIMEOUT_MS = 5000;
 const MEMORY_LIMIT_MB = 50;
+
+type IsolatedVmModule = typeof import('isolated-vm');
+
+export function resolveIsolatedVmModule(moduleValue: unknown): IsolatedVmModule {
+  if (moduleValue && typeof moduleValue === 'object' && 'Isolate' in moduleValue) {
+    return moduleValue as IsolatedVmModule;
+  }
+
+  if (
+    moduleValue &&
+    typeof moduleValue === 'object' &&
+    'default' in moduleValue &&
+    moduleValue.default &&
+    typeof moduleValue.default === 'object' &&
+    'Isolate' in moduleValue.default
+  ) {
+    return moduleValue.default as IsolatedVmModule;
+  }
+
+  throw new Error('isolated-vm module did not expose an Isolate constructor');
+}
+
+const ivm = resolveIsolatedVmModule(ivmImport);
 
 /**
  * Strip `export` keywords from user script code so it can run in eval() context.
@@ -19,10 +43,10 @@ function preprocessScript(code: string): string {
  */
 export class CompiledScript {
   private constructor(
-    private isolate: ivm.Isolate,
-    private ctx: ivm.Context,
-    private onRequestRef: ivm.Reference<Function> | null,
-    private onResponseRef: ivm.Reference<Function> | null,
+    private isolate: Isolate,
+    private ctx: Context,
+    private onRequestRef: Reference<Function> | null,
+    private onResponseRef: Reference<Function> | null,
   ) {}
 
   get hasOnRequest(): boolean {
@@ -78,10 +102,10 @@ export class CompiledScript {
     ) as boolean;
 
     const onRequestRef = hasOnRequest
-      ? await ctx.eval('onRequest', { timeout: SCRIPT_TIMEOUT_MS, reference: true }) as ivm.Reference<Function>
+      ? await ctx.eval('onRequest', { timeout: SCRIPT_TIMEOUT_MS, reference: true }) as Reference<Function>
       : null;
     const onResponseRef = hasOnResponse
-      ? await ctx.eval('onResponse', { timeout: SCRIPT_TIMEOUT_MS, reference: true }) as ivm.Reference<Function>
+      ? await ctx.eval('onResponse', { timeout: SCRIPT_TIMEOUT_MS, reference: true }) as Reference<Function>
       : null;
 
     return new CompiledScript(isolate, ctx, onRequestRef, onResponseRef);
