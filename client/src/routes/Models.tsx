@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, Show, type Component } from 'solid-js';
+import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
 import Pencil from 'lucide-solid/icons/pencil';
 import Plus from 'lucide-solid/icons/plus';
 import Trash2 from 'lucide-solid/icons/trash-2';
@@ -39,6 +39,7 @@ const emptyForm = (): RewriteFormState => ({
 
 export const Models: Component = () => {
   const [overview, { refetch: refetchOverview }] = createResource(() => api.modelCache.getOverview());
+  const [backends] = createResource(() => api.backends.getAll());
   const [rules, { refetch: refetchRules }] = createResource(() => api.modelRewrites.getAll());
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
@@ -47,6 +48,21 @@ export const Models: Component = () => {
   const [form, setForm] = createSignal<RewriteFormState>(emptyForm());
   const [submitting, setSubmitting] = createSignal(false);
   const [notice, setNotice] = createSignal<{ tone: 'success' | 'danger'; message: string } | null>(null);
+  const backendNameById = createMemo(() => {
+    const names = new Map<number, string>();
+    for (const backend of backends() ?? []) {
+      names.set(backend.id, backend.name);
+    }
+    return names;
+  });
+
+  const getBackendName = (backendId: number) => backendNameById().get(backendId) ?? `Backend ${backendId}`;
+  const modelCatalogRows = createMemo(() =>
+    (overview()?.models ?? []).map((entry) => ({
+      ...entry,
+      backend_names: entry.backend_ids.map((backendId) => getBackendName(backendId)).join(', '),
+    }))
+  );
 
   const openCreateDialog = () => {
     setEditingRule(null);
@@ -145,41 +161,73 @@ export const Models: Component = () => {
           {(currentNotice) => <Alert tone={currentNotice().tone}>{currentNotice().message}</Alert>}
         </Show>
 
-        <Panel title="Model Cache Overview" description="Memory-backed catalog state used by request routing and `/v1/models`.">
-          <Show
-            when={(overview()?.backends.length ?? 0) > 0}
-            fallback={<EmptyState title="No backend cache yet" description="Backend model states appear here after the server has seen active backends." />}
-          >
-            <DataGrid
-              rows={overview()?.backends ?? []}
-              columns={[
-                { id: 'backend_id', header: 'Backend', mono: true, cell: (item) => <span>{item.backend_id}</span> },
-                { id: 'state', header: 'State', cell: (item) => <StatusBadge tone={item.state === 'ready' ? 'success' : item.state === 'error' ? 'danger' : item.state === 'inactive' ? 'neutral' : 'warning'}>{item.state}</StatusBadge> },
-                { id: 'model_count', header: 'Models', cell: (item) => <span>{item.model_count}</span> },
-                { id: 'last_synced_at', header: 'Last Sync', cell: (item) => <span>{item.last_synced_at ? new Date(item.last_synced_at).toLocaleString() : '-'}</span> },
-                { id: 'last_error', header: 'Last Error', cell: (item) => <span title={item.last_error ?? '-'}>{item.last_error ?? '-'}</span> },
-              ]}
-              getRowKey={(item) => item.backend_id}
-              loading={overview.loading}
-            />
-            <Show when={(overview()?.models.length ?? 0) > 0}>
-              <div class="ui-chip-row">
-                <For each={overview()?.models ?? []}>
-                  {(entry) => <StatusBadge tone="neutral">{`${entry.model_id} (${entry.backend_ids.length})`}</StatusBadge>}
-                </For>
-              </div>
+        <div class="ui-section-grid">
+          <Panel title="Backend Cache Status" description="Memory-backed backend cache state used by request routing and `/v1/models`.">
+            <Show
+              when={(overview()?.backends.length ?? 0) > 0}
+              fallback={<EmptyState title="No backend cache yet" description="Backend model states appear here after the server has seen active backends." />}
+            >
+              <DataGrid
+                rows={overview()?.backends ?? []}
+                columns={[
+                  {
+                    id: 'backend_id',
+                    header: 'Backend',
+                    class: 'models__catalog-column',
+                    cell: (item) => <span title={getBackendName(item.backend_id)}>{getBackendName(item.backend_id)}</span>,
+                  },
+                  { id: 'state', header: 'State', cell: (item) => <StatusBadge tone={item.state === 'ready' ? 'success' : item.state === 'error' ? 'danger' : item.state === 'inactive' ? 'neutral' : 'warning'}>{item.state}</StatusBadge> },
+                  { id: 'model_count', header: 'Models', cell: (item) => <span>{item.model_count}</span> },
+                  { id: 'last_synced_at', header: 'Last Sync', cell: (item) => <span>{item.last_synced_at ? new Date(item.last_synced_at).toLocaleString() : '-'}</span> },
+                  { id: 'last_error', header: 'Last Error', cell: (item) => <span title={item.last_error ?? '-'}>{item.last_error ?? '-'}</span> },
+                ]}
+                getRowKey={(item) => item.backend_id}
+                loading={overview.loading}
+              />
             </Show>
-          </Show>
-        </Panel>
+          </Panel>
+
+          <Panel title="Model Catalog" description="Unique models and the backend names currently advertising each one.">
+            <Show
+              when={modelCatalogRows().length > 0}
+              fallback={<EmptyState title="No cached models yet" description="Model catalog entries appear here after backend model snapshots are available." />}
+            >
+              <DataGrid
+                rows={modelCatalogRows()}
+                columns={[
+                  {
+                    id: 'model_id',
+                    header: 'Model',
+                    class: 'models__catalog-column',
+                    cell: (item) => <span title={item.model_id}>{item.model_id}</span>,
+                  },
+                  {
+                    id: 'backend_names',
+                    header: 'Backends',
+                    class: 'models__catalog-column',
+                    cell: (item) => <span title={item.backend_names}>{item.backend_names}</span>,
+                  },
+                  {
+                    id: 'backend_count',
+                    header: 'Count',
+                    width: '64px',
+                    mono: true,
+                    cell: (item) => <span>{item.backend_ids.length}</span>,
+                  },
+                ]}
+                getRowKey={(item) => item.model_id}
+                loading={overview.loading}
+              />
+            </Show>
+          </Panel>
+        </div>
 
         <Panel
           title="Model Rewrite Rules"
           description="Force rules always rewrite. Fallback rules rewrite only when the original model has no usable backend."
+          actions={<IconButton variant="primary" icon={<Plus />} label="Add Rule" onClick={openCreateDialog} />}
         >
           <div class="ui-stack ui-stack--tight">
-            <div class="ui-row-actions">
-              <IconButton variant="primary" icon={<Plus />} label="Add Rule" onClick={openCreateDialog} />
-            </div>
             <Show
               when={(rules()?.length ?? 0) > 0}
               fallback={<EmptyState title="No rewrite rules" description="Requests currently route using the original model name." />}

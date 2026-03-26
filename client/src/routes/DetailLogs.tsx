@@ -94,6 +94,49 @@ export const DetailLogs: Component = () => {
   const pageCount = createMemo(() => Math.max(1, Math.ceil(totalRows() / pageSize())));
   const rangeStart = createMemo(() => (totalRows() === 0 ? 0 : (page() - 1) * pageSize() + 1));
   const rangeEnd = createMemo(() => Math.min(totalRows(), page() * pageSize()));
+  const sourceScope = createMemo(() => {
+    const currentFilters = filters();
+    if (currentFilters.date.trim()) {
+      return {
+        value: currentFilters.date.trim(),
+        hint: 'Single day request log database',
+      };
+    }
+
+    if (currentFilters.month.trim()) {
+      return {
+        value: currentFilters.month.trim(),
+        hint: 'Specific month request log database',
+      };
+    }
+
+    return {
+      value: 'Latest months',
+      hint: 'Sequential monthly fallback search',
+    };
+  });
+  const activeFilterCount = createMemo(() => {
+    const currentFilters = filters();
+    return [currentFilters.q, currentFilters.userId, currentFilters.backendId, currentFilters.endpoint].filter((value) => value.trim().length > 0).length;
+  });
+  const activeFilterHint = createMemo(() => {
+    const currentFilters = filters();
+    const labels = [
+      currentFilters.q.trim() ? 'Search' : null,
+      currentFilters.userId.trim() ? 'User' : null,
+      currentFilters.backendId.trim() ? 'Backend' : null,
+      currentFilters.endpoint.trim() ? 'Endpoint' : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return labels.length > 0 ? labels.join(' + ') : 'No search/user/backend/endpoint filters';
+  });
+  const pageWindow = createMemo(() => {
+    if (totalRows() === 0) {
+      return '0 of 0';
+    }
+
+    return `${rangeStart()}-${rangeEnd()} of ${totalRows()}`;
+  });
   const assistantPreviewById = createMemo(() => {
     const previews = new Map<number, string>();
     for (const row of requestRows()) {
@@ -142,10 +185,9 @@ export const DetailLogs: Component = () => {
 
         <SummaryStrip
           items={[
-            { label: 'Total Matches', value: totalRows(), hint: totalRows() > 0 ? `${rangeStart()}-${rangeEnd()} on page ${page()}` : `Page ${page()} of ${pageCount()}` },
-            { label: 'Rows Loaded', value: requestRows().length, hint: `${pageSize()} per page` },
-            { label: 'Verbose Rows', value: requestRows().filter((row) => row.detail_logged).length, hint: 'Current page' },
-            { label: 'Selected Log', value: selectedLog()?.id ?? '-', hint: selectedLog() ? 'Focused inspector row' : 'No selection' },
+            { label: 'Source Scope', value: sourceScope().value, hint: sourceScope().hint },
+            { label: 'Active Filters', value: activeFilterCount(), hint: activeFilterHint() },
+            { label: 'Page Window', value: pageWindow(), hint: `Page ${page()} of ${pageCount()} - ${pageSize()} per page` },
           ]}
         />
 

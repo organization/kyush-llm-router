@@ -267,6 +267,12 @@
   white-space: nowrap;
 }
 
+.models__catalog-column {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ui-data-grid__status {
   padding: var(--space-6);
   color: var(--color-text-muted);

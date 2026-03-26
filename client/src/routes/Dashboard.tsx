@@ -50,7 +50,7 @@ export const Dashboard: Component = () => {
           items={[
             { label: 'Total Users', value: data()?.users.length ?? 0, hint: 'Provisioned API identities' },
             { label: 'Active Backends', value: data()?.backends.filter((backend) => backend.is_active).length ?? 0, hint: 'Routable upstream targets' },
-            { label: 'Recent Requests', value: data()?.recentRequests.rows.length ?? 0, hint: 'Loaded in the current overview' },
+            { label: 'Recent Requests', value: data()?.recentRequests.rows.length ?? 0, hint: 'Latest traffic snapshot in this overview' },
           ]}
         />
 

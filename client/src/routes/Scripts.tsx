@@ -25,7 +25,6 @@ import {
   Panel,
   Select,
   StatusBadge,
-  SummaryStrip,
   Tabs,
   TextField,
 } from '../ui';
@@ -303,14 +302,6 @@ export const Scripts: Component = () => {
         <PageHeader
           title="Scripts"
           description="Create and maintain request and response middleware with compact editing, metadata, and test feedback."
-        />
-
-        <SummaryStrip
-          items={[
-            { label: 'Total Scripts', value: scripts()?.length ?? 0, hint: 'All stored middleware entries' },
-            { label: 'Active', value: activeCount(), hint: 'Currently applied during routing' },
-            { label: 'Users', value: users()?.length ?? 0, hint: 'Available test context identities' },
-          ]}
         />
 
         <Show when={notice()}>

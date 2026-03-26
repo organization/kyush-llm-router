@@ -1,7 +1,7 @@
 import { createResource, type Component } from 'solid-js';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
-import { DataGrid, EmptyState, MetaCluster, PageHeader, Panel, StatusBadge, SummaryStrip } from '../ui';
+import { DataGrid, EmptyState, MetaCluster, PageHeader, Panel, StatusBadge } from '../ui';
 
 export const Analytics: Component = () => {
   const [requests] = createResource(() => api.analytics.getRequests({ limit: 50 }));
@@ -20,16 +20,8 @@ export const Analytics: Component = () => {
           description="Panel-based operational analytics for request logs, usage totals, and backend performance."
         />
 
-        <SummaryStrip
-          items={[
-            { label: 'Recent Requests', value: requestRows().length, hint: 'Loaded log rows' },
-            { label: 'Usage Windows', value: usageRows().length, hint: 'Daily aggregates for the last 7 days' },
-            { label: 'Metric Windows', value: metricRows().length, hint: 'Backend performance snapshots' },
-          ]}
-        />
-
         <div class="ui-section-grid">
-          <Panel title="Recent Requests" description="Latest request outcomes and token volume.">
+          <Panel title="Recent Requests" description="Latest loaded request outcomes and token volume from the analytics log feed.">
             <DataGrid
               rows={requestRows()}
               columns={[
@@ -52,7 +44,7 @@ export const Analytics: Component = () => {
             />
           </Panel>
 
-          <Panel title="Usage Stats" description="Daily request and token totals for the last 7 days.">
+          <Panel title="Usage Stats" description="Daily request and token totals aggregated for the last 7 days.">
             <DataGrid
               rows={usageRows()}
               columns={[
@@ -67,7 +59,7 @@ export const Analytics: Component = () => {
           </Panel>
         </div>
 
-        <Panel title="Backend Metrics" description="Response quality and performance windows per backend.">
+        <Panel title="Backend Metrics" description="Per-backend performance windows and success rates for the last 7 days.">
           <MetaCluster
             items={[
               { key: 'Window', value: 'Last 7 days' },
