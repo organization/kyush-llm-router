@@ -99,7 +99,7 @@ export const api = {
   users: {
     getAll: (): Promise<User[]> => fetchJson<User[]>(`${API_BASE}/admin/users`),
     getById: (id: number): Promise<User> => fetchJson<User>(`${API_BASE}/admin/users/${id}`),
-    create: (data: { name: string; email?: string; detail_logging?: boolean }): Promise<User> =>
+    create: (data: { name: string; email?: string; api_key?: string; detail_logging?: boolean }): Promise<User> =>
       fetchJson<User>(`${API_BASE}/admin/users`, { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: Partial<User>): Promise<User> =>
       fetchJson<User>(`${API_BASE}/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

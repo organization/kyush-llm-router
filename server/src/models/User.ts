@@ -28,7 +28,7 @@ export class UserModel {
   }
 
   static create(data: CreateUserData): User {
-    const apiKey = `sk-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    const apiKey = data.api_key ?? generateApiKey();
     const timestamp = getUtcTimestamp();
     const detailLogging = data.detail_logging ?? false;
     const stmt = getDb().prepare(
@@ -59,6 +59,10 @@ export class UserModel {
     if (data.email !== undefined) {
       updates.push('email = ?');
       values.push(data.email);
+    }
+    if (data.api_key !== undefined) {
+      updates.push('api_key = ?');
+      values.push(data.api_key);
     }
     if (data.is_active !== undefined) {
       updates.push('is_active = ?');

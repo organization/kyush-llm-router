@@ -36,6 +36,22 @@ describe('Admin API - User Management', () => {
       expect(response.body.api_key).toMatch(/^sk-/);
     });
 
+    it('should create a user with a manually supplied api key', async () => {
+      const userData = { name: 'Migrated User', api_key: 'legacy-user-key-001' };
+      const response = await admin.post('/admin/users').send(userData);
+
+      expect(response.status).toBe(201);
+      expect(response.body.api_key).toBe(userData.api_key);
+    });
+
+    it('should return 409 if a manually supplied api key already exists', async () => {
+      await admin.post('/admin/users').send({ name: 'Duplicate Key Source', api_key: 'legacy-duplicate-key' });
+      const response = await admin.post('/admin/users').send({ name: 'Duplicate Key Target', api_key: 'legacy-duplicate-key' });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('API key already exists');
+    });
+
     it('should return 400 if name is missing', async () => {
       const response = await admin.post('/admin/users').send({ email: 'test@example.com' });
       
@@ -84,6 +100,15 @@ describe('Admin API - User Management', () => {
       expect(response.status).toBe(200);
       expect(response.body.name).toBe('Updated Name');
       expect(response.body.email).toBe('updated@example.com');
+    });
+
+    it('should update user api key manually', async () => {
+      const response = await admin
+        .put(`/admin/users/${userId}`)
+        .send({ api_key: 'legacy-updated-key-001' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.api_key).toBe('legacy-updated-key-001');
     });
 
     it('should return 404 for non-existent user', async () => {

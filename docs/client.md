@@ -15,7 +15,7 @@ client/src/
     index.ts                # TypeScript 타입 정의
   routes/
     Dashboard.tsx           # 운영 요약, 최근 요청, 관리자 토큰 관리
-    Users.tsx               # 사용자 CRUD / 권한 매핑 관리
+    Users.tsx               # 사용자 CRUD / API 키 수동 지정 / 권한 매핑 관리
     Backends.tsx            # 백엔드 CRUD
     Models.tsx              # 모델 캐시/리라이트 규칙 관리
     Analytics.tsx           # 분석 화면

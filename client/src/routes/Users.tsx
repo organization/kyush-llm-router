@@ -35,6 +35,7 @@ type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
 interface UserFormState {
   name: string;
   email: string;
+  api_key: string;
   is_active: boolean;
   detail_logging: boolean;
 }
@@ -42,6 +43,7 @@ interface UserFormState {
 const emptyForm = (): UserFormState => ({
   name: '',
   email: '',
+  api_key: '',
   is_active: true,
   detail_logging: false,
 });
@@ -124,6 +126,7 @@ export const Users: Component = () => {
     setForm({
       name: user.name,
       email: user.email ?? '',
+      api_key: user.api_key,
       is_active: user.is_active,
       detail_logging: user.detail_logging,
     });
@@ -145,6 +148,7 @@ export const Users: Component = () => {
         await api.users.update(editingUser()!.id, {
           name: current.name.trim(),
           email: current.email.trim() || undefined,
+          api_key: current.api_key.trim() || undefined,
           is_active: current.is_active,
           detail_logging: current.detail_logging,
         });
@@ -153,6 +157,7 @@ export const Users: Component = () => {
         await api.users.create({
           name: current.name.trim(),
           email: current.email.trim() || undefined,
+          api_key: current.api_key.trim() || undefined,
           detail_logging: current.detail_logging,
         });
         setNotice({ tone: 'success', message: 'User created.' });
@@ -495,6 +500,17 @@ export const Users: Component = () => {
               value={form().email}
               placeholder="ops@example.com"
               onInput={(event) => setForm((current) => ({ ...current, email: event.currentTarget.value }))}
+            />
+            <TextField
+              label="API Key"
+              value={form().api_key}
+              placeholder="Leave blank to auto-generate"
+              description={
+                editingUser()
+                  ? 'Set a replacement key for migrations or leave blank to keep the current key.'
+                  : 'Optional. Paste a legacy key to preserve it during migration, or leave blank to auto-generate.'
+              }
+              onInput={(event) => setForm((current) => ({ ...current, api_key: event.currentTarget.value }))}
             />
             <Show when={editingUser()}>
               <Checkbox

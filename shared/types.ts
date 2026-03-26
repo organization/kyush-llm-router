@@ -100,6 +100,7 @@ export interface Permission {
 export interface CreateUserData {
   name: string;
   email?: string;
+  api_key?: string;
   detail_logging?: boolean;
 }
 
@@ -118,6 +119,7 @@ export interface CreatePermissionData {
 export interface UpdateUserData {
   name?: string;
   email?: string;
+  api_key?: string;
   is_active?: boolean;
   detail_logging?: boolean;
 }

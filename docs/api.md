@@ -52,9 +52,9 @@
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/users` | 전체 사용자 목록 |
-| POST | `/admin/users` | 사용자 생성 (API 키 자동 발급) |
+| POST | `/admin/users` | 사용자 생성 (`api_key` 생략 시 자동 발급, 지정 시 수동 등록) |
 | GET | `/admin/users/:id` | 사용자 조회 |
-| PUT | `/admin/users/:id` | 사용자 수정 (name, email, is_active, detail_logging) |
+| PUT | `/admin/users/:id` | 사용자 수정 (name, email, api_key, is_active, detail_logging) |
 | DELETE | `/admin/users/:id` | 사용자 삭제 |
 | POST | `/admin/users/:id/regenerate-api-key` | API 키 재발급 |
 

@@ -34,25 +34,29 @@ router.get('/users', (req: Request, res: Response) => {
 });
 
 router.post('/users', (req: Request, res: Response) => {
-  const { name, email, detail_logging } = req.body as CreateUserData;
+  const { name, email, api_key, detail_logging } = req.body as CreateUserData;
 
-  if (!name) {
+  if (!name?.trim()) {
     res.status(400).json({ error: 'Name is required' });
     return;
   }
 
-  const user = UserModel.create({
-    name,
-    email,
-    detail_logging,
-  });
+  try {
+    const user = UserModel.create({
+      name: name.trim(),
+      email: email?.trim() || undefined,
+      api_key: api_key?.trim() || undefined,
+      detail_logging,
+    });
 
-  const updatedUser = UserModel.regenerateApiKey(user.id);
-  if (updatedUser) {
-    user.api_key = updatedUser;
+    res.status(201).json(user);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      res.status(409).json({ error: 'API key already exists' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to create user' });
   }
-
-  res.status(201).json(user);
 });
 
 router.get('/users/:id', (req: Request, res: Response) => {
@@ -76,10 +80,30 @@ router.put('/users/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { name, email, is_active, detail_logging } = req.body as UpdateUserData;
-  const updatedUser = UserModel.update(id, { name, email, is_active, detail_logging });
+  const { name, email, api_key, is_active, detail_logging } = req.body as UpdateUserData;
 
-  res.json(updatedUser);
+  if (typeof name === 'string' && !name.trim()) {
+    res.status(400).json({ error: 'Name cannot be empty' });
+    return;
+  }
+
+  try {
+    const updatedUser = UserModel.update(id, {
+      name: typeof name === 'string' ? name.trim() : undefined,
+      email: typeof email === 'string' ? email.trim() || undefined : undefined,
+      api_key: typeof api_key === 'string' ? api_key.trim() || undefined : undefined,
+      is_active,
+      detail_logging,
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      res.status(409).json({ error: 'API key already exists' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to update user' });
+  }
 });
 
 router.delete('/users/:id', (req: Request, res: Response) => {
