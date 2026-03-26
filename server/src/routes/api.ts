@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { authenticate, AuthenticatedRequest } from './auth';
+import { BackendModel } from '../models/Backend';
 import { RouterService } from '../services/RouterService';
 import { AnalyticsService } from '../services/AnalyticsService';
 import { ScriptEngine } from '../services/ScriptEngine';
 import { logger } from '../utils/logger';
+import { ModelCatalogService } from '../services/ModelCatalogService';
 
 const router: Router = Router();
 
@@ -30,15 +32,55 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
     return;
   }
 
-  const backend = RouterService.selectBackend(allowedBackendIds);
-  if (!backend) {
+  const requestedModel = typeof req.body?.model === 'string' ? req.body.model : '';
+  await ModelCatalogService.ensureInitializedForBackends(allowedBackendIds);
+  const resolution = ModelCatalogService.resolveRequestedModel(requestedModel, allowedBackendIds);
+  const activeAllowedBackendIds = BackendModel.findActive()
+    .map((item) => item.id)
+    .filter((backendId) => allowedBackendIds.includes(backendId));
+  if (activeAllowedBackendIds.length === 0) {
+    AnalyticsService.logRequest({
+      user_id: user.id,
+      backend_id: 0,
+      endpoint: '/v1/chat/completions',
+      request_model: requestedModel,
+      routed_model: resolution.routedModel,
+      status_code: 403,
+      error_message: 'No active backends available',
+      detail_logged: user.detail_logging,
+      request_headers: user.detail_logging ? normalizeHeaders(req.headers) : undefined,
+      request_body: user.detail_logging ? req.body : undefined,
+    });
     res.status(403).json({ error: 'No active backends available' });
+    return;
+  }
+  const candidateBackendIds = ModelCatalogService.getCandidateBackendIds(resolution.routedModel, allowedBackendIds);
+  const backend = RouterService.selectBackend(candidateBackendIds);
+  if (!backend) {
+    AnalyticsService.logRequest({
+      user_id: user.id,
+      backend_id: 0,
+      endpoint: '/v1/chat/completions',
+      request_model: resolution.requestedModel,
+      routed_model: resolution.routedModel,
+      status_code: 404,
+      error_message: 'Requested model is not available for your account',
+      detail_logged: user.detail_logging,
+      request_headers: user.detail_logging ? normalizeHeaders(req.headers) : undefined,
+      request_body: user.detail_logging ? req.body : undefined,
+    });
+    res.status(404).json({
+      error: 'Requested model is not available for your account',
+      request_model: resolution.requestedModel,
+      routed_model: resolution.routedModel,
+    });
     return;
   }
 
   try {
     const { model, messages, ...rest } = req.body;
     const detailLoggingEnabled = user.detail_logging || backend.detail_logging;
+    const rewrittenBody = { model: resolution.routedModel, messages, ...rest };
 
     const execContext = {
       user: { id: user.id, name: user.name, email: user.email },
@@ -50,7 +92,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
           ...normalizeHeaders(req.headers),
           'content-type': req.get('content-type') || 'application/json',
         },
-        body: req.body,
+        body: rewrittenBody,
         isStream: req.body.stream === true,
       },
     };
@@ -94,6 +136,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       backend_id: backend.id,
       endpoint: '/v1/chat/completions',
       request_model: model,
+      routed_model: resolution.routedModel,
       response_model: response.data && typeof response.data === 'object' && 'model' in response.data ? String(response.data.model) : undefined,
       prompt_tokens: response.data && typeof response.data === 'object' && 'usage' in response.data && typeof (response.data as { usage?: { prompt_tokens?: number } }).usage === 'object' ? (response.data as { usage: { prompt_tokens: number } }).usage?.prompt_tokens : undefined,
       completion_tokens: response.data && typeof response.data === 'object' && 'usage' in response.data && typeof (response.data as { usage?: { completion_tokens?: number } }).usage === 'object' ? (response.data as { usage: { completion_tokens: number } }).usage?.completion_tokens : undefined,
@@ -115,6 +158,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       const causeInfo = errorDetails.cause ? ` (Cause: ${errorDetails.cause})` : '';
       const backendInfo = errorDetails.backend ? ` [Backend: ${errorDetails.backend}]` : '';
       logger.error(`Backend error for user ${user.id}: ${errorInfo}${causeInfo}${backendInfo}`);
+      void ModelCatalogService.refreshBackendAfterFailure(backend.id);
     }
 
     res.status(response.status).json(response.data);
@@ -128,6 +172,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       backend_id: backend.id,
       endpoint: '/v1/chat/completions',
       request_model: req.body.model,
+      routed_model: resolution.routedModel,
       status_code: 502,
       response_time_ms: responseTime,
       error_message: errorMsg,
@@ -140,6 +185,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
     });
 
     logger.error(`Request failed for user ${user.id}: ${errorMsg}`);
+    void ModelCatalogService.refreshBackendAfterFailure(backend.id);
     res.status(502).json({ error: 'Backend request failed', details: errorMsg });
   }
 });
@@ -152,26 +198,19 @@ router.get('/models', async (req: AuthenticatedRequest, res: Response) => {
     return;
   }
 
-  const backend = RouterService.selectBackend(allowedBackendIds);
-  if (!backend) {
+  await ModelCatalogService.ensureInitializedForBackends(allowedBackendIds);
+  const activeAllowedBackendIds = BackendModel.findActive()
+    .map((item) => item.id)
+    .filter((backendId) => allowedBackendIds.includes(backendId));
+  if (activeAllowedBackendIds.length === 0) {
     res.status(403).json({ error: 'No active backends available' });
     return;
   }
-
-  try {
-    const response = await RouterService.forwardRequest(
-      backend,
-      '/v1/models',
-      'GET',
-      {}
-    );
-
-    res.status(response.status).json(response.data);
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`Models request failed for user ${req.user!.id}: ${errorMsg}`);
-    res.status(502).json({ error: 'Failed to fetch models from backend', details: errorMsg });
-  }
+  const models = ModelCatalogService.getModelsForAllowedBackends(activeAllowedBackendIds).map((entry) => ({
+    id: entry.model_id,
+    object: 'model',
+  }));
+  res.json({ object: 'list', data: models });
 });
 
 export default router;

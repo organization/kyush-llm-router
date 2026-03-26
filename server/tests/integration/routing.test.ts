@@ -19,7 +19,7 @@ describe('Permission-based Routing', () => {
   });
 
   describe('Scenario 1: Authorized backend routing', () => {
-    it('should route to authorized backend (auth passes, backend may fail)', async () => {
+    it('should return model-not-available when catalog refresh fails for an authorized backend', async () => {
       const userResponse = await admin.post('/admin/users').send({ name: 'Auth User 1-1' });
       const userApiKey = userResponse.body.api_key;
       const userId = userResponse.body.id;
@@ -39,7 +39,7 @@ describe('Permission-based Routing', () => {
         .set('Authorization', `Bearer ${userApiKey}`)
         .send({ model: 'test', messages: [{ role: 'user', content: 'Hello' }] });
 
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(404);
       expect(response.body).toHaveProperty('error');
     });
   });
@@ -83,13 +83,13 @@ describe('Permission-based Routing', () => {
       expect(response.body.error).toBe('No backends available for your account');
     });
 
-    it('should successfully route user with permissions', async () => {
+    it('should return model-not-available when the permitted backend has no cached model match', async () => {
       const response = await request(app)
         .post('/v1/chat/completions')
         .set('Authorization', `Bearer ${userBApiKey}`)
         .send({ model: 'test', messages: [{ role: 'user', content: 'Hello' }] });
 
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(404);
     });
   });
 
@@ -122,21 +122,40 @@ describe('Multi-backend Routing', () => {
     admin = await createAdminClient(app);
   });
 
-  describe('Scenario 4: Random selection from multiple backends', () => {
-    it('should route to different backends across multiple requests', async () => {
+  describe('Scenario 4: Model-aware candidate selection', () => {
+    it('should use only backends that serve the requested model', async () => {
       const userResponse = await admin.post('/admin/users').send({ name: 'Multi Backend User 4-4' });
       const userApiKey = userResponse.body.api_key;
       const userId = userResponse.body.id;
 
+      const backendServerA = createMockBackend({
+        chatResponse: {
+          id: 'candidate-a',
+          model: 'model-a',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'A' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        },
+        modelsResponse: [{ id: 'model-a', object: 'model' }],
+      });
+      const backendServerB = createMockBackend({
+        chatResponse: {
+          id: 'candidate-b',
+          model: 'model-b',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'B' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        },
+        modelsResponse: [{ id: 'model-b', object: 'model' }],
+      });
+
       const backend1Response = await admin.post('/admin/backends').send({
         name: 'Multi Backend 4-4-1',
-        base_url: 'http://localhost:8010/v1'
+        base_url: `http://localhost:${backendServerA.port}`
       });
       const backend1Id = backend1Response.body.id;
 
       const backend2Response = await admin.post('/admin/backends').send({
         name: 'Multi Backend 4-4-2',
-        base_url: 'http://localhost:8011/v1'
+        base_url: `http://localhost:${backendServerB.port}`
       });
       const backend2Id = backend2Response.body.id;
 
@@ -148,15 +167,22 @@ describe('Multi-backend Routing', () => {
         .post('/admin/permissions')
         .send({ user_id: userId, backend_id: backend2Id });
 
-      const responses = await Promise.all([
-        request(app).post('/v1/chat/completions').set('Authorization', `Bearer ${userApiKey}`).send({ model: 'test', messages: [] }),
-        request(app).post('/v1/chat/completions').set('Authorization', `Bearer ${userApiKey}`).send({ model: 'test', messages: [] }),
-        request(app).post('/v1/chat/completions').set('Authorization', `Bearer ${userApiKey}`).send({ model: 'test', messages: [] })
-      ]);
+      const responseA = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send({ model: 'model-a', messages: [] });
+      const responseB = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send({ model: 'model-b', messages: [] });
 
-      responses.forEach(response => {
-        expect(response.status).toBe(502);
-      });
+      expect(responseA.status).toBe(200);
+      expect(responseA.body.id).toBe('candidate-a');
+      expect(responseB.status).toBe(200);
+      expect(responseB.body.id).toBe('candidate-b');
+
+      await new Promise<void>((resolve) => backendServerA.server.close(() => resolve()));
+      await new Promise<void>((resolve) => backendServerB.server.close(() => resolve()));
     });
   });
 });
@@ -351,7 +377,7 @@ describe('OpenAI Compatible Backend Integration', () => {
   });
 
   describe('Scenario 7: Models endpoint routing', () => {
-    it('should proxy models request to mock backend', async () => {
+    it('should return the union of cached models from allowed active backends', async () => {
       // First, deactivate all existing backends to ensure only our mock backend is selected
       const allBackendsResponse = await admin.get('/admin/backends');
       const allBackends = allBackendsResponse.body;
@@ -396,6 +422,7 @@ describe('OpenAI Compatible Backend Integration', () => {
       expect(response.body).toHaveProperty('data');
       expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.data.length).toBe(2);
+      expect(response.body.data.map((item: any) => item.id)).toEqual(['test-model-1', 'test-model-2']);
     });
 
     it('should return 403 for models when user has no permissions', async () => {
@@ -444,6 +471,102 @@ describe('OpenAI Compatible Backend Integration', () => {
 
       expect(response.status).toBe(200);
       expect(receivedAuthorization).toBeUndefined();
+    });
+  });
+
+  describe('Scenario 8: Rewrite-based routing', () => {
+    it('should rewrite the requested model before backend selection and upstream forwarding', async () => {
+      let receivedModel: string | undefined;
+      const { server, port } = createMockBackend({
+        onRequest: (req) => {
+          if (req.path === '/v1/chat/completions') {
+            receivedModel = req.body.model;
+          }
+        },
+        chatResponse: {
+          id: 'rewrite-success',
+          model: 'gpt-3.5',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'rewritten' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        },
+        modelsResponse: [{ id: 'gpt-3.5', object: 'model' }],
+      });
+      mockServer = server;
+      mockPort = port;
+
+      const userResponse = await admin.post('/admin/users').send({ name: 'Rewrite Route User 8-8' });
+      const userApiKey = userResponse.body.api_key;
+      const userId = userResponse.body.id;
+
+      const backendResponse = await admin.post('/admin/backends').send({
+        name: 'Rewrite Backend 8-8',
+        base_url: `http://localhost:${port}`,
+      });
+      const backendId = backendResponse.body.id;
+
+      await admin.post('/admin/permissions').send({ user_id: userId, backend_id: backendId });
+      const rewriteResponse = await admin.post('/admin/model-rewrites').send({
+        source_model: 'gpt-3.5-turbo',
+        target_model: 'gpt-3.5',
+        force: true,
+      });
+      expect(rewriteResponse.status).toBe(201);
+
+      const response = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send({ model: 'gpt-3.5-turbo', messages: [{ role: 'user', content: 'Hello' }] });
+
+      expect(response.status).toBe(200);
+      expect(receivedModel).toBe('gpt-3.5');
+      expect(response.body.model).toBe('gpt-3.5');
+    });
+
+    it('should use fallback rewrite only when the original model is unavailable', async () => {
+      let receivedModel: string | undefined;
+      const { server, port } = createMockBackend({
+        onRequest: (req) => {
+          if (req.path === '/v1/chat/completions') {
+            receivedModel = req.body.model;
+          }
+        },
+        chatResponse: {
+          id: 'fallback-success',
+          model: 'fallback-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'fallback' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        },
+        modelsResponse: [{ id: 'fallback-model', object: 'model' }],
+      });
+      mockServer = server;
+      mockPort = port;
+
+      const userResponse = await admin.post('/admin/users').send({ name: 'Fallback Route User 8-9' });
+      const userApiKey = userResponse.body.api_key;
+      const userId = userResponse.body.id;
+
+      const backendResponse = await admin.post('/admin/backends').send({
+        name: 'Fallback Backend 8-9',
+        base_url: `http://localhost:${port}`,
+      });
+      const backendId = backendResponse.body.id;
+
+      await admin.post('/admin/permissions').send({ user_id: userId, backend_id: backendId });
+      const rewriteResponse = await admin.post('/admin/model-rewrites').send({
+        source_model: 'missing-model',
+        target_model: 'fallback-model',
+        force: false,
+      });
+      expect(rewriteResponse.status).toBe(201);
+
+      const response = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send({ model: 'missing-model', messages: [{ role: 'user', content: 'Hello' }] });
+
+      expect(response.status).toBe(200);
+      expect(receivedModel).toBe('fallback-model');
+      expect(response.body.model).toBe('fallback-model');
     });
   });
 });

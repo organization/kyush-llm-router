@@ -70,7 +70,7 @@ describe('Auth & Proxy API', () => {
   });
 
   describe('POST /v1/chat/completions with valid auth', () => {
-    it('should return 502 when backend is unreachable (but auth passes)', async () => {
+    it('should return 404 when model catalog cannot confirm the requested model', async () => {
       const response = await request(app)
         .post('/v1/chat/completions')
         .set('Authorization', `Bearer ${userApiKey}`)
@@ -79,9 +79,9 @@ describe('Auth & Proxy API', () => {
           messages: [{ role: 'user', content: 'Hello' }] 
         });
       
-      // Should authenticate successfully but fail to connect to backend
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(404);
       expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('request_model', 'test-model');
     });
   });
 
@@ -120,7 +120,7 @@ describe('Auth & Proxy API', () => {
       
       // Find our logged request
       const loggedRequest = analyticsResponse.body.rows.find((r: any) => 
-        r.status_code === 502 && r.endpoint === '/v1/chat/completions'
+        r.status_code === 404 && r.endpoint === '/v1/chat/completions'
       );
       
       expect(loggedRequest).toBeDefined();

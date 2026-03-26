@@ -17,10 +17,16 @@
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/v1/chat/completions` | Chat completions 프록시 (스크립트 적용, 분석 로깅) |
-| GET | `/v1/models` | 사용 가능한 모델 목록 |
+| POST | `/v1/chat/completions` | Chat completions 프록시 (모델 카탈로그 기반 라우팅, 스크립트 적용, 분석 로깅) |
+| GET | `/v1/models` | 허용 가능한 활성 백엔드들의 캐시된 모델 목록 합집합 |
 
 `/v1/**`는 기존 사용자 API 키 인증을 유지하며 관리자 인증과 분리된다.
+
+추가 동작:
+- `/v1/chat/completions` 는 요청 모델명을 먼저 전역 rewrite 규칙으로 해석한 뒤, 최종 모델을 서빙하는 허용 가능한 활성 백엔드만 후보로 사용한다
+- `force=true` rewrite 는 항상 적용된다
+- `force=false` rewrite 는 원본 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용된다
+- 최종 후보가 없으면 모델 미지원 오류를 반환하고 `request_model`, `routed_model` 을 함께 내려준다
 
 ## Admin API
 
@@ -61,6 +67,24 @@
 | GET | `/admin/backends/:id` | 백엔드 조회 |
 | PUT | `/admin/backends/:id` | 백엔드 수정 |
 | DELETE | `/admin/backends/:id` | 백엔드 삭제 |
+| GET | `/admin/backends/:id/models` | 백엔드별 모델 스냅샷 + 메모리 캐시 상태 조회 |
+| POST | `/admin/backends/:id/models/refresh` | 활성 백엔드 모델 캐시 강제 갱신 |
+
+### Models
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/models/cache` | 전체 메모리 모델 캐시 상태와 모델 집계 조회 |
+| GET | `/admin/model-rewrites` | 전역 모델 rewrite 규칙 목록 |
+| POST | `/admin/model-rewrites` | 전역 모델 rewrite 규칙 생성 (`force=true` 면 항상 rewrite, 아니면 fallback) |
+| PUT | `/admin/model-rewrites/:id` | 전역 모델 rewrite 규칙 수정 |
+| DELETE | `/admin/model-rewrites/:id` | 전역 모델 rewrite 규칙 삭제 |
+
+`GET /admin/backends/:id/models` 응답에는 아래가 함께 포함된다.
+- `backend`: 백엔드 기본 정보 + 캐시 요약
+- `cache`: 메모리 캐시 상태 (`ready`, `uninitialized`, `error`, `inactive`)
+- `snapshots`: DB에 저장된 마지막 모델 스냅샷
+- `models`: 현재 메모리 캐시에 올라와 있는 모델 ID 목록
 
 ### Permissions
 

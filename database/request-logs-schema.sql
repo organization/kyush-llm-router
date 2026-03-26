@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     backend_id INTEGER NOT NULL,
     endpoint TEXT NOT NULL,
     request_model TEXT,
+    routed_model TEXT,
     response_model TEXT,
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
@@ -26,4 +27,3 @@ CREATE INDEX IF NOT EXISTS idx_request_logs_user ON request_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_request_logs_backend ON request_logs(backend_id);
 CREATE INDEX IF NOT EXISTS idx_request_logs_endpoint ON request_logs(endpoint);
 CREATE INDEX IF NOT EXISTS idx_request_logs_detail_logged ON request_logs(detail_logged);
-

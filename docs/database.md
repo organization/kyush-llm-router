@@ -36,6 +36,43 @@ Indexes: `idx_users_api_key(api_key)`
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP |
 
+### backend_models
+
+백엔드가 마지막으로 광고한 모델 스냅샷. 요청 라우팅에는 사용하지 않고 관리자 조회와 오프라인 확인용으로만 사용한다.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| backend_id | INTEGER | NOT NULL, FK → `backends(id)` |
+| model_id | TEXT | NOT NULL |
+| raw_json | TEXT | |
+| fetched_at | TEXT | NOT NULL |
+| created_at | TEXT | NOT NULL |
+| updated_at | TEXT | NOT NULL |
+
+Unique: `(backend_id, model_id)`
+
+Indexes: `idx_backend_models_backend(backend_id)`, `idx_backend_models_model(model_id)`
+
+### model_rewrites
+
+요청 모델명을 실제 라우팅 모델명으로 변환하는 전역 규칙.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| source_model | TEXT | UNIQUE NOT NULL |
+| target_model | TEXT | NOT NULL |
+| is_active | BOOLEAN | DEFAULT 1 |
+| force | BOOLEAN | DEFAULT 0 |
+| note | TEXT | |
+| created_at | TEXT | NOT NULL |
+| updated_at | TEXT | NOT NULL |
+
+의미:
+- `force = 1`: 항상 `target_model` 로 rewrite
+- `force = 0`: 원본 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback rewrite
+
 ### permissions
 
 `users`와 `backends`의 many-to-many 관계.
@@ -165,6 +202,7 @@ Indexes: `idx_backend_metrics_backend`, `idx_backend_metrics_date`
 | backend_id | INTEGER | NOT NULL |
 | endpoint | TEXT | NOT NULL |
 | request_model | TEXT | |
+| routed_model | TEXT | rewrite 후 실제 라우팅에 사용된 모델 |
 | response_model | TEXT | |
 | prompt_tokens | INTEGER | |
 | completion_tokens | INTEGER | |

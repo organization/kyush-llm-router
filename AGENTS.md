@@ -76,8 +76,10 @@ pnpm run bench      # 벤치마크 실행
 | `OIDC_REDIRECT_URI` | empty | OIDC callback URL |
 | `OIDC_ALLOWED_EMAILS` | empty | 관리자 접근을 허용할 이메일 목록 |
 | `OIDC_SCOPES` | `openid profile email` | OIDC authorization scope |
+| `MODEL_CATALOG_REFRESH_MIN_MS` | `300000` 예시 | 모델 카탈로그 refresh 최소 간격(ms) |
 
 ## Detailed Docs
+관련 기능을 수정하기 전에 해당 문서를 반드시 먼저 읽으세요.
 
 클라이언트 중심
 - [docs/client.md](docs/client.md) — 클라이언트 구조, `/dashboard` 라우팅, 관리자 UI 동작
@@ -87,6 +89,7 @@ pnpm run bench      # 벤치마크 실행
 
 서버 중심
 - [docs/server.md](docs/server.md) — 서버 구조, 서비스, 모델, 의존성
+- [docs/model-routing.md](docs/model-routing.md) — 모델 카탈로그, force/fallback rewrite, 캐시 갱신 규칙
 - [docs/database.md](docs/database.md) — DB 테이블 스키마 전체
 - [docs/api.md](docs/api.md) — API 엔드포인트 레퍼런스
 - [docs/k8s-traefik.md](docs/k8s-traefik.md) — Traefik path 기반 내부망 제어 예시

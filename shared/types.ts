@@ -18,6 +18,76 @@ export interface Backend {
   detail_logging: boolean;
   created_at: string;
   updated_at: string;
+  cached_model_count?: number;
+  last_model_sync_at?: string;
+  model_cache_initialized?: boolean;
+  model_cache_state?: ModelCacheState;
+}
+
+export interface BackendModelSnapshot {
+  id: number;
+  backend_id: number;
+  model_id: string;
+  raw_json?: string;
+  fetched_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ModelCacheState = 'ready' | 'uninitialized' | 'error' | 'inactive';
+
+export interface BackendModelCacheStatus {
+  backend_id: number;
+  initialized: boolean;
+  state: ModelCacheState;
+  model_count: number;
+  last_synced_at?: string;
+  last_attempted_at?: string;
+  last_error?: string;
+}
+
+export interface BackendModelCatalogEntry {
+  model_id: string;
+  backend_ids: number[];
+}
+
+export interface BackendModelsResponse {
+  backend: Backend;
+  cache: BackendModelCacheStatus;
+  snapshots: BackendModelSnapshot[];
+  models: string[];
+}
+
+export interface ModelCacheOverview {
+  backends: BackendModelCacheStatus[];
+  models: BackendModelCatalogEntry[];
+}
+
+export interface ModelRewriteRule {
+  id: number;
+  source_model: string;
+  target_model: string;
+  is_active: boolean;
+  force: boolean;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateModelRewriteData {
+  source_model: string;
+  target_model: string;
+  is_active?: boolean;
+  force?: boolean;
+  note?: string;
+}
+
+export interface UpdateModelRewriteData {
+  source_model?: string;
+  target_model?: string;
+  is_active?: boolean;
+  force?: boolean;
+  note?: string;
 }
 
 export interface Permission {
@@ -66,6 +136,7 @@ export interface RequestLog {
   backend_id: number;
   endpoint: string;
   request_model?: string;
+  routed_model?: string;
   response_model?: string;
   prompt_tokens?: number;
   completion_tokens?: number;

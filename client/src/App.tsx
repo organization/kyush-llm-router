@@ -10,6 +10,7 @@ const Backends = lazy(() => import('./routes/Backends').then((module) => ({ defa
 const Permissions = lazy(() => import('./routes/Permissions').then((module) => ({ default: module.Permissions })));
 const Analytics = lazy(() => import('./routes/Analytics').then((module) => ({ default: module.Analytics })));
 const DetailLogs = lazy(() => import('./routes/DetailLogs').then((module) => ({ default: module.DetailLogs })));
+const Models = lazy(() => import('./routes/Models').then((module) => ({ default: module.Models })));
 const Scripts = lazy(() => import('./routes/Scripts').then((module) => ({ default: module.Scripts })));
 
 function RouteLoadingFallback() {
@@ -40,6 +41,7 @@ function AuthenticatedApp() {
             <Route path="/backends" component={Backends} />
             <Route path="/permissions" component={Permissions} />
             <Route path="/analytics" component={Analytics} />
+            <Route path="/models" component={Models} />
             <Route path="/detail-logs" component={DetailLogs} />
             <Route path="/scripts" component={Scripts} />
           </Router>

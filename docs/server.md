@@ -19,6 +19,7 @@ server/src/
     analytics.ts         # /admin/analytics 핸들러
   services/
     RouterService.ts     # 백엔드 선택 및 포워딩
+    ModelCatalogService.ts # 백엔드 모델 캐시, 모델 인덱스, rewrite/fallback 규칙
     AnalyticsService.ts  # 사용량 집계 및 요청 로그 조회
     ScriptEngine.ts      # 스크립트 오케스트레이션
   utils/
@@ -34,6 +35,8 @@ server/src/
 - `/admin/**` 는 관리자 API 표면을 유지한다
 - `/dashboard` 와 `/dashboard/**` 는 빌드된 관리자 SPA를 서빙한다
 - 빌드된 `client/dist` 가 있으면 관리자 UI를 함께 제공하고, 없으면 API 전용 모드처럼 동작한다
+- 서버 시작 시 활성 백엔드의 `/v1/models` 를 조회해 메모리 모델 카탈로그를 초기화한다
+- 라우팅은 DB가 아니라 메모리 모델 카탈로그를 사용하고, 비활성 백엔드는 모델 조회와 후보 선택에서 항상 제외된다
 
 라우트 우선순위는 다음과 같다.
 
@@ -49,7 +52,19 @@ server/src/
 
 - `DB_DIR` 에 `core.db`, `analytics.db`, `request_logs/request_logs_YYYY-MM.db` 가 저장된다
 - `core.db` 에는 `admin_sessions`, `admin_api_tokens` 도 함께 저장된다
+- `core.db` 에는 `backend_models`, `model_rewrites` 도 저장된다
 - 시간 경계 계산은 `TZ` 기준이다
+
+## Model Routing
+
+- 요청 모델명은 먼저 전역 `model_rewrites` 규칙을 확인한다
+- `force=1` 규칙은 항상 `source_model -> target_model` 로 변환한다
+- `force=0` 규칙은 원본 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용한다
+- 최종 모델을 서빙하는 허용 가능한 활성 백엔드가 없으면 `/v1/chat/completions` 는 모델 미지원 오류를 반환한다
+- `/v1/models` 는 허용 가능한 활성 백엔드들의 캐시된 모델 목록 합집합을 반환한다
+
+참고:
+- 세부 라우팅 규칙과 캐시 트리거는 [docs/model-routing.md](./model-routing.md) 참고
 
 ## Deployment Notes
 

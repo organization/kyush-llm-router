@@ -1,6 +1,9 @@
 import type {
   User,
   Backend,
+  BackendModelsResponse,
+  ModelCacheOverview,
+  ModelRewriteRule,
   Permission,
   RequestLogPage,
   UsageStats,
@@ -100,6 +103,9 @@ export const api = {
   backends: {
     getAll: (): Promise<Backend[]> => fetchJson<Backend[]>(`${API_BASE}/admin/backends`),
     getById: (id: number): Promise<Backend> => fetchJson<Backend>(`${API_BASE}/admin/backends/${id}`),
+    getModels: (id: number): Promise<BackendModelsResponse> => fetchJson<BackendModelsResponse>(`${API_BASE}/admin/backends/${id}/models`),
+    refreshModels: (id: number): Promise<BackendModelsResponse> =>
+      fetchJson<BackendModelsResponse>(`${API_BASE}/admin/backends/${id}/models/refresh`, { method: 'POST' }),
     create: (data: { name: string; base_url: string; api_key?: string; detail_logging?: boolean }): Promise<Backend> =>
       fetchJson<Backend>(`${API_BASE}/admin/backends`, { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: Partial<Backend>): Promise<Backend> =>
@@ -118,6 +124,20 @@ export const api = {
       fetchJson<Permission>(`${API_BASE}/admin/permissions`, { method: 'POST', body: JSON.stringify(data) }),
     delete: (userId: number, backendId: number): Promise<void> =>
       fetchJson<void>(`${API_BASE}/admin/permissions?user_id=${userId}&backend_id=${backendId}`, { method: 'DELETE' }),
+  },
+
+  modelRewrites: {
+    getAll: (): Promise<ModelRewriteRule[]> => fetchJson<ModelRewriteRule[]>(`${API_BASE}/admin/model-rewrites`),
+    create: (data: { source_model: string; target_model: string; is_active?: boolean; force?: boolean; note?: string }): Promise<ModelRewriteRule> =>
+      fetchJson<ModelRewriteRule>(`${API_BASE}/admin/model-rewrites`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<ModelRewriteRule>): Promise<ModelRewriteRule> =>
+      fetchJson<ModelRewriteRule>(`${API_BASE}/admin/model-rewrites/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number): Promise<void> =>
+      fetchJson<void>(`${API_BASE}/admin/model-rewrites/${id}`, { method: 'DELETE' }),
+  },
+
+  modelCache: {
+    getOverview: (): Promise<ModelCacheOverview> => fetchJson<ModelCacheOverview>(`${API_BASE}/admin/models/cache`),
   },
 
   scripts: {

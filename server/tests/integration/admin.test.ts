@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createTestApp } from '../utils/testApp';
 import { createAdminClient } from '../utils/adminClient';
+import { createMockBackend } from '../utils/mockBackend';
 
 let app: ReturnType<typeof createTestApp>;
 let admin: Awaited<ReturnType<typeof createAdminClient>>;
@@ -210,6 +211,7 @@ describe('Admin API - Backend Management', () => {
       expect(response.status).toBe(200);
       expect(response.body.name).toBe('Updated Backend');
       expect(response.body.is_active).toBe(false);
+      expect(response.body.model_cache_state).toBe('inactive');
     });
 
     it('should return 404 for non-existent backend', async () => {
@@ -241,6 +243,77 @@ describe('Admin API - Backend Management', () => {
       
       expect(response.status).toBe(404);
     });
+  });
+
+  describe('Backend model cache endpoints', () => {
+    it('should expose backend cache details and allow manual refresh for active backends', async () => {
+      const { server, port } = createMockBackend({
+        modelsResponse: [{ id: 'admin-refresh-model', object: 'model' }],
+      });
+
+      const backendResponse = await admin.post('/admin/backends').send({
+        name: 'Backend Cache Admin Test',
+        base_url: `http://localhost:${port}`,
+      });
+      const backendId = backendResponse.body.id;
+
+      const beforeRefresh = await admin.get(`/admin/backends/${backendId}/models`);
+      expect(beforeRefresh.status).toBe(200);
+      expect(beforeRefresh.body.cache.state).toBe('uninitialized');
+
+      const refreshResponse = await admin.post(`/admin/backends/${backendId}/models/refresh`);
+      expect(refreshResponse.status).toBe(200);
+      expect(refreshResponse.body.models).toContain('admin-refresh-model');
+
+      const cacheOverview = await admin.get('/admin/models/cache');
+      expect(cacheOverview.status).toBe(200);
+      expect(Array.isArray(cacheOverview.body.models)).toBe(true);
+
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+
+    it('should reject manual refresh for inactive backends', async () => {
+      const backendResponse = await admin.post('/admin/backends').send({
+        name: 'Inactive Refresh Reject',
+        base_url: 'http://localhost:8041',
+      });
+
+      await admin.put(`/admin/backends/${backendResponse.body.id}`).send({ is_active: false });
+      const refreshResponse = await admin.post(`/admin/backends/${backendResponse.body.id}/models/refresh`);
+      expect(refreshResponse.status).toBe(409);
+    });
+  });
+});
+
+describe('Admin API - Model Rewrite Management', () => {
+  it('should create, update, list, and delete model rewrite rules', async () => {
+    const createResponse = await admin.post('/admin/model-rewrites').send({
+      source_model: 'gpt-3.5-turbo-admin-test',
+      target_model: 'gpt-3.5-admin-test',
+      force: true,
+      note: 'fallback alias',
+    });
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body.source_model).toBe('gpt-3.5-turbo-admin-test');
+    expect(createResponse.body.force).toBe(true);
+
+    const listResponse = await admin.get('/admin/model-rewrites');
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body.some((rule: any) => rule.source_model === 'gpt-3.5-turbo-admin-test')).toBe(true);
+
+    const updateResponse = await admin.put(`/admin/model-rewrites/${createResponse.body.id}`).send({
+      target_model: 'gpt-3.5-mini-admin-test',
+      is_active: false,
+      force: false,
+    });
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.target_model).toBe('gpt-3.5-mini-admin-test');
+    expect(updateResponse.body.is_active).toBe(false);
+    expect(updateResponse.body.force).toBe(false);
+
+    const deleteResponse = await admin.delete(`/admin/model-rewrites/${createResponse.body.id}`);
+    expect(deleteResponse.status).toBe(204);
   });
 });
 

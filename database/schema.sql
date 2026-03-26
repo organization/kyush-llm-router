@@ -25,6 +25,34 @@ CREATE TABLE IF NOT EXISTS backends (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Backend model snapshots (offline/admin visibility only)
+CREATE TABLE IF NOT EXISTS backend_models (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    backend_id INTEGER NOT NULL,
+    model_id TEXT NOT NULL,
+    raw_json TEXT,
+    fetched_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (backend_id) REFERENCES backends(id) ON DELETE CASCADE,
+    UNIQUE(backend_id, model_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_backend_models_backend ON backend_models(backend_id);
+CREATE INDEX IF NOT EXISTS idx_backend_models_model ON backend_models(model_id);
+
+-- Global model rewrite rules
+CREATE TABLE IF NOT EXISTS model_rewrites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_model TEXT UNIQUE NOT NULL,
+    target_model TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    force BOOLEAN DEFAULT 0,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 -- Permissions table (many-to-many: users ↔ backends)
 CREATE TABLE IF NOT EXISTS permissions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

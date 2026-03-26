@@ -1,10 +1,11 @@
-import { createResource, createSignal, Show, type Component } from 'solid-js';
+import { For, createResource, createSignal, Show, type Component } from 'solid-js';
 import Pencil from 'lucide-solid/icons/pencil';
 import Plus from 'lucide-solid/icons/plus';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import Trash2 from 'lucide-solid/icons/trash-2';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
-import type { Backend } from '../types';
+import type { Backend, BackendModelsResponse } from '../types';
 import {
   Alert,
   Button,
@@ -45,6 +46,34 @@ export const Backends: Component = () => {
   const [form, setForm] = createSignal<BackendFormState>(emptyForm());
   const [submitting, setSubmitting] = createSignal(false);
   const [notice, setNotice] = createSignal<{ tone: 'success' | 'danger'; message: string } | null>(null);
+  const [expandedBackendId, setExpandedBackendId] = createSignal<number | null>(null);
+  const [backendModels, setBackendModels] = createSignal<Record<number, BackendModelsResponse>>({});
+
+  const modelStateTone = (backend: Backend): 'success' | 'warning' | 'danger' | 'neutral' => {
+    switch (backend.model_cache_state) {
+      case 'ready':
+        return 'success';
+      case 'error':
+        return 'danger';
+      case 'inactive':
+        return 'neutral';
+      default:
+        return 'warning';
+    }
+  };
+
+  const modelStateLabel = (backend: Backend): string => {
+    switch (backend.model_cache_state) {
+      case 'ready':
+        return 'Cached';
+      case 'error':
+        return 'Error';
+      case 'inactive':
+        return 'Skipped';
+      default:
+        return 'Pending';
+    }
+  };
 
   const openCreateDialog = () => {
     setEditingBackend(null);
@@ -127,6 +156,37 @@ export const Backends: Component = () => {
     }
   };
 
+  const toggleDetails = async (backend: Backend) => {
+    const isClosing = expandedBackendId() === backend.id;
+    setExpandedBackendId(isClosing ? null : backend.id);
+    if (isClosing || backendModels()[backend.id]) {
+      return;
+    }
+
+    try {
+      const detail = await api.backends.getModels(backend.id);
+      setBackendModels((current) => ({ ...current, [backend.id]: detail }));
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Failed to load backend models.' });
+    }
+  };
+
+  const refreshModels = async (backend: Backend) => {
+    if (!backend.is_active) return;
+
+    setSubmitting(true);
+    try {
+      const detail = await api.backends.refreshModels(backend.id);
+      setBackendModels((current) => ({ ...current, [backend.id]: detail }));
+      setNotice({ tone: 'success', message: `${backend.name} model cache refreshed.` });
+      await refetch();
+    } catch (error) {
+      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Model refresh failed.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Layout>
       <div class="ui-app-page">
@@ -172,6 +232,16 @@ export const Backends: Component = () => {
                     cell: (backend) => <StatusBadge tone={backend.detail_logging ? 'warning' : 'neutral'}>{backend.detail_logging ? 'On' : 'Off'}</StatusBadge>,
                   },
                   {
+                    id: 'model_cache',
+                    header: 'Model Cache',
+                    cell: (backend) => <StatusBadge tone={modelStateTone(backend)}>{modelStateLabel(backend)}</StatusBadge>,
+                  },
+                  {
+                    id: 'model_count',
+                    header: 'Models',
+                    cell: (backend) => <span>{backend.cached_model_count ?? 0}</span>,
+                  },
+                  {
                     id: 'status',
                     header: 'Status',
                     cell: (backend) => <StatusBadge tone={backend.is_active ? 'success' : 'warning'}>{backend.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
@@ -181,11 +251,47 @@ export const Backends: Component = () => {
                 loading={backends.loading}
                 rowActions={(backend) => (
                   <div class="ui-row-actions">
+                    <IconButton
+                      icon={<RefreshCw />}
+                      label="Refresh Models"
+                      disabled={!backend.is_active || submitting()}
+                      onClick={() => void refreshModels(backend)}
+                    />
                     <IconButton icon={<Pencil />} label="Edit" onClick={() => openEditDialog(backend)} />
+                    <Button onClick={() => void toggleDetails(backend)}>{expandedBackendId() === backend.id ? 'Hide Models' : 'View Models'}</Button>
                     <IconButton variant="danger" icon={<Trash2 />} label="Delete" onClick={() => requestDelete(backend)} />
                   </div>
                 )}
               />
+              <Show when={expandedBackendId()}>
+                {(backendId) => {
+                  const detail = () => backendModels()[backendId()];
+                  return (
+                    <Panel
+                      title={`Backend ${backendId()} Models`}
+                      description={detail()?.cache.state === 'inactive' ? 'Inactive backends skip model fetches and only keep the last DB snapshot.' : 'Live cache state and last persisted model snapshot.'}
+                    >
+                      <div class="ui-stack ui-stack--tight">
+                        <Show when={detail()} fallback={<EmptyState title="Loading models" description="Reading cached model information for this backend." />}>
+                          <Alert tone={detail()!.cache.last_error ? 'danger' : 'success'}>
+                            {detail()!.cache.last_error
+                              ? `Last error: ${detail()!.cache.last_error}`
+                              : `State: ${detail()!.cache.state}, models: ${detail()!.cache.model_count}, last sync: ${detail()!.cache.last_synced_at ?? 'never'}`}
+                          </Alert>
+                          <Show
+                            when={detail()!.models.length > 0}
+                            fallback={<EmptyState title="No cached models" description="This backend has not published any models yet or the last refresh failed." />}
+                          >
+                            <div class="ui-chip-row">
+                              <For each={detail()!.models}>{(modelId) => <StatusBadge tone="neutral">{modelId}</StatusBadge>}</For>
+                            </div>
+                          </Show>
+                        </Show>
+                      </div>
+                    </Panel>
+                  );
+                }}
+              </Show>
             </Show>
           </Show>
         </Panel>

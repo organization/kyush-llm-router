@@ -7,6 +7,7 @@ export interface RequestLogInsert {
   backend_id: number;
   endpoint: string;
   request_model?: string;
+  routed_model?: string;
   response_model?: string;
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -74,6 +75,7 @@ function buildWhereClause(query: RequestLogQuery): { whereClause: string; params
     clauses.push(`(
       endpoint LIKE ?
       OR COALESCE(request_model, '') LIKE ?
+      OR COALESCE(routed_model, '') LIKE ?
       OR COALESCE(response_model, '') LIKE ?
       OR COALESCE(error_message, '') LIKE ?
       OR COALESCE(request_headers, '') LIKE ?
@@ -81,7 +83,7 @@ function buildWhereClause(query: RequestLogQuery): { whereClause: string; params
       OR COALESCE(response_headers, '') LIKE ?
       OR COALESCE(response_body, '') LIKE ?
     )`);
-    params.push(like, like, like, like, like, like, like, like);
+    params.push(like, like, like, like, like, like, like, like, like);
   }
 
   return {
@@ -148,16 +150,17 @@ export class RequestLogService {
 
     db.prepare(`
       INSERT INTO request_logs (
-        user_id, backend_id, endpoint, request_model, response_model,
+        user_id, backend_id, endpoint, request_model, routed_model, response_model,
         prompt_tokens, completion_tokens, total_tokens,
         status_code, response_time_ms, error_message, detail_logged,
         local_date, request_headers, request_body, response_headers, response_body, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       logData.user_id,
       logData.backend_id,
       logData.endpoint,
       logData.request_model || null,
+      logData.routed_model || null,
       logData.response_model || null,
       logData.prompt_tokens || null,
       logData.completion_tokens || null,

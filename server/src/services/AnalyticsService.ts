@@ -10,8 +10,10 @@ export class AnalyticsService {
     try {
       RequestLogService.logRequest(logData);
 
-      this.updateUsageStats(logData.user_id, logData.backend_id, logData.total_tokens || 0);
-      this.updateBackendMetrics(logData.backend_id, logData);
+      if (logData.backend_id > 0) {
+        this.updateUsageStats(logData.user_id, logData.backend_id, logData.total_tokens || 0);
+        this.updateBackendMetrics(logData.backend_id, logData);
+      }
     } catch (error) {
       console.error('Failed to log analytics:', error);
     }

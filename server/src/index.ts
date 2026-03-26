@@ -11,6 +11,7 @@ import analyticsRoutes from './routes/analytics';
 import { requireAdminAccess, requireSessionCsrf } from './utils/adminAuth';
 import { logger } from './utils/logger';
 import { getUtcTimestamp } from './utils/time';
+import { ModelCatalogService } from './services/ModelCatalogService';
 
 const envPathCandidates = [
   path.resolve(__dirname, '..', '..', '.env'),
@@ -26,6 +27,7 @@ dotenv.config({
 });
 
 export function createServer(): Application {
+  void ModelCatalogService.initialize();
   const app = express();
   const adminDistCandidates = [
     path.resolve(__dirname, '..', '..', '..', 'client', 'dist'),

@@ -6,10 +6,18 @@ import { getLocalMonthKey } from '../utils/time';
 
 const connections = new Map<string, Database.Database>();
 
+function hasColumn(database: Database.Database, tableName: string, columnName: string): boolean {
+  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  return columns.some((column) => column.name === columnName);
+}
+
 function initRequestLogsSchema(db: Database.Database): void {
   const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'request-logs-schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf-8');
   db.exec(schema);
+  if (hasColumn(db, 'request_logs', 'routed_model') === false) {
+    db.exec('ALTER TABLE request_logs ADD COLUMN routed_model TEXT');
+  }
 }
 
 export function getRequestLogsDb(monthKey: string = getLocalMonthKey()): Database.Database {

@@ -9,12 +9,15 @@ import analyticsRoutes from '../../src/routes/analytics';
 import { initRequestLogsDb } from '../../src/config/request-logs-db';
 import { getUtcTimestamp } from '../../src/utils/time';
 import { requireAdminAccess, requireSessionCsrf } from '../../src/utils/adminAuth';
+import { ModelCatalogService } from '../../src/services/ModelCatalogService';
 
 export function createTestApp() {
   // Initialize both databases
   initDb();
   initAnalyticsDb();
   initRequestLogsDb();
+  ModelCatalogService.reset();
+  void ModelCatalogService.initialize();
   
   const app = express();
   

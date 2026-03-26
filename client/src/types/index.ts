@@ -18,6 +18,58 @@ export type Backend = {
   detail_logging: boolean;
   created_at: string;
   updated_at: string;
+  cached_model_count?: number;
+  last_model_sync_at?: string;
+  model_cache_initialized?: boolean;
+  model_cache_state?: 'ready' | 'uninitialized' | 'error' | 'inactive';
+};
+
+export type BackendModelSnapshot = {
+  id: number;
+  backend_id: number;
+  model_id: string;
+  raw_json?: string;
+  fetched_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BackendModelCacheStatus = {
+  backend_id: number;
+  initialized: boolean;
+  state: 'ready' | 'uninitialized' | 'error' | 'inactive';
+  model_count: number;
+  last_synced_at?: string;
+  last_attempted_at?: string;
+  last_error?: string;
+};
+
+export type BackendModelsResponse = {
+  backend: Backend;
+  cache: BackendModelCacheStatus;
+  snapshots: BackendModelSnapshot[];
+  models: string[];
+};
+
+export type BackendModelCatalogEntry = {
+  model_id: string;
+  backend_ids: number[];
+};
+
+export type ModelCacheOverview = {
+  backends: BackendModelCacheStatus[];
+  models: BackendModelCatalogEntry[];
+};
+
+export type ModelRewriteRule = {
+  id: number;
+  source_model: string;
+  target_model: string;
+  is_active: boolean;
+  force: boolean;
+  note?: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Permission = {
@@ -33,6 +85,7 @@ export type RequestLog = {
   backend_id: number;
   endpoint: string;
   request_model?: string;
+  routed_model?: string;
   response_model?: string;
   prompt_tokens?: number;
   completion_tokens?: number;
