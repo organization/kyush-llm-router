@@ -20,10 +20,10 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/users', label: 'Users', icon: Users },
   { path: '/backends', label: 'Backends', icon: Server },
-  { path: '/analytics', label: 'Analytics', icon: ChartColumn },
   { path: '/models', label: 'Models', icon: Network },
-  { path: '/detail-logs', label: 'Detail Logs', icon: Logs },
   { path: '/scripts', label: 'Scripts', icon: FileCode },
+  { path: '/detail-logs', label: 'Detail Logs', icon: Logs },
+  { path: '/analytics', label: 'Analytics', icon: ChartColumn },
 ];
 
 interface AppShellProps {

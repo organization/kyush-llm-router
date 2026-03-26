@@ -180,6 +180,44 @@ export interface BackendMetrics {
   success_rate: number;
 }
 
+export interface AnalyticsDailyTotalsPoint {
+  date: string;
+  total_requests: number;
+  total_tokens: number;
+}
+
+export interface AnalyticsBackendQualityPoint {
+  date: string;
+  backend_id: number;
+  total_requests: number;
+  total_tokens: number;
+  avg_response_time_ms: number;
+  error_count: number;
+  success_rate: number;
+}
+
+export interface AnalyticsModelTrendPoint {
+  date: string;
+  model: string;
+  request_count: number;
+}
+
+export interface AnalyticsHistogramBin {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+}
+
+export interface AnalyticsBoxPlotPoint {
+  date: string;
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  count: number;
+}
+
 export interface OpenAIChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;

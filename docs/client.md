@@ -15,10 +15,9 @@ client/src/
     index.ts                # TypeScript 타입 정의
   routes/
     Dashboard.tsx           # 운영 요약, 최근 요청, 관리자 토큰 관리
-    Users.tsx               # 사용자 CRUD
+    Users.tsx               # 사용자 CRUD / 권한 매핑 관리
     Backends.tsx            # 백엔드 CRUD
     Models.tsx              # 모델 캐시/리라이트 규칙 관리
-    Permissions.tsx         # 권한 매핑 관리
     Analytics.tsx           # 분석 화면
     DetailLogs.tsx          # 상세 요청 로그 탐색
     Scripts.tsx             # 스크립트 관리 및 테스트
@@ -40,10 +39,9 @@ client/src/
 | `/dashboard/users` | Users | 사용자 관리 |
 | `/dashboard/backends` | Backends | 백엔드 관리 |
 | `/dashboard/models` | Models | 모델 캐시/리라이트 관리 |
-| `/dashboard/permissions` | Permissions | 권한 관리 |
-| `/dashboard/analytics` | Analytics | 분석 대시보드 |
-| `/dashboard/detail-logs` | DetailLogs | 상세 요청 로그 탐색 |
 | `/dashboard/scripts` | Scripts | 스크립트 관리 |
+| `/dashboard/detail-logs` | DetailLogs | 상세 요청 로그 탐색 |
+| `/dashboard/analytics` | Analytics | 분석 대시보드 |
 
 모든 관리자 라우트는 로그인 게이트 아래에서 렌더링된다.
 
@@ -65,6 +63,14 @@ SPA는 `/dashboard`를 라우터 base로 사용하고, 관리자 API는 계속 `
 - ENV 로그인과 OIDC 로그인을 함께 사용할 수 있다
 - 세션 기반 쓰기 요청에는 `X-CSRF-Token`이 자동 포함된다
 - 401 응답이 오면 UI는 로그인 상태로 되돌아간다
+
+## Analytics 메모
+
+- `Analytics` 화면은 D3 기반 시계열 대시보드로 동작한다.
+- 공통 필터는 기간(`7`, `30`, `90`일)과 backend 선택이다.
+- 상단 summary strip 뒤에 일별 volume, reliability, response time, model trends, response length 분포 패널이 배치된다.
+- 상세 raw request 확인은 계속 `DetailLogs` 화면이 담당한다.
+- 자세한 내용은 [docs/analytics.md](./analytics.md) 참고.
 
 ## Model Management UI
 

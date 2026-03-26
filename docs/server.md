@@ -66,6 +66,15 @@ server/src/
 참고:
 - 세부 라우팅 규칙과 캐시 트리거는 [docs/model-routing.md](./model-routing.md) 참고
 
+## Analytics 메모
+
+- `/admin/analytics` 는 기존 usage/requests/metrics 외에 chart 전용 집계 endpoint를 함께 제공한다.
+- 추가 endpoint: `daily-totals`, `backend-quality`, `model-trends`, `response-length-histogram`, `response-length-box-plot`
+- `AnalyticsService` 는 `analytics.db` 의 일별 집계와 `request_logs_YYYY-MM.db` 의 범위 조회를 함께 사용해 시계열/분포 데이터를 만든다.
+- 모델 추이 키는 `response_model -> routed_model -> request_model -> unknown` 순서로 결정한다.
+- response length 계열 집계는 `completion_tokens` 가 있는 요청만 포함한다.
+- 자세한 화면/API 설명은 [docs/analytics.md](./analytics.md) 참고.
+
 ## Deployment Notes
 
 - 권장 런타임은 단일 OCI 이미지다

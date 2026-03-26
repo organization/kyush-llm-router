@@ -2,8 +2,88 @@ import { getAnalyticsDb } from '../config/analytics-db';
 import { RequestLogPage } from '../../../shared/types';
 import { RequestLogInsert, RequestLogQuery, RequestLogService } from './RequestLogService';
 import { getLocalDateKey } from '../utils/time';
+import { getRequestLogsDb, listRequestLogMonths } from '../config/request-logs-db';
 
 type AnalyticsLogInput = RequestLogInsert;
+type RequestLogFilter = {
+  backendId?: number;
+  startDate: string;
+  endDate: string;
+};
+
+type DailyTotalsRow = {
+  date: string;
+  total_requests: number;
+  total_tokens: number;
+};
+
+type RequestLogRangeRow = {
+  local_date: string;
+  backend_id: number;
+  request_model: string | null;
+  routed_model: string | null;
+  response_model: string | null;
+  completion_tokens: number | null;
+};
+
+function getDateRange(days: number): { startDate: string; endDate: string } {
+  const normalizedDays = Math.max(1, days);
+  const endDate = getLocalDateKey();
+  const startDate = getLocalDateKey(new Date(Date.now() - (normalizedDays - 1) * 24 * 60 * 60 * 1000));
+  return { startDate, endDate };
+}
+
+function buildRequestLogRangeWhere(filter: RequestLogFilter): { whereClause: string; params: unknown[] } {
+  const clauses = ['local_date >= ?', 'local_date <= ?'];
+  const params: unknown[] = [filter.startDate, filter.endDate];
+
+  if (filter.backendId) {
+    clauses.push('backend_id = ?');
+    params.push(filter.backendId);
+  }
+
+  return {
+    whereClause: `WHERE ${clauses.join(' AND ')}`,
+    params,
+  };
+}
+
+function getRequestLogMonthsForRange(startDate: string, endDate: string): string[] {
+  const startMonth = startDate.slice(0, 7);
+  const endMonth = endDate.slice(0, 7);
+  return listRequestLogMonths().filter((month) => month >= startMonth && month <= endMonth);
+}
+
+function groupByDate(rows: DailyTotalsRow[]): DailyTotalsRow[] {
+  const grouped = new Map<string, DailyTotalsRow>();
+  for (const row of rows) {
+    const existing = grouped.get(row.date);
+    if (existing) {
+      existing.total_requests += row.total_requests;
+      existing.total_tokens += row.total_tokens;
+    } else {
+      grouped.set(row.date, { ...row });
+    }
+  }
+
+  return Array.from(grouped.values()).sort((left, right) => left.date.localeCompare(right.date));
+}
+
+function calculateQuantile(sortedValues: number[], ratio: number): number {
+  if (sortedValues.length === 0) return 0;
+  if (sortedValues.length === 1) return sortedValues[0];
+
+  const index = (sortedValues.length - 1) * ratio;
+  const lowerIndex = Math.floor(index);
+  const upperIndex = Math.ceil(index);
+
+  if (lowerIndex === upperIndex) {
+    return sortedValues[lowerIndex];
+  }
+
+  const weight = index - lowerIndex;
+  return sortedValues[lowerIndex] * (1 - weight) + sortedValues[upperIndex] * weight;
+}
 
 export class AnalyticsService {
   static logRequest(logData: AnalyticsLogInput): void {
@@ -115,8 +195,7 @@ export class AnalyticsService {
 
   static getBackendMetrics(backendId?: number, days: number = 30): unknown[] {
     const db = getAnalyticsDb();
-    const endDate = getLocalDateKey();
-    const startDate = getLocalDateKey(new Date(Date.now() - days * 24 * 60 * 60 * 1000));
+    const { startDate, endDate } = getDateRange(days);
 
     let query = `
       SELECT * FROM backend_metrics 
@@ -132,5 +211,164 @@ export class AnalyticsService {
     query += ' ORDER BY date DESC';
 
     return db.prepare(query).all(...params);
+  }
+
+  static getDailyTotals(backendId?: number, days: number = 30): DailyTotalsRow[] {
+    const db = getAnalyticsDb();
+    const { startDate, endDate } = getDateRange(days);
+
+    if (backendId) {
+      return db.prepare(`
+        SELECT date, SUM(total_requests) as total_requests, SUM(total_tokens) as total_tokens
+        FROM usage_stats
+        WHERE date >= ? AND date <= ? AND backend_id = ?
+        GROUP BY date
+        ORDER BY date ASC
+      `).all(startDate, endDate, backendId) as DailyTotalsRow[];
+    }
+
+    return db.prepare(`
+      SELECT date, SUM(total_requests) as total_requests, SUM(total_tokens) as total_tokens
+      FROM usage_stats
+      WHERE date >= ? AND date <= ?
+      GROUP BY date
+      ORDER BY date ASC
+    `).all(startDate, endDate) as DailyTotalsRow[];
+  }
+
+  static getBackendQuality(backendId?: number, days: number = 30): unknown[] {
+    const db = getAnalyticsDb();
+    const { startDate, endDate } = getDateRange(days);
+
+    let query = `
+      SELECT backend_id, date, total_requests, total_tokens, avg_response_time_ms, error_count, success_rate
+      FROM backend_metrics
+      WHERE date >= ? AND date <= ?
+    `;
+    const params: unknown[] = [startDate, endDate];
+
+    if (backendId) {
+      query += ' AND backend_id = ?';
+      params.push(backendId);
+    }
+
+    query += ' ORDER BY date ASC, backend_id ASC';
+
+    return db.prepare(query).all(...params);
+  }
+
+  private static collectRequestLogRangeRows(filter: RequestLogFilter): RequestLogRangeRow[] {
+    const { whereClause, params } = buildRequestLogRangeWhere(filter);
+    const rows: RequestLogRangeRow[] = [];
+
+    for (const month of getRequestLogMonthsForRange(filter.startDate, filter.endDate)) {
+      const db = getRequestLogsDb(month);
+      const monthRows = db.prepare(`
+        SELECT local_date, backend_id, request_model, routed_model, response_model, completion_tokens
+        FROM request_logs
+        ${whereClause}
+      `).all(...params) as RequestLogRangeRow[];
+      rows.push(...monthRows);
+    }
+
+    return rows;
+  }
+
+  static getModelTrends(backendId?: number, days: number = 30, limit: number = 8): unknown[] {
+    const { startDate, endDate } = getDateRange(days);
+    const rows = this.collectRequestLogRangeRows({ backendId, startDate, endDate });
+    const countsByModel = new Map<string, number>();
+    const countsByDateAndModel = new Map<string, number>();
+
+    for (const row of rows) {
+      const model = row.response_model || row.routed_model || row.request_model || 'unknown';
+      countsByModel.set(model, (countsByModel.get(model) ?? 0) + 1);
+      const key = `${row.local_date}::${model}`;
+      countsByDateAndModel.set(key, (countsByDateAndModel.get(key) ?? 0) + 1);
+    }
+
+    const topModels = Array.from(countsByModel.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .slice(0, Math.max(1, limit))
+      .map(([model]) => model);
+
+    const result: Array<{ date: string; model: string; request_count: number }> = [];
+    const seenDates = new Set(rows.map((row) => row.local_date));
+
+    for (const date of Array.from(seenDates).sort((left, right) => left.localeCompare(right))) {
+      for (const model of topModels) {
+        result.push({
+          date,
+          model,
+          request_count: countsByDateAndModel.get(`${date}::${model}`) ?? 0,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  static getResponseLengthHistogram(backendId?: number, days: number = 30, bins: number = 20): unknown[] {
+    const { startDate, endDate } = getDateRange(days);
+    const values = this.collectRequestLogRangeRows({ backendId, startDate, endDate })
+      .map((row) => row.completion_tokens)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+
+    if (values.length === 0) {
+      return [];
+    }
+
+    const safeBinCount = Math.max(1, bins);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+
+    if (min === max) {
+      return [{ bin_start: min, bin_end: max, count: values.length }];
+    }
+
+    const width = (max - min) / safeBinCount;
+    const histogram = Array.from({ length: safeBinCount }, (_, index) => ({
+      bin_start: min + width * index,
+      bin_end: index === safeBinCount - 1 ? max : min + width * (index + 1),
+      count: 0,
+    }));
+
+    for (const value of values) {
+      const index = Math.min(safeBinCount - 1, Math.floor((value - min) / width));
+      histogram[index].count += 1;
+    }
+
+    return histogram;
+  }
+
+  static getResponseLengthBoxPlot(backendId?: number, days: number = 30): unknown[] {
+    const { startDate, endDate } = getDateRange(days);
+    const rows = this.collectRequestLogRangeRows({ backendId, startDate, endDate });
+    const valuesByDate = new Map<string, number[]>();
+
+    for (const row of rows) {
+      if (typeof row.completion_tokens !== 'number' || !Number.isFinite(row.completion_tokens) || row.completion_tokens < 0) {
+        continue;
+      }
+
+      const values = valuesByDate.get(row.local_date) ?? [];
+      values.push(row.completion_tokens);
+      valuesByDate.set(row.local_date, values);
+    }
+
+    return Array.from(valuesByDate.entries())
+      .sort((left, right) => left[0].localeCompare(right[0]))
+      .map(([date, values]) => {
+        const sortedValues = [...values].sort((left, right) => left - right);
+        return {
+          date,
+          min: sortedValues[0],
+          q1: calculateQuantile(sortedValues, 0.25),
+          median: calculateQuantile(sortedValues, 0.5),
+          q3: calculateQuantile(sortedValues, 0.75),
+          max: sortedValues[sortedValues.length - 1],
+          count: sortedValues.length,
+        };
+      });
   }
 }

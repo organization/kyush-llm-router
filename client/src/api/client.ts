@@ -8,6 +8,11 @@ import type {
   RequestLogPage,
   UsageStats,
   BackendMetrics,
+  AnalyticsDailyTotalsPoint,
+  AnalyticsBackendQualityPoint,
+  AnalyticsModelTrendPoint,
+  AnalyticsHistogramBin,
+  AnalyticsBoxPlotPoint,
   UserScript,
   CreateScriptData,
   UpdateScriptData,
@@ -186,6 +191,38 @@ export const api = {
       if (backendId) params.append('backendId', String(backendId));
       params.append('days', String(days));
       return fetchJson<BackendMetrics[]>(`${API_BASE}/admin/analytics/metrics?${params}`);
+    },
+    getDailyTotals: (backendId?: number, days: number = 30): Promise<AnalyticsDailyTotalsPoint[]> => {
+      const params = new URLSearchParams();
+      if (backendId) params.append('backendId', String(backendId));
+      params.append('days', String(days));
+      return fetchJson<AnalyticsDailyTotalsPoint[]>(`${API_BASE}/admin/analytics/daily-totals?${params}`);
+    },
+    getBackendQuality: (backendId?: number, days: number = 30): Promise<AnalyticsBackendQualityPoint[]> => {
+      const params = new URLSearchParams();
+      if (backendId) params.append('backendId', String(backendId));
+      params.append('days', String(days));
+      return fetchJson<AnalyticsBackendQualityPoint[]>(`${API_BASE}/admin/analytics/backend-quality?${params}`);
+    },
+    getModelTrends: (params: { backendId?: number; days?: number; limit?: number } = {}): Promise<AnalyticsModelTrendPoint[]> => {
+      const search = new URLSearchParams();
+      if (params.backendId) search.set('backendId', String(params.backendId));
+      search.set('days', String(params.days ?? 30));
+      search.set('limit', String(params.limit ?? 8));
+      return fetchJson<AnalyticsModelTrendPoint[]>(`${API_BASE}/admin/analytics/model-trends?${search}`);
+    },
+    getResponseLengthHistogram: (params: { backendId?: number; days?: number; bins?: number } = {}): Promise<AnalyticsHistogramBin[]> => {
+      const search = new URLSearchParams();
+      if (params.backendId) search.set('backendId', String(params.backendId));
+      search.set('days', String(params.days ?? 30));
+      search.set('bins', String(params.bins ?? 20));
+      return fetchJson<AnalyticsHistogramBin[]>(`${API_BASE}/admin/analytics/response-length-histogram?${search}`);
+    },
+    getResponseLengthBoxPlot: (backendId?: number, days: number = 30): Promise<AnalyticsBoxPlotPoint[]> => {
+      const params = new URLSearchParams();
+      if (backendId) params.append('backendId', String(backendId));
+      params.append('days', String(days));
+      return fetchJson<AnalyticsBoxPlotPoint[]>(`${API_BASE}/admin/analytics/response-length-box-plot?${params}`);
     },
   },
 };

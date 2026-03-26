@@ -83,6 +83,7 @@ pnpm run bench      # 벤치마크 실행
 
 클라이언트 중심
 - [docs/client.md](docs/client.md) — 클라이언트 구조, `/dashboard` 라우팅, 관리자 UI 동작
+- [docs/analytics.md](docs/analytics.md) — Analytics 대시보드 구성, 시각화 패널, 집계 규칙
 - [docs/frontend-design.md](docs/frontend-design.md) — 프론트엔드 디자인 가이드
 - [docs/admin-auth.md](docs/admin-auth.md) — 관리자 인증, 세션, CSRF, 관리자 토큰
 - [docs/oidc.md](docs/oidc.md) — OpenID Connect 설정과 allowlist 정책

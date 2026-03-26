@@ -38,4 +38,51 @@ router.get('/metrics', (req: Request, res: Response) => {
   res.json(result);
 });
 
+router.get('/daily-totals', (req: Request, res: Response) => {
+  const { backendId, days } = req.query;
+  const result = AnalyticsService.getDailyTotals(
+    backendId ? Number(backendId) : undefined,
+    days ? Number(days) : 30
+  );
+  res.json(result);
+});
+
+router.get('/backend-quality', (req: Request, res: Response) => {
+  const { backendId, days } = req.query;
+  const result = AnalyticsService.getBackendQuality(
+    backendId ? Number(backendId) : undefined,
+    days ? Number(days) : 30
+  );
+  res.json(result);
+});
+
+router.get('/model-trends', (req: Request, res: Response) => {
+  const { backendId, days, limit } = req.query;
+  const result = AnalyticsService.getModelTrends(
+    backendId ? Number(backendId) : undefined,
+    days ? Number(days) : 30,
+    limit ? Number(limit) : 8
+  );
+  res.json(result);
+});
+
+router.get('/response-length-histogram', (req: Request, res: Response) => {
+  const { backendId, days, bins } = req.query;
+  const result = AnalyticsService.getResponseLengthHistogram(
+    backendId ? Number(backendId) : undefined,
+    days ? Number(days) : 30,
+    bins ? Number(bins) : 20
+  );
+  res.json(result);
+});
+
+router.get('/response-length-box-plot', (req: Request, res: Response) => {
+  const { backendId, days } = req.query;
+  const result = AnalyticsService.getResponseLengthBoxPlot(
+    backendId ? Number(backendId) : undefined,
+    days ? Number(days) : 30
+  );
+  res.json(result);
+});
+
 export default router;

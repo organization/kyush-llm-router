@@ -15,6 +15,7 @@ export * from './primitives/Tooltip';
 export * from './patterns/CommandBar';
 export * from './patterns/ConfirmDialog';
 export * from './patterns/ConversationTimeline';
+export * from './patterns/Charts';
 export * from './patterns/DataGrid';
 export * from './patterns/EmptyState';
 export * from './patterns/FieldRow';

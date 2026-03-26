@@ -118,8 +118,17 @@
 | GET | `/admin/analytics/usage` | userId, backendId, days | 사용량 통계 |
 | GET | `/admin/analytics/requests` | month, date, limit, offset, q, userId, backendId, endpoint, detailLogged | 월별 상세 요청 로그 조회 |
 | GET | `/admin/analytics/metrics` | backendId, days | 백엔드 성능 메트릭 |
+| GET | `/admin/analytics/daily-totals` | backendId, days | 일별 전체 request/token 합계 |
+| GET | `/admin/analytics/backend-quality` | backendId, days | 일별 backend response time / error / success rate 시계열 |
+| GET | `/admin/analytics/model-trends` | backendId, days, limit | 모델별 일별 요청 추이 |
+| GET | `/admin/analytics/response-length-histogram` | backendId, days, bins | `completion_tokens` 분포 histogram |
+| GET | `/admin/analytics/response-length-box-plot` | backendId, days | `completion_tokens` 일별 box plot 요약 |
 
 상세 로그는 `users.detail_logging=1` 또는 `backends.detail_logging=1`일 때만 request/response header/body가 저장된다.
+
+- `model-trends` 는 `response_model -> routed_model -> request_model -> unknown` 순서로 모델 키를 결정한다.
+- response length 계열 endpoint는 `completion_tokens` 가 있는 요청만 집계한다.
+- 자세한 내용은 [docs/analytics.md](./analytics.md) 참고.
 
 참고:
 - 관리자 인증과 세션/토큰 정책은 [docs/admin-auth.md](./admin-auth.md) 참고

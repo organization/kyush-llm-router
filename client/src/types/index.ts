@@ -129,6 +129,44 @@ export type BackendMetrics = {
   success_rate: number;
 };
 
+export type AnalyticsDailyTotalsPoint = {
+  date: string;
+  total_requests: number;
+  total_tokens: number;
+};
+
+export type AnalyticsBackendQualityPoint = {
+  date: string;
+  backend_id: number;
+  total_requests: number;
+  total_tokens: number;
+  avg_response_time_ms: number;
+  error_count: number;
+  success_rate: number;
+};
+
+export type AnalyticsModelTrendPoint = {
+  date: string;
+  model: string;
+  request_count: number;
+};
+
+export type AnalyticsHistogramBin = {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+};
+
+export type AnalyticsBoxPlotPoint = {
+  date: string;
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  count: number;
+};
+
 export type ScriptType = 'per-user-backend' | 'per-backend' | 'per-user';
 
 export type UserScript = {

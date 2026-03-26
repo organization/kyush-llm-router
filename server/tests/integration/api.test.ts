@@ -3,6 +3,7 @@ import request from 'supertest';
 import { createTestApp } from '../utils/testApp';
 import { initDb } from '../../src/config/database';
 import { RequestLogService } from '../../src/services/RequestLogService';
+import { AnalyticsService } from '../../src/services/AnalyticsService';
 import { createAdminClient } from '../utils/adminClient';
 
 describe('Auth & Proxy API', () => {
@@ -160,6 +161,67 @@ describe('Auth & Proxy API', () => {
       expect(secondPage.body.total).toBe(2);
       expect(firstPage.body.rows[0].user_id).toBe(9992);
       expect(secondPage.body.rows[0].user_id).toBe(9991);
+    });
+
+    it('should expose chart-friendly analytics endpoints', async () => {
+      AnalyticsService.logRequest({
+        user_id: 7001,
+        backend_id: backendId,
+        endpoint: '/v1/chat/completions',
+        request_model: 'gpt-4o-mini',
+        routed_model: 'gpt-4o-mini',
+        response_model: 'gpt-4o-mini',
+        completion_tokens: 120,
+        total_tokens: 240,
+        response_time_ms: 380,
+        status_code: 200,
+        local_date: '2026-03-10',
+        created_at: '2026-03-10T03:00:00.000Z',
+      });
+
+      AnalyticsService.logRequest({
+        user_id: 7002,
+        backend_id: backendId,
+        endpoint: '/v1/chat/completions',
+        request_model: 'gpt-4.1-mini',
+        routed_model: 'gpt-4.1-mini',
+        response_model: 'gpt-4.1-mini',
+        completion_tokens: 60,
+        total_tokens: 190,
+        response_time_ms: 510,
+        status_code: 500,
+        error_message: 'synthetic-error',
+        local_date: '2026-03-11',
+        created_at: '2026-03-11T03:00:00.000Z',
+      });
+
+      const [dailyTotals, backendQuality, modelTrends, histogram, boxPlot] = await Promise.all([
+        admin.get(`/admin/analytics/daily-totals?backendId=${backendId}&days=30`),
+        admin.get(`/admin/analytics/backend-quality?backendId=${backendId}&days=30`),
+        admin.get(`/admin/analytics/model-trends?backendId=${backendId}&days=30&limit=8`),
+        admin.get(`/admin/analytics/response-length-histogram?backendId=${backendId}&days=30&bins=6`),
+        admin.get(`/admin/analytics/response-length-box-plot?backendId=${backendId}&days=30`),
+      ]);
+
+      expect(dailyTotals.status).toBe(200);
+      expect(Array.isArray(dailyTotals.body)).toBe(true);
+      expect(dailyTotals.body.some((row: any) => row.total_requests >= 1 && typeof row.total_tokens === 'number')).toBe(true);
+
+      expect(backendQuality.status).toBe(200);
+      expect(Array.isArray(backendQuality.body)).toBe(true);
+      expect(backendQuality.body.some((row: any) => row.backend_id === backendId && typeof row.error_count === 'number')).toBe(true);
+
+      expect(modelTrends.status).toBe(200);
+      expect(Array.isArray(modelTrends.body)).toBe(true);
+      expect(modelTrends.body.some((row: any) => row.model === 'gpt-4o-mini')).toBe(true);
+
+      expect(histogram.status).toBe(200);
+      expect(Array.isArray(histogram.body)).toBe(true);
+      expect(histogram.body.every((row: any) => typeof row.count === 'number')).toBe(true);
+
+      expect(boxPlot.status).toBe(200);
+      expect(Array.isArray(boxPlot.body)).toBe(true);
+      expect(boxPlot.body.some((row: any) => row.date === '2026-03-10' && row.median === 120)).toBe(true);
     });
   });
 });
