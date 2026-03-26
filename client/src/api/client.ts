@@ -40,9 +40,12 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
 async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> {
   const isUnsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes((options.method ?? 'GET').toUpperCase());
   const nextHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
   };
+
+  if (isUnsafeMethod) {
+    nextHeaders['Content-Type'] = nextHeaders['Content-Type'] ?? 'application/json';
+  }
 
   if (isUnsafeMethod && url.startsWith('/admin') && csrfToken) {
     nextHeaders['X-CSRF-Token'] = csrfToken;
