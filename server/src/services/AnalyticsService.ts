@@ -1,8 +1,12 @@
 import { getAnalyticsDb } from '../config/analytics-db';
-import { RequestLogPage } from '../../../shared/types';
+import { DashboardSummaryResponse, RequestLogPage, ScriptType } from '../../../shared/types';
 import { RequestLogInsert, RequestLogQuery, RequestLogService } from './RequestLogService';
-import { getLocalDateKey } from '../utils/time';
+import { getLocalDateKey, getUtcTimestamp } from '../utils/time';
 import { getRequestLogsDb, listRequestLogMonths } from '../config/request-logs-db';
+import { UserModel } from '../models/User';
+import { PermissionModel } from '../models/Permission';
+import { ScriptModel } from '../models/Script';
+import { ModelCatalogService } from './ModelCatalogService';
 
 type AnalyticsLogInput = RequestLogInsert;
 type RequestLogFilter = {
@@ -83,6 +87,14 @@ function calculateQuantile(sortedValues: number[], ratio: number): number {
 
   const weight = index - lowerIndex;
   return sortedValues[lowerIndex] * (1 - weight) + sortedValues[upperIndex] * weight;
+}
+
+function createScriptTypeCounts(): Record<ScriptType, number> {
+  return {
+    'per-user-backend': 0,
+    'per-backend': 0,
+    'per-user': 0,
+  };
 }
 
 export class AnalyticsService {
@@ -370,5 +382,98 @@ export class AnalyticsService {
           count: sortedValues.length,
         };
       });
+  }
+
+  static getDashboardSummary(days: number = 30): DashboardSummaryResponse {
+    const normalizedDays = Math.max(1, days);
+    const users = UserModel.findAll();
+    const backends = ModelCatalogService.getBackendsWithSummary();
+    const permissions = PermissionModel.findAll();
+    const scripts = ScriptModel.findAll();
+    const cacheOverview = ModelCatalogService.getCacheOverview();
+    const now = getUtcTimestamp();
+    const staleThresholdMs = 24 * 60 * 60 * 1000;
+    const permissionsByUserId = new Set(permissions.map((permission) => permission.user_id));
+    const totalByType = createScriptTypeCounts();
+    const activeByType = createScriptTypeCounts();
+
+    for (const script of scripts) {
+      totalByType[script.script_type] += 1;
+      if (script.is_active) {
+        activeByType[script.script_type] += 1;
+      }
+    }
+
+    const cacheStateCounts = cacheOverview.backends.reduce(
+      (acc, backend) => {
+        acc[backend.state] += 1;
+        return acc;
+      },
+      {
+        ready: 0,
+        uninitialized: 0,
+        error: 0,
+        inactive: 0,
+      }
+    );
+
+    const staleBackends = backends
+      .filter((backend) => {
+        if (!backend.is_active || !backend.last_model_sync_at) {
+          return false;
+        }
+        const lastSyncedAt = Date.parse(backend.last_model_sync_at);
+        return Number.isFinite(lastSyncedAt) && Date.now() - lastSyncedAt > staleThresholdMs;
+      })
+      .map((backend) => ({
+        id: backend.id,
+        name: backend.name,
+        state: backend.model_cache_state ?? 'uninitialized',
+        last_synced_at: backend.last_model_sync_at,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+
+    return {
+      window_days: normalizedDays,
+      generated_at: now,
+      overview: {
+        total_users: users.length,
+        active_users: users.filter((user) => user.is_active).length,
+        total_backends: backends.length,
+        active_backends: backends.filter((backend) => backend.is_active).length,
+        total_permissions: permissions.length,
+        total_scripts: scripts.length,
+        active_scripts: scripts.filter((script) => script.is_active).length,
+      },
+      health: {
+        cache_state_counts: cacheStateCounts,
+        stale_backends: staleBackends,
+        public_health: {
+          status: 'ok',
+          timestamp: now,
+        },
+        admin_health: {
+          status: 'ok',
+          timestamp: now,
+        },
+      },
+      logging: {
+        users_with_detail_logging: users.filter((user) => user.detail_logging).length,
+        backends_with_detail_logging: backends.filter((backend) => backend.detail_logging).length,
+      },
+      scripts: {
+        active_by_type: activeByType,
+        total_by_type: totalByType,
+      },
+      access: {
+        permission_assignments: permissions.length,
+        users_without_permissions: users.filter((user) => !permissionsByUserId.has(user.id)).length,
+      },
+      series: {
+        daily_totals: this.getDailyTotals(undefined, normalizedDays),
+        backend_quality: this.getBackendQuality(undefined, normalizedDays) as DashboardSummaryResponse['series']['backend_quality'],
+        model_trends: this.getModelTrends(undefined, normalizedDays, 6) as DashboardSummaryResponse['series']['model_trends'],
+      },
+    };
   }
 }

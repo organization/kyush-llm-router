@@ -218,6 +218,63 @@ export interface AnalyticsBoxPlotPoint {
   count: number;
 }
 
+export interface DashboardHealthStatus {
+  status: 'ok';
+  timestamp: string;
+}
+
+export interface DashboardOverviewSummary {
+  total_users: number;
+  active_users: number;
+  total_backends: number;
+  active_backends: number;
+  total_permissions: number;
+  total_scripts: number;
+  active_scripts: number;
+}
+
+export interface DashboardHealthSummary {
+  cache_state_counts: Record<ModelCacheState, number>;
+  stale_backends: Array<{
+    id: number;
+    name: string;
+    state: ModelCacheState;
+    last_synced_at?: string;
+  }>;
+  public_health: DashboardHealthStatus;
+  admin_health: DashboardHealthStatus;
+}
+
+export interface DashboardLoggingSummary {
+  users_with_detail_logging: number;
+  backends_with_detail_logging: number;
+}
+
+export interface DashboardScriptSummary {
+  active_by_type: Record<ScriptType, number>;
+  total_by_type: Record<ScriptType, number>;
+}
+
+export interface DashboardAccessSummary {
+  permission_assignments: number;
+  users_without_permissions: number;
+}
+
+export interface DashboardSummaryResponse {
+  window_days: number;
+  generated_at: string;
+  overview: DashboardOverviewSummary;
+  health: DashboardHealthSummary;
+  logging: DashboardLoggingSummary;
+  scripts: DashboardScriptSummary;
+  access: DashboardAccessSummary;
+  series: {
+    daily_totals: AnalyticsDailyTotalsPoint[];
+    backend_quality: AnalyticsBackendQualityPoint[];
+    model_trends: AnalyticsModelTrendPoint[];
+  };
+}
+
 export interface OpenAIChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;

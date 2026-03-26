@@ -223,5 +223,44 @@ describe('Auth & Proxy API', () => {
       expect(Array.isArray(boxPlot.body)).toBe(true);
       expect(boxPlot.body.some((row: any) => row.date === '2026-03-10' && row.median === 120)).toBe(true);
     });
+
+    it('should expose dashboard summary data for the ops cockpit', async () => {
+      const response = await admin.get('/admin/dashboard/summary?days=30');
+
+      expect(response.status).toBe(200);
+      expect(response.body.window_days).toBe(30);
+      expect(response.body.overview.total_users).toBeGreaterThanOrEqual(1);
+      expect(response.body.overview.total_backends).toBeGreaterThanOrEqual(1);
+      expect(response.body.overview.total_permissions).toBeGreaterThanOrEqual(1);
+      expect(response.body.overview.total_scripts).toBeGreaterThanOrEqual(0);
+      expect(response.body.health.public_health.status).toBe('ok');
+      expect(response.body.health.admin_health.status).toBe('ok');
+      expect(Array.isArray(response.body.series.daily_totals)).toBe(true);
+      expect(Array.isArray(response.body.series.backend_quality)).toBe(true);
+      expect(Array.isArray(response.body.series.model_trends)).toBe(true);
+      expect(typeof response.body.logging.users_with_detail_logging).toBe('number');
+      expect(typeof response.body.access.users_without_permissions).toBe('number');
+    });
+
+    it('should keep dashboard summary stable for empty datasets', async () => {
+      const emptyUser = await admin.post('/admin/users').send({ name: 'Dashboard Empty User' });
+      const emptyBackend = await admin.post('/admin/backends').send({
+        name: 'Dashboard Empty Backend',
+        base_url: 'http://localhost:8999/v1',
+      });
+
+      const response = await admin.get('/admin/dashboard/summary?days=7');
+
+      expect(response.status).toBe(200);
+      expect(response.body.window_days).toBe(7);
+      expect(response.body.overview.total_users).toBeGreaterThanOrEqual(2);
+      expect(response.body.overview.total_backends).toBeGreaterThanOrEqual(2);
+      expect(Array.isArray(response.body.health.stale_backends)).toBe(true);
+      expect(response.body.health.cache_state_counts.uninitialized).toBeGreaterThanOrEqual(1);
+      expect(response.body.access.users_without_permissions).toBeGreaterThanOrEqual(1);
+
+      await admin.delete(`/admin/users/${emptyUser.body.id}`);
+      await admin.delete(`/admin/backends/${emptyBackend.body.id}`);
+    });
   });
 });

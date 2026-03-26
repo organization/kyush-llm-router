@@ -130,6 +130,12 @@
 - response length 계열 endpoint는 `completion_tokens` 가 있는 요청만 집계한다.
 - 자세한 내용은 [docs/analytics.md](./analytics.md) 참고.
 
+### Dashboard Summary
+
+| Method | Path | Query Params | Description |
+|--------|------|-------------|-------------|
+| GET | `/admin/dashboard/summary` | days | Dashboard 홈용 운영 요약, backend/script/access context, 최소 시계열 집계 반환 |
+
 참고:
 - 관리자 인증과 세션/토큰 정책은 [docs/admin-auth.md](./admin-auth.md) 참고
 - OpenID Connect 설정은 [docs/oidc.md](./oidc.md) 참고

@@ -13,6 +13,7 @@ import type {
   AnalyticsModelTrendPoint,
   AnalyticsHistogramBin,
   AnalyticsBoxPlotPoint,
+  DashboardSummaryResponse,
   UserScript,
   CreateScriptData,
   UpdateScriptData,
@@ -163,6 +164,14 @@ export const api = {
       fetchJson<UserScript>(`${API_BASE}/admin/scripts/${id}/deactivate`, { method: 'POST' }),
     test: (id: number, context: { user?: User; backend?: Backend; request: { method: string; path: string; headers: Record<string, string>; body: unknown; isStream: boolean } }): Promise<{ success: boolean; error?: string; executionTime?: number }> =>
       fetchJson(`${API_BASE}/admin/scripts/${id}/test`, { method: 'POST', body: JSON.stringify(context) }),
+  },
+
+  dashboard: {
+    getSummary: (days: number = 30): Promise<DashboardSummaryResponse> => {
+      const params = new URLSearchParams();
+      params.append('days', String(days));
+      return fetchJson<DashboardSummaryResponse>(`${API_BASE}/admin/dashboard/summary?${params}`);
+    },
   },
 
   analytics: {

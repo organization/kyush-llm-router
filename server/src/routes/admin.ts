@@ -15,10 +15,16 @@ import {
 } from '../../../shared/types';
 import { getUtcTimestamp } from '../utils/time';
 import { ModelCatalogService } from '../services/ModelCatalogService';
+import { AnalyticsService } from '../services/AnalyticsService';
 
 const router: Router = Router();
 
 router.use('/scripts', scriptRoutes);
+
+router.get('/dashboard/summary', (req: Request, res: Response) => {
+  const days = req.query.days ? Number(req.query.days) : 30;
+  res.json(AnalyticsService.getDashboardSummary(days));
+});
 
 // ============ User Management ============
 

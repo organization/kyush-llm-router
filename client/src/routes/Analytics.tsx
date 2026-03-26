@@ -246,12 +246,6 @@ export const Analytics: Component = () => {
               />
             }
           >
-            <MetaCluster
-              items={[
-                { key: 'Series', value: String(responseTimeSeries().length) },
-                { key: 'Window', value: `Last ${days()} days` },
-              ]}
-            />
             <TimeSeriesChart
               data={responseTimeRows()}
               series={responseTimeSeries()}
@@ -275,12 +269,6 @@ export const Analytics: Component = () => {
               />
             }
           >
-            <MetaCluster
-              items={[
-                { key: 'Models', value: String(modelTrendSeries().length) },
-                { key: 'Selection', value: backendFilter() === 'all' ? 'All backends' : backendOptions().find((option) => option.value === backendFilter())?.label ?? 'Selected backend' },
-              ]}
-            />
             <TimeSeriesChart
               data={modelTrendRows()}
               series={modelTrendSeries()}
@@ -298,7 +286,6 @@ export const Analytics: Component = () => {
           <Panel title="Response Length Distribution" description="Histogram of completion token lengths across the selected window.">
             <MetaCluster
               items={[
-                { key: 'Bins', value: String((histogram() ?? []).length) },
                 { key: 'Metric', value: 'completion_tokens' },
               ]}
             />
@@ -308,7 +295,6 @@ export const Analytics: Component = () => {
           <Panel title="Daily Response Length Spread" description="Completion token box plot by day using min / q1 / median / q3 / max summary.">
             <MetaCluster
               items={[
-                { key: 'Days', value: String((boxPlot() ?? []).length) },
                 { key: 'Outliers', value: 'Hidden in this view' },
               ]}
             />

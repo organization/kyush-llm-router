@@ -167,6 +167,63 @@ export type AnalyticsBoxPlotPoint = {
   count: number;
 };
 
+export type DashboardHealthStatus = {
+  status: 'ok';
+  timestamp: string;
+};
+
+export type DashboardOverviewSummary = {
+  total_users: number;
+  active_users: number;
+  total_backends: number;
+  active_backends: number;
+  total_permissions: number;
+  total_scripts: number;
+  active_scripts: number;
+};
+
+export type DashboardHealthSummary = {
+  cache_state_counts: Record<Backend['model_cache_state'] extends infer T ? Extract<T, string> : never, number>;
+  stale_backends: Array<{
+    id: number;
+    name: string;
+    state: NonNullable<Backend['model_cache_state']>;
+    last_synced_at?: string;
+  }>;
+  public_health: DashboardHealthStatus;
+  admin_health: DashboardHealthStatus;
+};
+
+export type DashboardLoggingSummary = {
+  users_with_detail_logging: number;
+  backends_with_detail_logging: number;
+};
+
+export type DashboardScriptSummary = {
+  active_by_type: Record<ScriptType, number>;
+  total_by_type: Record<ScriptType, number>;
+};
+
+export type DashboardAccessSummary = {
+  permission_assignments: number;
+  users_without_permissions: number;
+};
+
+export type DashboardSummaryResponse = {
+  window_days: number;
+  generated_at: string;
+  overview: DashboardOverviewSummary;
+  health: DashboardHealthSummary;
+  logging: DashboardLoggingSummary;
+  scripts: DashboardScriptSummary;
+  access: DashboardAccessSummary;
+  series: {
+    daily_totals: AnalyticsDailyTotalsPoint[];
+    backend_quality: AnalyticsBackendQualityPoint[];
+    model_trends: AnalyticsModelTrendPoint[];
+  };
+};
+
 export type ScriptType = 'per-user-backend' | 'per-backend' | 'per-user';
 
 export type UserScript = {
