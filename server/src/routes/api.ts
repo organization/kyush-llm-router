@@ -107,6 +107,145 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       logger.warn(`Script warnings for user ${user.id}: ${requestErrors.join('; ')}`);
     }
 
+    // Stream path: pipe SSE response directly to client
+    if (modifiedContext.request.body && typeof modifiedContext.request.body === 'object' && 'stream' in modifiedContext.request.body && modifiedContext.request.body.stream === true) {
+      const streamResult = await RouterService.forwardStreamRequest(
+        backend,
+        '/v1/chat/completions',
+        'POST',
+        modifiedContext.request.headers,
+        modifiedContext.request.body
+      );
+
+      // Network error — return JSON error
+      if (!('response' in streamResult)) {
+        const responseTime = Date.now() - startTime;
+        AnalyticsService.logRequest({
+          user_id: user.id,
+          backend_id: backend.id,
+          endpoint: '/v1/chat/completions',
+          request_model: model,
+          routed_model: resolution.routedModel,
+          status_code: streamResult.status,
+          response_time_ms: responseTime,
+          error_message: JSON.stringify(streamResult.data),
+          detail_logged: detailLoggingEnabled,
+          request_headers: detailLoggingEnabled ? modifiedContext.request.headers : undefined,
+          request_body: detailLoggingEnabled ? modifiedContext.request.body : undefined,
+          local_date: undefined,
+        });
+        logger.error(`Backend error for user ${user.id} (stream): ${JSON.stringify(streamResult.data)}`);
+        void ModelCatalogService.refreshBackendAfterFailure(backend.id);
+        res.status(streamResult.status).json(streamResult.data);
+        return;
+      }
+
+      const backendResponse = streamResult.response;
+      const backendResponseHeaders = Object.fromEntries(backendResponse.headers.entries());
+
+      // Backend returned non-SSE response (e.g. JSON error)
+      if (!backendResponse.headers.get('content-type')?.includes('text/event-stream')) {
+        const data = await backendResponse.json().catch(() => ({}));
+        const responseTime = Date.now() - startTime;
+        AnalyticsService.logRequest({
+          user_id: user.id,
+          backend_id: backend.id,
+          endpoint: '/v1/chat/completions',
+          request_model: model,
+          routed_model: resolution.routedModel,
+          status_code: backendResponse.status,
+          response_time_ms: responseTime,
+          error_message: backendResponse.status >= 400 ? JSON.stringify(data) : undefined,
+          detail_logged: detailLoggingEnabled,
+          request_headers: detailLoggingEnabled ? modifiedContext.request.headers : undefined,
+          request_body: detailLoggingEnabled ? modifiedContext.request.body : undefined,
+          response_headers: detailLoggingEnabled ? backendResponseHeaders : undefined,
+          response_body: detailLoggingEnabled ? data : undefined,
+          local_date: undefined,
+        });
+        if (backendResponse.status >= 400) {
+          void ModelCatalogService.refreshBackendAfterFailure(backend.id);
+        }
+        res.status(backendResponse.status).json(data);
+        return;
+      }
+
+      // onResponse scripts (body not available for streams)
+      await ScriptEngine.applyOnResponseScripts(
+        execContext,
+        { status: backendResponse.status, headers: backendResponseHeaders, body: null, isStream: true },
+        user.id,
+        backend.id
+      );
+
+      // Set SSE headers and start piping
+      res.status(backendResponse.status);
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      const reader = backendResponse.body!.getReader();
+      const decoder = new TextDecoder();
+      req.on('close', () => reader.cancel());
+
+      let responseModel: string | undefined;
+      let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
+      const collectedChunks: string[] = [];
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+
+          // Parse SSE chunks for model and usage metadata
+          const text = decoder.decode(value, { stream: true });
+          if (detailLoggingEnabled) collectedChunks.push(text);
+
+          for (const line of text.split('\n')) {
+            if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.model && !responseModel) responseModel = parsed.model;
+              if (parsed.usage) usage = parsed.usage;
+            } catch { /* non-JSON data line, skip */ }
+          }
+        }
+      } catch (err) {
+        logger.error(`Stream interrupted for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        res.end();
+      }
+
+      const responseTime = Date.now() - startTime;
+      AnalyticsService.logRequest({
+        user_id: user.id,
+        backend_id: backend.id,
+        endpoint: '/v1/chat/completions',
+        request_model: model,
+        routed_model: resolution.routedModel,
+        response_model: responseModel,
+        prompt_tokens: usage?.prompt_tokens,
+        completion_tokens: usage?.completion_tokens,
+        total_tokens: usage?.total_tokens,
+        status_code: backendResponse.status,
+        response_time_ms: responseTime,
+        detail_logged: detailLoggingEnabled,
+        request_headers: detailLoggingEnabled ? modifiedContext.request.headers : undefined,
+        request_body: detailLoggingEnabled ? modifiedContext.request.body : undefined,
+        response_headers: detailLoggingEnabled ? backendResponseHeaders : undefined,
+        response_body: detailLoggingEnabled ? collectedChunks.join('') : undefined,
+        local_date: undefined,
+      });
+
+      if (backendResponse.status >= 400) {
+        void ModelCatalogService.refreshBackendAfterFailure(backend.id);
+      }
+      return;
+    }
+
+    // Non-stream path: buffer and return JSON (unchanged)
     const response = await RouterService.forwardRequest(
       backend,
       '/v1/chat/completions',
@@ -121,7 +260,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       status: response.status,
       headers: response.headers,
       body: response.data,
-      isStream: req.body.stream === true,
+      isStream: false,
     };
 
     await ScriptEngine.applyOnResponseScripts(
