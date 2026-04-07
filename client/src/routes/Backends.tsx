@@ -46,7 +46,7 @@ const emptyForm = (): BackendFormState => ({
   detail_logging: false,
 });
 
-export const Backends: Component = () => {
+const Backends: Component = () => {
   const [backends, { refetch }] = createResource(() => api.backends.getAll());
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
@@ -527,3 +527,5 @@ export const Backends: Component = () => {
     </Layout>
   );
 };
+
+export default Backends;

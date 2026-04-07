@@ -45,7 +45,7 @@ type DashboardChartRow = { date: string } & Record<
   string | number | null
 >;
 
-export const Dashboard: Component = () => {
+const Dashboard: Component = () => {
   const [days, setDays] = createSignal('30');
   const [hiddenTrafficSeries, setHiddenTrafficSeries] = createSignal<
     Set<string>
@@ -494,3 +494,5 @@ export const Dashboard: Component = () => {
     </Layout>
   );
 };
+
+export default Dashboard;

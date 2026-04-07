@@ -1,6 +1,5 @@
-import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
@@ -9,6 +8,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { serveStatic } from '@hono/node-server/serve-static';
 import dotenv from 'dotenv';
 
+import { env } from './config/env.js';
 import adminRoutes from './routes/admin.js';
 import adminAuthRoutes from './routes/admin-auth.js';
 import apiRoutes from './routes/api.js';
@@ -19,11 +19,11 @@ import { ModelCatalogService } from './services/ModelCatalogService.js';
 
 import type { AppEnv } from './types/hono.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const moduleDir = import.meta.dirname;
 
 const envPathCandidates = [
-  path.resolve(__dirname, '..', '..', '.env'),
-  path.resolve(__dirname, '..', '..', '..', '..', '.env'),
+  path.resolve(moduleDir, '..', '..', '.env'),
+  path.resolve(moduleDir, '..', '..', '..', '..', '.env'),
   path.resolve(process.cwd(), '.env'),
   path.resolve(process.cwd(), '..', '.env'),
 ];
@@ -43,26 +43,17 @@ export function createApp(): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
   const adminDistCandidates = [
-    path.resolve(__dirname, '..', '..', '..', 'client', 'dist'),
-    path.resolve(__dirname, '..', '..', '..', '..', 'client', 'dist'),
+    path.resolve(moduleDir, '..', '..', '..', 'client', 'dist'),
+    path.resolve(moduleDir, '..', '..', '..', '..', 'client', 'dist'),
   ];
   const adminDistPath = adminDistCandidates.find((candidate) =>
     fs.existsSync(candidate),
   );
 
-  const corsOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
-    : [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3002',
-        'http://127.0.0.1:3002',
-      ];
-
   app.use(
     '*',
     cors({
-      origin: corsOrigins,
+      origin: env.CORS_ORIGINS,
       credentials: true,
     }),
   );

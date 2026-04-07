@@ -1,4 +1,4 @@
-import * as KTooltip from '@kobalte/core/tooltip';
+import * as TooltipPrimitive from '@kobalte/core/tooltip';
 
 import { cn } from '../lib/cn';
 
@@ -8,30 +8,35 @@ type WrapperProps = ParentProps<{ class?: string; [key: string]: unknown }>;
 
 export const Tooltip = {
   Root: (props: WrapperProps) => (
-    <KTooltip.Root openDelay={150} {...(props as KTooltip.TooltipRootProps)}>
+    <TooltipPrimitive.Root
+      openDelay={150}
+      {...(props as TooltipPrimitive.TooltipRootProps)}
+    >
       {props.children}
-    </KTooltip.Root>
+    </TooltipPrimitive.Root>
   ),
   Trigger: (props: WrapperProps) => (
-    <KTooltip.Trigger
-      {...(props as KTooltip.TooltipTriggerProps)}
+    <TooltipPrimitive.Trigger
+      {...(props as TooltipPrimitive.TooltipTriggerProps)}
       class={props.class}
     >
       {props.children}
-    </KTooltip.Trigger>
+    </TooltipPrimitive.Trigger>
   ),
   Portal: (props: WrapperProps) => (
-    <KTooltip.Portal>{props.children}</KTooltip.Portal>
+    <TooltipPrimitive.Portal>{props.children}</TooltipPrimitive.Portal>
   ),
   Content: (props: WrapperProps) => (
-    <KTooltip.Content
-      {...(props as KTooltip.TooltipContentProps)}
+    <TooltipPrimitive.Content
+      {...(props as TooltipPrimitive.TooltipContentProps)}
       class={cn('ui-tooltip__content', props.class)}
     >
       {props.children}
-    </KTooltip.Content>
+    </TooltipPrimitive.Content>
   ),
   Arrow: (props: WrapperProps) => (
-    <KTooltip.Arrow {...(props as KTooltip.TooltipArrowProps)} />
+    <TooltipPrimitive.Arrow
+      {...(props as TooltipPrimitive.TooltipArrowProps)}
+    />
   ),
 };

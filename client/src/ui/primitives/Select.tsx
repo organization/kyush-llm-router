@@ -1,5 +1,7 @@
-import * as KSelect from '@kobalte/core/select';
-import { Show, createMemo } from 'solid-js';
+import * as SelectPrimitive from '@kobalte/core/select';
+import Check from 'lucide-solid/icons/check';
+import ChevronDown from 'lucide-solid/icons/chevron-down';
+import { Show, type Component } from 'solid-js';
 
 import { cn } from '../lib/cn';
 
@@ -18,19 +20,25 @@ interface SelectProps {
   onChange?: (value: string) => void;
 }
 
-export function Select(props: SelectProps) {
-  const selected = createMemo(() =>
-    props.options.find((option) => option.value === props.value),
-  );
+export const Select: Component<SelectProps> = (props) => {
+  // Note: derive `selected` inline (no createMemo) — Solid's reactive primitives
+  // already cache prop reads, and `find` over a typically tiny option list is
+  // cheaper than the memo bookkeeping.
+  const selected = () =>
+    props.options.find((option) => option.value === props.value);
 
   return (
-    <KSelect.Root<SelectOption>
+    <SelectPrimitive.Root<SelectOption>
       class={cn('ui-select', props.class)}
       itemComponent={(itemProps) => (
-        <KSelect.Item class="ui-select__item" item={itemProps.item}>
-          <KSelect.ItemLabel>{itemProps.item.rawValue.label}</KSelect.ItemLabel>
-          <KSelect.ItemIndicator>✓</KSelect.ItemIndicator>
-        </KSelect.Item>
+        <SelectPrimitive.Item class="ui-select__item" item={itemProps.item}>
+          <SelectPrimitive.ItemLabel>
+            {itemProps.item.rawValue.label}
+          </SelectPrimitive.ItemLabel>
+          <SelectPrimitive.ItemIndicator class="ui-select__item-indicator">
+            <Check aria-hidden="true" size={14} />
+          </SelectPrimitive.ItemIndicator>
+        </SelectPrimitive.Item>
       )}
       onChange={(option) => props.onChange?.(option?.value ?? '')}
       optionTextValue="label"
@@ -40,21 +48,25 @@ export function Select(props: SelectProps) {
       value={selected()}
     >
       <Show when={props.label}>
-        <KSelect.Label class="ui-field__label">{props.label}</KSelect.Label>
+        <SelectPrimitive.Label class="ui-field__label">
+          {props.label}
+        </SelectPrimitive.Label>
       </Show>
-      <KSelect.Trigger class="ui-select__trigger">
-        <KSelect.Value<SelectOption> class="ui-select__value">
+      <SelectPrimitive.Trigger class="ui-select__trigger">
+        <SelectPrimitive.Value<SelectOption> class="ui-select__value">
           {(state) =>
             state.selectedOption()?.label ?? props.placeholder ?? 'Select'
           }
-        </KSelect.Value>
-        <KSelect.Icon>▾</KSelect.Icon>
-      </KSelect.Trigger>
-      <KSelect.Portal>
-        <KSelect.Content class="ui-select__content">
-          <KSelect.Listbox />
-        </KSelect.Content>
-      </KSelect.Portal>
-    </KSelect.Root>
+        </SelectPrimitive.Value>
+        <SelectPrimitive.Icon class="ui-select__icon">
+          <ChevronDown aria-hidden="true" size={14} />
+        </SelectPrimitive.Icon>
+      </SelectPrimitive.Trigger>
+      <SelectPrimitive.Portal>
+        <SelectPrimitive.Content class="ui-select__content">
+          <SelectPrimitive.Listbox />
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    </SelectPrimitive.Root>
   );
-}
+};

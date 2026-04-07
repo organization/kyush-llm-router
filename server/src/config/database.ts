@@ -1,24 +1,35 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 import Database from 'better-sqlite3';
 
 import { ensureDir, getCoreDbPath } from './db-paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Node 20.11+ exposes import.meta.dirname directly — no fileURLToPath needed.
+const moduleDir = import.meta.dirname;
 
-let db: Database.Database;
+// Lazy singleton — `getDb()` instantiates on first access, `closeDb()` resets
+// it back to `undefined` so the next `getDb()` reopens a fresh handle.
+let db: Database.Database | undefined;
+
+function isPragmaColumnRow(value: unknown): value is { name: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    typeof (value as { name: unknown }).name === 'string'
+  );
+}
 
 function hasColumn(
   database: Database.Database,
   tableName: string,
   columnName: string,
 ): boolean {
-  const columns = database
-    .prepare(`PRAGMA table_info(${tableName})`)
-    .all() as Array<{ name: string }>;
-  return columns.some((column) => column.name === columnName);
+  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all();
+  return columns.some(
+    (column) => isPragmaColumnRow(column) && column.name === columnName,
+  );
 }
 
 function runCoreMigrations(database: Database.Database): void {
@@ -31,7 +42,7 @@ function runCoreMigrations(database: Database.Database): void {
 
 function loadSchema(database: Database.Database): void {
   const schemaPath = path.join(
-    __dirname,
+    moduleDir,
     '..',
     '..',
     '..',
@@ -42,40 +53,29 @@ function loadSchema(database: Database.Database): void {
   database.exec(schema);
 }
 
+function openDb(): Database.Database {
+  const coreDbPath = getCoreDbPath();
+  ensureDir(path.dirname(coreDbPath));
+
+  const handle = new Database(coreDbPath);
+  handle.pragma('foreign_keys = ON');
+  loadSchema(handle);
+  runCoreMigrations(handle);
+  return handle;
+}
+
 export function getDb(): Database.Database {
-  if (!db) {
-    const coreDbPath = getCoreDbPath();
-    ensureDir(path.dirname(coreDbPath));
-
-    db = new Database(coreDbPath);
-    db.pragma('foreign_keys = ON');
-
-    loadSchema(db);
-    runCoreMigrations(db);
-  }
+  db ??= openDb();
   return db;
 }
 
 export function initDb(): Database.Database {
-  if (db) {
-    db.close();
-  }
-
-  const coreDbPath = getCoreDbPath();
-  ensureDir(path.dirname(coreDbPath));
-
-  db = new Database(coreDbPath);
-  db.pragma('foreign_keys = ON');
-
-  loadSchema(db);
-  runCoreMigrations(db);
-
+  db?.close();
+  db = openDb();
   return db;
 }
 
 export function closeDb(): void {
-  if (db) {
-    db.close();
-    db = undefined as unknown as Database.Database;
-  }
+  db?.close();
+  db = undefined;
 }

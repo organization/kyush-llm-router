@@ -1,4 +1,4 @@
-import * as KPopover from '@kobalte/core/popover';
+import * as PopoverPrimitive from '@kobalte/core/popover';
 
 import { cn } from '../lib/cn';
 
@@ -8,48 +8,48 @@ type WrapperProps = ParentProps<{ class?: string; [key: string]: unknown }>;
 
 export const Popover = {
   Root: (props: WrapperProps) => (
-    <KPopover.Root {...(props as KPopover.PopoverRootProps)}>
+    <PopoverPrimitive.Root {...(props as PopoverPrimitive.PopoverRootProps)}>
       {props.children}
-    </KPopover.Root>
+    </PopoverPrimitive.Root>
   ),
   Trigger: (props: WrapperProps) => (
-    <KPopover.Trigger
-      {...(props as KPopover.PopoverTriggerProps)}
+    <PopoverPrimitive.Trigger
+      {...(props as PopoverPrimitive.PopoverTriggerProps)}
       class={cn('ui-button', props.class)}
     >
       {props.children}
-    </KPopover.Trigger>
+    </PopoverPrimitive.Trigger>
   ),
   Portal: (props: WrapperProps) => (
-    <KPopover.Portal>{props.children}</KPopover.Portal>
+    <PopoverPrimitive.Portal>{props.children}</PopoverPrimitive.Portal>
   ),
   Content: (props: WrapperProps) => (
-    <KPopover.Content
-      {...(props as KPopover.PopoverContentProps)}
+    <PopoverPrimitive.Content
+      {...(props as PopoverPrimitive.PopoverContentProps)}
       class={cn('ui-popover__content', props.class)}
     >
       {props.children}
-    </KPopover.Content>
+    </PopoverPrimitive.Content>
   ),
   Title: (props: WrapperProps) => (
-    <KPopover.Title {...(props as KPopover.PopoverTitleProps)}>
+    <PopoverPrimitive.Title {...(props as PopoverPrimitive.PopoverTitleProps)}>
       {props.children}
-    </KPopover.Title>
+    </PopoverPrimitive.Title>
   ),
   Description: (props: WrapperProps) => (
-    <KPopover.Description
-      {...(props as KPopover.PopoverDescriptionProps)}
+    <PopoverPrimitive.Description
+      {...(props as PopoverPrimitive.PopoverDescriptionProps)}
       class={cn('ui-subtitle', props.class)}
     >
       {props.children}
-    </KPopover.Description>
+    </PopoverPrimitive.Description>
   ),
   CloseButton: (props: WrapperProps) => (
-    <KPopover.CloseButton
-      {...(props as KPopover.PopoverCloseButtonProps)}
+    <PopoverPrimitive.CloseButton
+      {...(props as PopoverPrimitive.PopoverCloseButtonProps)}
       class={cn('ui-button', props.class)}
     >
       {props.children}
-    </KPopover.CloseButton>
+    </PopoverPrimitive.CloseButton>
   ),
 };

@@ -1,10 +1,12 @@
-import { Dynamic } from 'solid-js/web';
 import { createSignal, lazy, onCleanup, onMount, Suspense } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
 
 const THEME_STORAGE_KEY = 'kyush-theme';
-const MonacoEditor = lazy(() =>
-  import('solid-monaco').then((module) => ({ default: module.MonacoEditor })),
-);
+
+const MonacoEditor = lazy(async () => {
+  const module = await import('solid-monaco');
+  return { default: module.MonacoEditor };
+});
 
 interface ScriptEditorProps {
   value: string;
@@ -13,8 +15,7 @@ interface ScriptEditorProps {
   path?: string;
 }
 
-export function ScriptEditor(props: ScriptEditorProps) {
-  const defaultCode = `// User-defined middleware script
+const DEFAULT_CODE = `// User-defined middleware script
 // Available functions: onRequest, onResponse
 
 /**
@@ -28,13 +29,12 @@ export async function onRequest(ctx) {
 
   // Example: Edit body
   // if (typeof ctx.request.body === 'object') {
-  //  if (typeof ctx.request.body['chat_template_kwargs'] !== 'object') {
-  //    ctx.request.body['chat_template_kwargs'] = {};
-  //  }
-  
+  //   ctx.request.body['chat_template_kwargs'] ??= {};
+  // }
+
   // Example: Log request
   // console.log('Request:', ctx.request.method, ctx.request.path);
-  
+
   return ctx;
 }
 
@@ -46,20 +46,23 @@ export async function onRequest(ctx) {
 export async function onResponse(ctx) {
   // Example: Log response
   // console.log('Response status:', ctx.response?.status);
-  
-  // Example: Handle streaming responses
-  // if (ctx.response?.isStream && ctx.onChunk) {
-  //   const originalOnChunk = ctx.onChunk;
-  //   ctx.onChunk = (chunk) => {
-  //     console.log('Stream chunk:', chunk);
-  //     originalOnChunk(chunk);
-  //   };
-  // }
-  
+
   return ctx;
 }
 `;
 
+function readThemePreference(): 'vs' | 'vs-dark' {
+  const root = document.documentElement;
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  const explicit = root.dataset.theme;
+  const preferred = stored === 'light' || stored === 'dark' ? stored : explicit;
+  const isDark = preferred
+    ? preferred === 'dark'
+    : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return isDark ? 'vs-dark' : 'vs';
+}
+
+function ScriptEditor(props: ScriptEditorProps) {
   const [editorTheme, setEditorTheme] = createSignal<'vs' | 'vs-dark'>(
     'vs-dark',
   );
@@ -68,25 +71,13 @@ export async function onResponse(ctx) {
     const root = document.documentElement;
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-    const syncTheme = () => {
-      const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-      const explicitTheme = root.dataset.theme;
-      const preferredTheme =
-        storedTheme === 'light' || storedTheme === 'dark'
-          ? storedTheme
-          : explicitTheme;
-      const isDark = preferredTheme
-        ? preferredTheme === 'dark'
-        : mediaQuery.matches;
-      setEditorTheme(isDark ? 'vs-dark' : 'vs');
-    };
+    const syncTheme = () => setEditorTheme(readThemePreference());
 
     const observer = new MutationObserver(syncTheme);
     observer.observe(root, {
       attributes: true,
       attributeFilter: ['data-theme'],
     });
-
     mediaQuery.addEventListener('change', syncTheme);
     syncTheme();
 
@@ -113,7 +104,7 @@ export async function onResponse(ctx) {
         <Dynamic
           component={MonacoEditor}
           language="typescript"
-          onChange={(value: string) => props.onChange(value)}
+          onChange={props.onChange}
           options={{
             minimap: { enabled: false },
             fontSize: 14,
@@ -125,9 +116,11 @@ export async function onResponse(ctx) {
           }}
           path={props.path}
           theme={editorTheme()}
-          value={props.value || defaultCode}
+          value={props.value || DEFAULT_CODE}
         />
       </Suspense>
     </div>
   );
 }
+
+export default ScriptEditor;

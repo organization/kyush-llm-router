@@ -45,7 +45,7 @@ type AnalyticsChartRow = { date: string } & Record<
 >;
 const formatInteger = new Intl.NumberFormat('en-US');
 
-export const Analytics: Component = () => {
+const Analytics: Component = () => {
   const [days, setDays] = createSignal('30');
   const [backendFilter, setBackendFilter] = createSignal('all');
   const [hiddenDailySeries, setHiddenDailySeries] = createSignal<Set<string>>(
@@ -419,3 +419,5 @@ export const Analytics: Component = () => {
     </Layout>
   );
 };
+
+export default Analytics;

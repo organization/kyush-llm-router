@@ -1,4 +1,4 @@
-import * as KTextField from '@kobalte/core/text-field';
+import * as TextFieldPrimitive from '@kobalte/core/text-field';
 
 import { cn } from '../lib/cn';
 
@@ -21,15 +21,17 @@ interface TextFieldProps extends ParentProps {
 
 export function TextField(props: TextFieldProps) {
   return (
-    <KTextField.Root
+    <TextFieldPrimitive.Root
       class={cn('ui-field', props.class)}
       validationState={props.errorMessage ? 'invalid' : 'valid'}
     >
-      <KTextField.Label class="ui-field__label">{props.label}</KTextField.Label>
+      <TextFieldPrimitive.Label class="ui-field__label">
+        {props.label}
+      </TextFieldPrimitive.Label>
       <div class="ui-field__control-row">
         <div class="ui-field__control-fill">
           {props.multiline ? (
-            <KTextField.TextArea
+            <TextFieldPrimitive.TextArea
               class="ui-textarea"
               onInput={
                 props.onInput as JSX.EventHandlerUnion<
@@ -41,7 +43,7 @@ export function TextField(props: TextFieldProps) {
               value={props.value}
             />
           ) : (
-            <KTextField.Input
+            <TextFieldPrimitive.Input
               class="ui-input"
               onInput={
                 props.onInput as JSX.EventHandlerUnion<
@@ -58,15 +60,15 @@ export function TextField(props: TextFieldProps) {
         {props.children}
       </div>
       {props.description && (
-        <KTextField.Description class="ui-field__description">
+        <TextFieldPrimitive.Description class="ui-field__description">
           {props.description}
-        </KTextField.Description>
+        </TextFieldPrimitive.Description>
       )}
       {props.errorMessage && (
-        <KTextField.ErrorMessage class="ui-field__error">
+        <TextFieldPrimitive.ErrorMessage class="ui-field__error">
           {props.errorMessage}
-        </KTextField.ErrorMessage>
+        </TextFieldPrimitive.ErrorMessage>
       )}
-    </KTextField.Root>
+    </TextFieldPrimitive.Root>
   );
 }

@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DEFAULT_DB_DIR = path.join(process.cwd(), 'data');
+import { env } from './env.js';
 
 export function getDbRootDir(): string {
-  return process.env.DB_DIR || process.env.DB_PATH || DEFAULT_DB_DIR;
+  return env.DB_DIR;
 }
 
 export function ensureDir(dirPath: string): void {

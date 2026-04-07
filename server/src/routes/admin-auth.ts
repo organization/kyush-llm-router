@@ -1,4 +1,10 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
+
+import {
+  AdminLoginInputSchema,
+  CreateAdminTokenInputSchema,
+} from '@kyush/shared';
 
 import { AdminApiTokenModel } from '../models/AdminApiToken.js';
 import { AdminSessionModel } from '../models/AdminSession.js';
@@ -97,13 +103,12 @@ router.get('/session', (c) => {
   return c.json(buildSessionResponse(adminAuth));
 });
 
-router.post('/login', async (c) => {
+router.post('/login', zValidator('json', AdminLoginInputSchema), (c) => {
   if (!isEnvAdminEnabled()) {
     return c.json({ error: 'ENV admin login is disabled' }, 404);
   }
 
-  const body = await c.req.json();
-  const { username, password } = body;
+  const { username, password } = c.req.valid('json');
   const configuredUsername = getAdminUsername();
 
   if (!configuredUsername || !username || !password) {
@@ -311,32 +316,29 @@ router.get('/tokens', requireAdminAccess, (c) => {
   return c.json(AdminApiTokenModel.listBySubject(adminAuth.principal.subject));
 });
 
-router.post('/tokens', requireAdminAccess, requireSessionCsrf, async (c) => {
-  const body = await c.req.json();
-  const { name, expiresInDays } = body;
-  const trimmedName = name?.trim();
-  if (!trimmedName) {
-    return c.json({ error: 'Token name is required' }, 400);
-  }
+router.post(
+  '/tokens',
+  requireAdminAccess,
+  requireSessionCsrf,
+  zValidator('json', CreateAdminTokenInputSchema),
+  (c) => {
+    const { name: trimmedName, expiresInDays } = c.req.valid('json');
+    const ttlDays = expiresInDays ?? getAdminApiTokenTtlDays();
+    const token = generateOpaqueToken('adm_tok');
+    const adminAuth = c.get('adminAuth')!;
+    const record = AdminApiTokenModel.create({
+      tokenHash: hashAdminToken(token),
+      tokenPrefix: tokenPrefix(token),
+      name: trimmedName,
+      principal: adminAuth.principal,
+      expiresAt: new Date(
+        Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+    });
 
-  const ttlDays =
-    Number.isFinite(expiresInDays) && Number(expiresInDays) > 0
-      ? Number(expiresInDays)
-      : getAdminApiTokenTtlDays();
-  const token = generateOpaqueToken('adm_tok');
-  const adminAuth = c.get('adminAuth')!;
-  const record = AdminApiTokenModel.create({
-    tokenHash: hashAdminToken(token),
-    tokenPrefix: tokenPrefix(token),
-    name: trimmedName,
-    principal: adminAuth.principal,
-    expiresAt: new Date(
-      Date.now() + ttlDays * 24 * 60 * 60 * 1000,
-    ).toISOString(),
-  });
-
-  return c.json({ token, record }, 201);
-});
+    return c.json({ token, record }, 201);
+  },
+);
 
 router.delete('/tokens/:id', requireAdminAccess, requireSessionCsrf, (c) => {
   const tokenId = Number(c.req.param('id'));

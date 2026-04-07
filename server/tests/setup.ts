@@ -1,16 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import { beforeAll, afterAll } from 'vitest';
+import { afterAll, beforeAll } from 'vitest';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const moduleDir = import.meta.dirname;
 
 const workerId =
   process.env.VITEST_POOL_ID ||
   process.env.VITEST_WORKER_ID ||
   String(process.pid);
-const TEST_DB_DIR = path.join(__dirname, '..', 'data', `test-db-${workerId}`);
+const TEST_DB_DIR = path.join(moduleDir, '..', 'data', `test-db-${workerId}`);
 
 process.env.DB_DIR = TEST_DB_DIR;
 process.env.TZ = 'Asia/Seoul';

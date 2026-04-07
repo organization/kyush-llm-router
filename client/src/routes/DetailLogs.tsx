@@ -85,7 +85,7 @@ function prettyPrint(value?: string): string {
   }
 }
 
-export const DetailLogs: Component = () => {
+const DetailLogs: Component = () => {
   const [filters, setFilters] = createSignal<FilterState>(emptyFilters());
   const [page, setPage] = createSignal(1);
   const [pageSize, setPageSize] = createSignal(25);
@@ -527,3 +527,5 @@ export const DetailLogs: Component = () => {
     </Layout>
   );
 };
+
+export default DetailLogs;

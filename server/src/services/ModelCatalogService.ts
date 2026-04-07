@@ -1,3 +1,4 @@
+import { env } from '../config/env.js';
 import { BackendModel } from '../models/Backend.js';
 import { BackendModelSnapshotModel } from '../models/BackendModelSnapshot.js';
 import { ModelRewriteModel } from '../models/ModelRewrite.js';
@@ -44,8 +45,6 @@ interface RewriteConfig {
   force: boolean;
 }
 
-const DEFAULT_REFRESH_MIN_MS = 5 * 60 * 1000;
-
 export class ModelCatalogService {
   private static backendModelsByBackendId = new Map<
     number,
@@ -60,12 +59,7 @@ export class ModelCatalogService {
   private static initialized = false;
 
   private static getRefreshMinMs(): number {
-    const raw = process.env.MODEL_CATALOG_REFRESH_MIN_MS;
-    if (!raw) return DEFAULT_REFRESH_MIN_MS;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed >= 0
-      ? parsed
-      : DEFAULT_REFRESH_MIN_MS;
+    return env.MODEL_CATALOG_REFRESH_MIN_MS;
   }
 
   private static normalizeModelId(modelId: string): string {

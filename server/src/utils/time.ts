@@ -1,4 +1,4 @@
-const DEFAULT_TIME_ZONE = 'UTC';
+import { env } from '../config/env.js';
 
 function getFormatter(
   timeZone: string,
@@ -32,7 +32,7 @@ function getParts(date: Date, timeZone: string): Record<string, string> {
 }
 
 export function getConfiguredTimeZone(): string {
-  return process.env.TZ || DEFAULT_TIME_ZONE;
+  return env.TIME_ZONE;
 }
 
 export function getUtcTimestamp(date: Date = new Date()): string {

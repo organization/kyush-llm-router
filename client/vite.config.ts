@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 
@@ -5,6 +6,7 @@ export default defineConfig({
   base: '/dashboard/',
   plugins: [
     solidPlugin(),
+    tailwindcss(),
     {
       name: 'dashboard-trailing-slash-redirect',
       configureServer(server) {

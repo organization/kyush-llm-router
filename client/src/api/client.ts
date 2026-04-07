@@ -1,3 +1,4 @@
+import { omitBy } from 'es-toolkit';
 import ky, {
   HTTPError,
   type KyInstance,
@@ -6,27 +7,34 @@ import ky, {
 } from 'ky';
 
 import type {
-  User,
+  AdminApiTokenSummary,
+  AdminSessionResponse,
+  AnalyticsBackendQualityPoint,
+  AnalyticsBoxPlotPoint,
+  AnalyticsDailyTotalsPoint,
+  AnalyticsHistogramBin,
+  AnalyticsModelTrendPoint,
   Backend,
+  BackendMetrics,
   BackendModelsResponse,
+  CreateBackendInput,
+  CreateModelRewriteInput,
+  CreatePermissionInput,
+  CreateScriptInput,
+  CreateUserInput,
+  DashboardSummaryResponse,
   ModelCacheOverview,
   ModelRewriteRule,
   Permission,
   RequestLogPage,
+  UpdateBackendInput,
+  UpdateModelRewriteInput,
+  UpdateScriptInput,
+  UpdateUserInput,
   UsageStats,
-  BackendMetrics,
-  AnalyticsDailyTotalsPoint,
-  AnalyticsBackendQualityPoint,
-  AnalyticsModelTrendPoint,
-  AnalyticsHistogramBin,
-  AnalyticsBoxPlotPoint,
-  DashboardSummaryResponse,
+  User,
   UserScript,
-  CreateScriptData,
-  UpdateScriptData,
-  AdminApiTokenSummary,
-  AdminSessionResponse,
-} from '../types';
+} from '@kyush/shared';
 
 /**
  * Base URL prepended by ky to every request.
@@ -68,12 +76,8 @@ const httpClient: KyInstance = ky.extend({
   hooks: {
     beforeRequest: [
       (request) => {
-        if (!UNSAFE_METHODS.has(request.method.toUpperCase())) {
-          return;
-        }
-        if (!csrfToken) {
-          return;
-        }
+        if (!UNSAFE_METHODS.has(request.method.toUpperCase())) return;
+        if (!csrfToken) return;
         const url = new URL(request.url);
         if (url.pathname.startsWith('/admin')) {
           request.headers.set('X-CSRF-Token', csrfToken);
@@ -84,15 +88,31 @@ const httpClient: KyInstance = ky.extend({
 });
 
 type SearchParamsInit = Exclude<KyOptions['searchParams'], undefined>;
+type Primitive = string | number | boolean | undefined | null;
+
+/**
+ * Drop `undefined`/`null` keys so callers can pass `{ userId: maybeUndefined }`
+ * without polluting the query string with empty values. Returns `undefined`
+ * when nothing is left so ky skips the search parameter step entirely.
+ */
+function compactSearchParams(
+  params: Record<string, Primitive>,
+): SearchParamsInit | undefined {
+  const cleaned = omitBy(
+    params,
+    (value) => value === undefined || value === null,
+  );
+  const entries = Object.entries(cleaned);
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries.map(([k, v]) => [k, String(v)]));
+}
 
 async function toApiError(error: HTTPError): Promise<ApiError> {
   const { response, request } = error;
   let message = `HTTP ${response.status}`;
   try {
     const payload = (await response.clone().json()) as { error?: string };
-    if (payload.error) {
-      message = payload.error;
-    }
+    if (payload.error) message = payload.error;
   } catch {
     // body wasn't JSON; keep the default message
   }
@@ -113,14 +133,10 @@ async function toApiError(error: HTTPError): Promise<ApiError> {
 async function unwrap<T>(promise: ResponsePromise): Promise<T> {
   try {
     const response = await promise;
-    if (response.status === 204) {
-      return {} as T;
-    }
+    if (response.status === 204) return {} as T;
     return (await response.json()) as T;
   } catch (error) {
-    if (error instanceof HTTPError) {
-      throw await toApiError(error);
-    }
+    if (error instanceof HTTPError) throw await toApiError(error);
     throw error;
   }
 }
@@ -170,81 +186,85 @@ function buildUrl(path: string, searchParams?: Record<string, string>): string {
   return url.toString();
 }
 
+interface AnalyticsRequestParams {
+  limit?: number;
+  offset?: number;
+  month?: string;
+  date?: string;
+  q?: string;
+  userId?: number;
+  backendId?: number;
+  endpoint?: string;
+  detailLogged?: boolean;
+}
+
+interface ModelTrendsParams {
+  backendId?: number;
+  days?: number;
+  limit?: number;
+}
+
+interface HistogramParams {
+  backendId?: number;
+  days?: number;
+  bins?: number;
+}
+
 export const api = {
   auth: {
-    getSession: (): Promise<AdminSessionResponse> =>
-      getJson<AdminSessionResponse>('admin/auth/session'),
-    login: (
-      username: string,
-      password: string,
-    ): Promise<AdminSessionResponse> =>
+    getSession: () => getJson<AdminSessionResponse>('admin/auth/session'),
+    login: (username: string, password: string) =>
       postJson<AdminSessionResponse>('admin/auth/login', {
         username,
         password,
       }),
-    logout: (): Promise<void> => postJson<void>('admin/auth/logout'),
+    logout: () => postJson<void>('admin/auth/logout'),
     beginOidc: (next: string = window.location.pathname) => {
       window.location.href = buildUrl('admin/auth/oidc/start', { next });
     },
-    getTokens: (): Promise<AdminApiTokenSummary[]> =>
-      getJson<AdminApiTokenSummary[]>('admin/auth/tokens'),
-    createToken: (
-      name: string,
-      expiresInDays?: number,
-    ): Promise<{ token: string; record: AdminApiTokenSummary }> =>
-      postJson('admin/auth/tokens', { name, expiresInDays }),
-    deleteToken: (id: number): Promise<void> =>
-      deleteJson<void>(`admin/auth/tokens/${id}`),
+    getTokens: () => getJson<AdminApiTokenSummary[]>('admin/auth/tokens'),
+    createToken: (name: string, expiresInDays?: number) =>
+      postJson<{ token: string; record: AdminApiTokenSummary }>(
+        'admin/auth/tokens',
+        { name, expiresInDays },
+      ),
+    deleteToken: (id: number) => deleteJson<void>(`admin/auth/tokens/${id}`),
   },
+
   users: {
-    getAll: (): Promise<User[]> => getJson<User[]>('admin/users'),
-    getById: (id: number): Promise<User> => getJson<User>(`admin/users/${id}`),
-    create: (data: {
-      name: string;
-      email?: string;
-      api_key?: string;
-      detail_logging?: boolean;
-    }): Promise<User> => postJson<User>('admin/users', data),
-    update: (id: number, data: Partial<User>): Promise<User> =>
+    getAll: () => getJson<User[]>('admin/users'),
+    getById: (id: number) => getJson<User>(`admin/users/${id}`),
+    create: (data: CreateUserInput) => postJson<User>('admin/users', data),
+    update: (id: number, data: UpdateUserInput) =>
       putJson<User>(`admin/users/${id}`, data),
-    delete: (id: number): Promise<void> =>
-      deleteJson<void>(`admin/users/${id}`),
-    regenerateApiKey: (id: number): Promise<User> =>
+    delete: (id: number) => deleteJson<void>(`admin/users/${id}`),
+    regenerateApiKey: (id: number) =>
       postJson<User>(`admin/users/${id}/regenerate-api-key`),
   },
 
   backends: {
-    getAll: (): Promise<Backend[]> => getJson<Backend[]>('admin/backends'),
-    getById: (id: number): Promise<Backend> =>
-      getJson<Backend>(`admin/backends/${id}`),
-    getModels: (id: number): Promise<BackendModelsResponse> =>
+    getAll: () => getJson<Backend[]>('admin/backends'),
+    getById: (id: number) => getJson<Backend>(`admin/backends/${id}`),
+    getModels: (id: number) =>
       getJson<BackendModelsResponse>(`admin/backends/${id}/models`),
-    refreshModels: (id: number): Promise<BackendModelsResponse> =>
+    refreshModels: (id: number) =>
       postJson<BackendModelsResponse>(`admin/backends/${id}/models/refresh`),
-    create: (data: {
-      name: string;
-      base_url: string;
-      api_key?: string;
-      detail_logging?: boolean;
-    }): Promise<Backend> => postJson<Backend>('admin/backends', data),
-    update: (id: number, data: Partial<Backend>): Promise<Backend> =>
+    create: (data: CreateBackendInput) =>
+      postJson<Backend>('admin/backends', data),
+    update: (id: number, data: UpdateBackendInput) =>
       putJson<Backend>(`admin/backends/${id}`, data),
-    delete: (id: number): Promise<void> =>
-      deleteJson<void>(`admin/backends/${id}`),
+    delete: (id: number) => deleteJson<void>(`admin/backends/${id}`),
   },
 
   permissions: {
-    getAll: (): Promise<Permission[]> =>
-      getJson<Permission[]>('admin/permissions'),
-    getByUser: (userId: number): Promise<Permission[]> =>
+    getAll: () => getJson<Permission[]>('admin/permissions'),
+    getByUser: (userId: number) =>
       getJson<Permission[]>(`admin/permissions/user/${userId}`),
-    getByBackend: (backendId: number): Promise<Permission[]> =>
+    getByBackend: (backendId: number) =>
       getJson<Permission[]>(`admin/permissions/backend/${backendId}`),
-    create: (data: {
-      user_id: number;
-      backend_id: number;
-    }): Promise<Permission> => postJson<Permission>('admin/permissions', data),
-    delete: (userId: number, backendId: number): Promise<void> =>
+    create: (data: CreatePermissionInput) =>
+      postJson<Permission>('admin/permissions', data),
+    delete: (userId: number, backendId: number) =>
       deleteJson<void>('admin/permissions', {
         user_id: String(userId),
         backend_id: String(backendId),
@@ -252,49 +272,35 @@ export const api = {
   },
 
   modelRewrites: {
-    getAll: (): Promise<ModelRewriteRule[]> =>
-      getJson<ModelRewriteRule[]>('admin/model-rewrites'),
-    create: (data: {
-      source_model: string;
-      target_model: string;
-      is_active?: boolean;
-      force?: boolean;
-      note?: string;
-    }): Promise<ModelRewriteRule> =>
+    getAll: () => getJson<ModelRewriteRule[]>('admin/model-rewrites'),
+    create: (data: CreateModelRewriteInput) =>
       postJson<ModelRewriteRule>('admin/model-rewrites', data),
-    update: (
-      id: number,
-      data: Partial<ModelRewriteRule>,
-    ): Promise<ModelRewriteRule> =>
+    update: (id: number, data: UpdateModelRewriteInput) =>
       putJson<ModelRewriteRule>(`admin/model-rewrites/${id}`, data),
-    delete: (id: number): Promise<void> =>
-      deleteJson<void>(`admin/model-rewrites/${id}`),
+    delete: (id: number) => deleteJson<void>(`admin/model-rewrites/${id}`),
   },
 
   modelCache: {
-    getOverview: (): Promise<ModelCacheOverview> =>
-      getJson<ModelCacheOverview>('admin/models/cache'),
+    getOverview: () => getJson<ModelCacheOverview>('admin/models/cache'),
   },
 
   scripts: {
-    getAll: (): Promise<UserScript[]> => getJson<UserScript[]>('admin/scripts'),
-    getById: (id: number): Promise<UserScript> =>
-      getJson<UserScript>(`admin/scripts/${id}`),
-    create: (data: CreateScriptData): Promise<UserScript> =>
+    getAll: () => getJson<UserScript[]>('admin/scripts'),
+    getById: (id: number) => getJson<UserScript>(`admin/scripts/${id}`),
+    create: (data: CreateScriptInput) =>
       postJson<UserScript>('admin/scripts', data),
-    update: (id: number, data: UpdateScriptData): Promise<UserScript> =>
+    update: (id: number, data: UpdateScriptInput) =>
       putJson<UserScript>(`admin/scripts/${id}`, data),
-    delete: (id: number): Promise<void> =>
-      deleteJson<void>(`admin/scripts/${id}`),
-    activate: (id: number): Promise<UserScript> =>
+    delete: (id: number) => deleteJson<void>(`admin/scripts/${id}`),
+    activate: (id: number) =>
       postJson<UserScript>(`admin/scripts/${id}/activate`),
-    deactivate: (id: number): Promise<UserScript> =>
+    deactivate: (id: number) =>
       postJson<UserScript>(`admin/scripts/${id}/deactivate`),
     test: (
       id: number,
       context: {
-        user?: User;
-        backend?: Backend;
+        user?: { id: number; name: string; email?: string };
+        backend?: { id: number; name: string; base_url: string };
         request: {
           method: string;
           path: string;
@@ -303,120 +309,81 @@ export const api = {
           isStream: boolean;
         };
       },
-    ): Promise<{ success: boolean; error?: string; executionTime?: number }> =>
-      postJson(`admin/scripts/${id}/test`, context),
+    ) =>
+      postJson<{ success: boolean; error?: string; executionTime?: number }>(
+        `admin/scripts/${id}/test`,
+        context,
+      ),
   },
 
   dashboard: {
-    getSummary: (days: number = 30): Promise<DashboardSummaryResponse> =>
+    getSummary: (days: number = 30) =>
       getJson<DashboardSummaryResponse>('admin/dashboard/summary', { days }),
   },
 
   analytics: {
-    getUsage: (
-      userId?: number,
-      backendId?: number,
-      days: number = 30,
-    ): Promise<UsageStats[]> => {
-      const searchParams: Record<string, number> = { days };
-      if (userId) searchParams.userId = userId;
-      if (backendId) searchParams.backendId = backendId;
-      return getJson<UsageStats[]>('admin/analytics/usage', searchParams);
-    },
-    getRequests: (
-      params: {
-        limit?: number;
-        offset?: number;
-        month?: string;
-        date?: string;
-        q?: string;
-        userId?: number;
-        backendId?: number;
-        endpoint?: string;
-        detailLogged?: boolean;
-      } = {},
-    ): Promise<RequestLogPage> => {
-      const searchParams: Record<string, string | number> = {
-        limit: params.limit ?? 100,
-        offset: params.offset ?? 0,
-      };
-      if (params.month) searchParams.month = params.month;
-      if (params.date) searchParams.date = params.date;
-      if (params.q) searchParams.q = params.q;
-      if (params.userId) searchParams.userId = params.userId;
-      if (params.backendId) searchParams.backendId = params.backendId;
-      if (params.endpoint) searchParams.endpoint = params.endpoint;
-      if (params.detailLogged !== undefined) {
-        searchParams.detailLogged = params.detailLogged ? '1' : '0';
-      }
-      return getJson<RequestLogPage>('admin/analytics/requests', searchParams);
-    },
-    getMetrics: (
-      backendId?: number,
-      days: number = 30,
-    ): Promise<BackendMetrics[]> => {
-      const searchParams: Record<string, number> = { days };
-      if (backendId) searchParams.backendId = backendId;
-      return getJson<BackendMetrics[]>('admin/analytics/metrics', searchParams);
-    },
-    getDailyTotals: (
-      backendId?: number,
-      days: number = 30,
-    ): Promise<AnalyticsDailyTotalsPoint[]> => {
-      const searchParams: Record<string, number> = { days };
-      if (backendId) searchParams.backendId = backendId;
-      return getJson<AnalyticsDailyTotalsPoint[]>(
+    getUsage: (userId?: number, backendId?: number, days: number = 30) =>
+      getJson<UsageStats[]>(
+        'admin/analytics/usage',
+        compactSearchParams({ userId, backendId, days }),
+      ),
+    getRequests: (params: AnalyticsRequestParams = {}) =>
+      getJson<RequestLogPage>(
+        'admin/analytics/requests',
+        compactSearchParams({
+          limit: params.limit ?? 100,
+          offset: params.offset ?? 0,
+          month: params.month,
+          date: params.date,
+          q: params.q,
+          userId: params.userId,
+          backendId: params.backendId,
+          endpoint: params.endpoint,
+          detailLogged:
+            params.detailLogged === undefined
+              ? undefined
+              : params.detailLogged
+                ? '1'
+                : '0',
+        }),
+      ),
+    getMetrics: (backendId?: number, days: number = 30) =>
+      getJson<BackendMetrics[]>(
+        'admin/analytics/metrics',
+        compactSearchParams({ backendId, days }),
+      ),
+    getDailyTotals: (backendId?: number, days: number = 30) =>
+      getJson<AnalyticsDailyTotalsPoint[]>(
         'admin/analytics/daily-totals',
-        searchParams,
-      );
-    },
-    getBackendQuality: (
-      backendId?: number,
-      days: number = 30,
-    ): Promise<AnalyticsBackendQualityPoint[]> => {
-      const searchParams: Record<string, number> = { days };
-      if (backendId) searchParams.backendId = backendId;
-      return getJson<AnalyticsBackendQualityPoint[]>(
+        compactSearchParams({ backendId, days }),
+      ),
+    getBackendQuality: (backendId?: number, days: number = 30) =>
+      getJson<AnalyticsBackendQualityPoint[]>(
         'admin/analytics/backend-quality',
-        searchParams,
-      );
-    },
-    getModelTrends: (
-      params: { backendId?: number; days?: number; limit?: number } = {},
-    ): Promise<AnalyticsModelTrendPoint[]> => {
-      const searchParams: Record<string, number> = {
-        days: params.days ?? 30,
-        limit: params.limit ?? 8,
-      };
-      if (params.backendId) searchParams.backendId = params.backendId;
-      return getJson<AnalyticsModelTrendPoint[]>(
+        compactSearchParams({ backendId, days }),
+      ),
+    getModelTrends: (params: ModelTrendsParams = {}) =>
+      getJson<AnalyticsModelTrendPoint[]>(
         'admin/analytics/model-trends',
-        searchParams,
-      );
-    },
-    getResponseLengthHistogram: (
-      params: { backendId?: number; days?: number; bins?: number } = {},
-    ): Promise<AnalyticsHistogramBin[]> => {
-      const searchParams: Record<string, number> = {
-        days: params.days ?? 30,
-        bins: params.bins ?? 20,
-      };
-      if (params.backendId) searchParams.backendId = params.backendId;
-      return getJson<AnalyticsHistogramBin[]>(
+        compactSearchParams({
+          backendId: params.backendId,
+          days: params.days ?? 30,
+          limit: params.limit ?? 8,
+        }),
+      ),
+    getResponseLengthHistogram: (params: HistogramParams = {}) =>
+      getJson<AnalyticsHistogramBin[]>(
         'admin/analytics/response-length-histogram',
-        searchParams,
-      );
-    },
-    getResponseLengthBoxPlot: (
-      backendId?: number,
-      days: number = 30,
-    ): Promise<AnalyticsBoxPlotPoint[]> => {
-      const searchParams: Record<string, number> = { days };
-      if (backendId) searchParams.backendId = backendId;
-      return getJson<AnalyticsBoxPlotPoint[]>(
+        compactSearchParams({
+          backendId: params.backendId,
+          days: params.days ?? 30,
+          bins: params.bins ?? 20,
+        }),
+      ),
+    getResponseLengthBoxPlot: (backendId?: number, days: number = 30) =>
+      getJson<AnalyticsBoxPlotPoint[]>(
         'admin/analytics/response-length-box-plot',
-        searchParams,
-      );
-    },
+        compactSearchParams({ backendId, days }),
+      ),
   },
 };

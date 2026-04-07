@@ -1,4 +1,15 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
+
+import {
+  CreateBackendInputSchema,
+  CreateModelRewriteInputSchema,
+  CreatePermissionInputSchema,
+  CreateUserInputSchema,
+  UpdateBackendInputSchema,
+  UpdateModelRewriteInputSchema,
+  UpdateUserInputSchema,
+} from '@kyush/shared';
 
 import scriptRoutes from './scripts.js';
 
@@ -10,16 +21,6 @@ import { PermissionModel } from '../models/Permission.js';
 import { getUtcTimestamp } from '../utils/time.js';
 import { ModelCatalogService } from '../services/ModelCatalogService.js';
 import { AnalyticsService } from '../services/AnalyticsService.js';
-
-import type {
-  CreateBackendData,
-  CreateModelRewriteData,
-  CreatePermissionData,
-  CreateUserData,
-  UpdateBackendData,
-  UpdateModelRewriteData,
-  UpdateUserData,
-} from '../../../shared/types.js';
 
 import type { AppEnv } from '../types/hono.js';
 
@@ -38,21 +39,11 @@ router.get('/users', (c) => {
   return c.json(UserModel.findAll());
 });
 
-router.post('/users', async (c) => {
-  const body = await c.req.json();
-  const { name, email, api_key, detail_logging } = body;
-
-  if (!name?.trim()) {
-    return c.json({ error: 'Name is required' }, 400);
-  }
+router.post('/users', zValidator('json', CreateUserInputSchema), (c) => {
+  const data = c.req.valid('json');
 
   try {
-    const user = UserModel.create({
-      name: name.trim(),
-      email: email?.trim() || undefined,
-      api_key: api_key?.trim() || undefined,
-      detail_logging,
-    });
+    const user = UserModel.create(data);
     return c.json(user, 201);
   } catch (error) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
@@ -71,7 +62,7 @@ router.get('/users/:id', (c) => {
   return c.json(user);
 });
 
-router.put('/users/:id', async (c) => {
+router.put('/users/:id', zValidator('json', UpdateUserInputSchema), (c) => {
   const id = Number(c.req.param('id'));
   const user = UserModel.findById(id);
 
@@ -79,22 +70,8 @@ router.put('/users/:id', async (c) => {
     return c.json({ error: 'User not found' }, 404);
   }
 
-  const body = await c.req.json();
-  const { name, email, api_key, is_active, detail_logging } = body;
-
-  if (typeof name === 'string' && !name.trim()) {
-    return c.json({ error: 'Name cannot be empty' }, 400);
-  }
-
   try {
-    const updatedUser = UserModel.update(id, {
-      name: typeof name === 'string' ? name.trim() : undefined,
-      email: typeof email === 'string' ? email.trim() || undefined : undefined,
-      api_key:
-        typeof api_key === 'string' ? api_key.trim() || undefined : undefined,
-      is_active,
-      detail_logging,
-    });
+    const updatedUser = UserModel.update(id, c.req.valid('json'));
     return c.json(updatedUser);
   } catch (error) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
@@ -134,20 +111,8 @@ router.get('/backends', (c) => {
   return c.json(ModelCatalogService.getBackendsWithSummary());
 });
 
-router.post('/backends', async (c) => {
-  const body = await c.req.json();
-  const { name, base_url, api_key, detail_logging } = body;
-
-  if (!name || !base_url) {
-    return c.json({ error: 'Name and base_url are required' }, 400);
-  }
-
-  const backend = BackendModel.create({
-    name,
-    base_url,
-    api_key,
-    detail_logging,
-  });
+router.post('/backends', zValidator('json', CreateBackendInputSchema), (c) => {
+  const backend = BackendModel.create(c.req.valid('json'));
   return c.json(backend, 201);
 });
 
@@ -162,29 +127,25 @@ router.get('/backends/:id', (c) => {
   return c.json(backend);
 });
 
-router.put('/backends/:id', async (c) => {
-  const id = Number(c.req.param('id'));
-  const backend = BackendModel.findById(id);
-  if (!backend) {
-    return c.json({ error: 'Backend not found' }, 404);
-  }
+router.put(
+  '/backends/:id',
+  zValidator('json', UpdateBackendInputSchema),
+  async (c) => {
+    const id = Number(c.req.param('id'));
+    const backend = BackendModel.findById(id);
+    if (!backend) {
+      return c.json({ error: 'Backend not found' }, 404);
+    }
 
-  const body = await c.req.json();
-  const { name, base_url, api_key, is_active, detail_logging } = body;
-  const updatedBackend = BackendModel.update(id, {
-    name,
-    base_url,
-    api_key,
-    is_active,
-    detail_logging,
-  });
-  await ModelCatalogService.handleBackendUpdated(id);
-  return c.json(
-    ModelCatalogService.getBackendsWithSummary().find(
-      (item) => item.id === id,
-    ) || updatedBackend,
-  );
-});
+    const updatedBackend = BackendModel.update(id, c.req.valid('json'));
+    await ModelCatalogService.handleBackendUpdated(id);
+    return c.json(
+      ModelCatalogService.getBackendsWithSummary().find(
+        (item) => item.id === id,
+      ) || updatedBackend,
+    );
+  },
+);
 
 router.delete('/backends/:id', async (c) => {
   const id = Number(c.req.param('id'));
@@ -255,24 +216,21 @@ router.get('/permissions/backend/:backendId', (c) => {
   return c.json(PermissionModel.findByBackendId(backendId));
 });
 
-router.post('/permissions', async (c) => {
-  const body = await c.req.json();
-  const { user_id, backend_id } = body;
-
-  if (!user_id || !backend_id) {
-    return c.json({ error: 'user_id and backend_id are required' }, 400);
-  }
-
-  try {
-    const permission = PermissionModel.create({ user_id, backend_id });
-    return c.json(permission, 201);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) {
-      return c.json({ error: error.message }, 409);
+router.post(
+  '/permissions',
+  zValidator('json', CreatePermissionInputSchema),
+  (c) => {
+    try {
+      const permission = PermissionModel.create(c.req.valid('json'));
+      return c.json(permission, 201);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already exists')) {
+        return c.json({ error: error.message }, 409);
+      }
+      return c.json({ error: 'Failed to create permission' }, 500);
     }
-    return c.json({ error: 'Failed to create permission' }, 500);
-  }
-});
+  },
+);
 
 router.delete('/permissions', (c) => {
   const user_id = c.req.query('user_id');
@@ -293,57 +251,51 @@ router.get('/model-rewrites', (c) => {
   return c.json(ModelRewriteModel.findAll());
 });
 
-router.post('/model-rewrites', async (c) => {
-  const body = await c.req.json();
-  const { source_model, target_model, is_active, force, note } = body;
-
-  if (!source_model?.trim() || !target_model?.trim()) {
-    return c.json({ error: 'source_model and target_model are required' }, 400);
-  }
-
-  try {
-    const rule = ModelRewriteModel.create({
-      source_model: source_model.trim(),
-      target_model: target_model.trim(),
-      is_active,
-      force,
-      note,
-    });
-    ModelCatalogService.loadRewriteMap();
-    return c.json(rule, 201);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('UNIQUE')) {
-      return c.json(
-        { error: 'Rewrite rule already exists for this source_model' },
-        409,
-      );
+router.post(
+  '/model-rewrites',
+  zValidator('json', CreateModelRewriteInputSchema),
+  (c) => {
+    try {
+      const rule = ModelRewriteModel.create(c.req.valid('json'));
+      ModelCatalogService.loadRewriteMap();
+      return c.json(rule, 201);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE')) {
+        return c.json(
+          { error: 'Rewrite rule already exists for this source_model' },
+          409,
+        );
+      }
+      return c.json({ error: 'Failed to create model rewrite rule' }, 500);
     }
-    return c.json({ error: 'Failed to create model rewrite rule' }, 500);
-  }
-});
+  },
+);
 
-router.put('/model-rewrites/:id', async (c) => {
-  const id = Number(c.req.param('id'));
-  const existing = ModelRewriteModel.findById(id);
-  if (!existing) {
-    return c.json({ error: 'Model rewrite rule not found' }, 404);
-  }
-
-  try {
-    const body = await c.req.json();
-    const updated = ModelRewriteModel.update(id, body);
-    ModelCatalogService.loadRewriteMap();
-    return c.json(updated);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('UNIQUE')) {
-      return c.json(
-        { error: 'Rewrite rule already exists for this source_model' },
-        409,
-      );
+router.put(
+  '/model-rewrites/:id',
+  zValidator('json', UpdateModelRewriteInputSchema),
+  (c) => {
+    const id = Number(c.req.param('id'));
+    const existing = ModelRewriteModel.findById(id);
+    if (!existing) {
+      return c.json({ error: 'Model rewrite rule not found' }, 404);
     }
-    return c.json({ error: 'Failed to update model rewrite rule' }, 500);
-  }
-});
+
+    try {
+      const updated = ModelRewriteModel.update(id, c.req.valid('json'));
+      ModelCatalogService.loadRewriteMap();
+      return c.json(updated);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE')) {
+        return c.json(
+          { error: 'Rewrite rule already exists for this source_model' },
+          409,
+        );
+      }
+      return c.json({ error: 'Failed to update model rewrite rule' }, 500);
+    }
+  },
+);
 
 router.delete('/model-rewrites/:id', (c) => {
   const id = Number(c.req.param('id'));

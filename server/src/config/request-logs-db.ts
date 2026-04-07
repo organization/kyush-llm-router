@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import Database from 'better-sqlite3';
 
@@ -12,24 +11,33 @@ import {
 
 import { getLocalMonthKey } from '../utils/time.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const moduleDir = import.meta.dirname;
 
 const connections = new Map<string, Database.Database>();
+
+function isPragmaColumnRow(value: unknown): value is { name: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    typeof (value as { name: unknown }).name === 'string'
+  );
+}
 
 function hasColumn(
   database: Database.Database,
   tableName: string,
   columnName: string,
 ): boolean {
-  const columns = database
-    .prepare(`PRAGMA table_info(${tableName})`)
-    .all() as Array<{ name: string }>;
-  return columns.some((column) => column.name === columnName);
+  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all();
+  return columns.some(
+    (column) => isPragmaColumnRow(column) && column.name === columnName,
+  );
 }
 
 function initRequestLogsSchema(db: Database.Database): void {
   const schemaPath = path.join(
-    __dirname,
+    moduleDir,
     '..',
     '..',
     '..',
@@ -38,7 +46,7 @@ function initRequestLogsSchema(db: Database.Database): void {
   );
   const schema = fs.readFileSync(schemaPath, 'utf-8');
   db.exec(schema);
-  if (hasColumn(db, 'request_logs', 'routed_model') === false) {
+  if (!hasColumn(db, 'request_logs', 'routed_model')) {
     db.exec('ALTER TABLE request_logs ADD COLUMN routed_model TEXT');
   }
 }
@@ -47,9 +55,7 @@ export function getRequestLogsDb(
   monthKey: string = getLocalMonthKey(),
 ): Database.Database {
   const existing = connections.get(monthKey);
-  if (existing) {
-    return existing;
-  }
+  if (existing) return existing;
 
   const dbPath = getRequestLogsDbPath(monthKey);
   ensureDir(path.dirname(dbPath));
@@ -63,14 +69,12 @@ export function getRequestLogsDb(
 export function initRequestLogsDb(
   monthKey: string = getLocalMonthKey(),
 ): Database.Database {
-  const existing = connections.get(monthKey);
-  if (existing) {
-    existing.close();
-    connections.delete(monthKey);
-  }
-
+  connections.get(monthKey)?.close();
+  connections.delete(monthKey);
   return getRequestLogsDb(monthKey);
 }
+
+const REQUEST_LOG_FILENAME_PATTERN = /^request_logs_(\d{4}-\d{2})\.db$/;
 
 export function listRequestLogMonths(): string[] {
   const requestLogsDir = getRequestLogsDir();
@@ -78,8 +82,8 @@ export function listRequestLogMonths(): string[] {
 
   return fs
     .readdirSync(requestLogsDir)
-    .map((entry) => /^request_logs_(\d{4}-\d{2})\.db$/.exec(entry)?.[1])
-    .filter((value): value is string => Boolean(value))
+    .map((entry) => REQUEST_LOG_FILENAME_PATTERN.exec(entry)?.[1])
+    .filter((value): value is string => value !== undefined)
     .sort((a, b) => b.localeCompare(a));
 }
 

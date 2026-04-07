@@ -46,7 +46,7 @@ const emptyForm = (): RewriteFormState => ({
   note: '',
 });
 
-export const Models: Component = () => {
+const Models: Component = () => {
   const [overview, { refetch: refetchOverview }] = createResource(() =>
     api.modelCache.getOverview(),
   );
@@ -528,3 +528,5 @@ export const Models: Component = () => {
     </Layout>
   );
 };
+
+export default Models;

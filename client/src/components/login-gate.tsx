@@ -1,17 +1,21 @@
 import { createSignal, Show, type Component } from 'solid-js';
 
-import { Alert, Button, Panel, TextField } from '../ui';
+import { ApiError, api } from '../api/client';
 import { useAuth } from '../auth';
-import { api, ApiError } from '../api/client';
+import { Alert, Button, Panel, TextField } from '../ui';
 
-export const LoginGate: Component = () => {
+const LoginGate: Component = () => {
   const auth = useAuth();
   const [username, setUsername] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [submitting, setSubmitting] = createSignal(false);
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
 
-  const handleSubmit = async (event: Event) => {
+  const authMode = () => auth.session()?.authMode ?? 'both';
+  const envEnabled = () => authMode() === 'env' || authMode() === 'both';
+  const oidcEnabled = () => authMode() === 'oidc' || authMode() === 'both';
+
+  const handleSubmit = async (event: SubmitEvent) => {
     event.preventDefault();
     setSubmitting(true);
     setErrorMessage(null);
@@ -26,10 +30,6 @@ export const LoginGate: Component = () => {
       setSubmitting(false);
     }
   };
-
-  const authMode = () => auth.session()?.authMode ?? 'both';
-  const envEnabled = () => authMode() === 'env' || authMode() === 'both';
-  const oidcEnabled = () => authMode() === 'oidc' || authMode() === 'both';
 
   return (
     <div class="auth-screen">
@@ -84,3 +84,5 @@ export const LoginGate: Component = () => {
     </div>
   );
 };
+
+export default LoginGate;

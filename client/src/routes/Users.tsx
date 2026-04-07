@@ -60,7 +60,7 @@ const emptyForm = (): UserFormState => ({
 
 const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 5)}...`;
 
-export const Users: Component = () => {
+const Users: Component = () => {
   const [users, { refetch: refetchUsers }] = createResource(() =>
     api.users.getAll(),
   );
@@ -897,3 +897,5 @@ export const Users: Component = () => {
     </Layout>
   );
 };
+
+export default Users;

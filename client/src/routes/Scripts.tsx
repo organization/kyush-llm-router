@@ -39,14 +39,15 @@ import {
   TextField,
 } from '../ui';
 
-import type { ScriptType, UserScript } from '../types';
+import type {
+  CreateScriptInput,
+  ScriptType,
+  UpdateScriptInput,
+  UserScript,
+} from '../types';
 
 type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
-const ScriptEditor = lazy(() =>
-  import('../components/ScriptEditor').then((module) => ({
-    default: module.ScriptEditor,
-  })),
-);
+const ScriptEditor = lazy(() => import('../components/script-editor'));
 
 interface ScriptFormState {
   id?: number;
@@ -119,7 +120,7 @@ const scriptTypeLabels: Record<ScriptType, string> = {
   'per-user': 'Per User',
 };
 
-export const Scripts: Component = () => {
+const Scripts: Component = () => {
   const [scripts, { refetch: refetchScripts }] = createResource(() =>
     api.scripts.getAll(),
   );
@@ -247,6 +248,51 @@ export const Scripts: Component = () => {
     return null;
   };
 
+  const buildCreatePayload = (current: ScriptFormState): CreateScriptInput => {
+    const base = {
+      name: current.name.trim(),
+      script_code: current.script_code,
+      is_active: current.is_active,
+    };
+
+    // Use type narrowing on script_type so the discriminated union picks the
+    // right variant — no `as` casting required.
+    switch (current.script_type) {
+      case 'per-user-backend':
+        return {
+          ...base,
+          script_type: 'per-user-backend',
+          target_user_id: Number(current.target_user_id),
+          target_backend_id: Number(current.target_backend_id),
+        };
+      case 'per-backend':
+        return {
+          ...base,
+          script_type: 'per-backend',
+          target_backend_id: Number(current.target_backend_id),
+        };
+      case 'per-user':
+        return {
+          ...base,
+          script_type: 'per-user',
+          target_user_id: Number(current.target_user_id),
+        };
+    }
+  };
+
+  const buildUpdatePayload = (current: ScriptFormState): UpdateScriptInput => ({
+    name: current.name.trim(),
+    script_type: current.script_type,
+    target_user_id: current.target_user_id
+      ? Number(current.target_user_id)
+      : null,
+    target_backend_id: current.target_backend_id
+      ? Number(current.target_backend_id)
+      : null,
+    script_code: current.script_code,
+    is_active: current.is_active,
+  });
+
   const saveScript = async () => {
     const error = validateForm();
     if (error) {
@@ -255,27 +301,18 @@ export const Scripts: Component = () => {
     }
 
     const current = form();
-    const payload = {
-      name: current.name.trim(),
-      script_type: current.script_type,
-      target_user_id: current.target_user_id
-        ? Number(current.target_user_id)
-        : null,
-      target_backend_id: current.target_backend_id
-        ? Number(current.target_backend_id)
-        : null,
-      script_code: current.script_code,
-      is_active: current.is_active,
-    };
 
     setSubmitting(true);
     try {
       if (current.id) {
-        const updated = await api.scripts.update(current.id, payload);
+        const updated = await api.scripts.update(
+          current.id,
+          buildUpdatePayload(current),
+        );
         setNotice({ tone: 'success', message: 'Script updated.' });
         syncForm(updated);
       } else {
-        const created = await api.scripts.create(payload);
+        const created = await api.scripts.create(buildCreatePayload(current));
         setNotice({ tone: 'success', message: 'Script created.' });
         syncForm(created);
       }
@@ -668,7 +705,7 @@ export const Scripts: Component = () => {
                   }
                 >
                   <ScriptEditor
-                    onChange={(value) =>
+                    onChange={(value: string) =>
                       setForm((current) => ({ ...current, script_code: value }))
                     }
                     path={
@@ -750,3 +787,5 @@ export const Scripts: Component = () => {
     </Layout>
   );
 };
+
+export default Scripts;

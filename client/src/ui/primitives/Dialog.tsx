@@ -1,4 +1,4 @@
-import * as KDialog from '@kobalte/core/dialog';
+import * as DialogPrimitive from '@kobalte/core/dialog';
 
 import { cn } from '../lib/cn';
 
@@ -8,54 +8,54 @@ type WrapperProps = ParentProps<{ class?: string; [key: string]: unknown }>;
 
 export const Dialog = {
   Root: (props: WrapperProps) => (
-    <KDialog.Root {...(props as KDialog.DialogRootProps)}>
+    <DialogPrimitive.Root {...(props as DialogPrimitive.DialogRootProps)}>
       {props.children}
-    </KDialog.Root>
+    </DialogPrimitive.Root>
   ),
   Trigger: (props: WrapperProps) => (
-    <KDialog.Trigger
-      {...(props as KDialog.DialogTriggerProps)}
+    <DialogPrimitive.Trigger
+      {...(props as DialogPrimitive.DialogTriggerProps)}
       class={cn('ui-button', props.class)}
     >
       {props.children}
-    </KDialog.Trigger>
+    </DialogPrimitive.Trigger>
   ),
   Portal: (props: WrapperProps) => (
-    <KDialog.Portal>{props.children}</KDialog.Portal>
+    <DialogPrimitive.Portal>{props.children}</DialogPrimitive.Portal>
   ),
   Overlay: (props: WrapperProps) => (
-    <KDialog.Overlay
-      {...(props as KDialog.DialogOverlayProps)}
+    <DialogPrimitive.Overlay
+      {...(props as DialogPrimitive.DialogOverlayProps)}
       class={cn('ui-dialog__overlay', props.class)}
     />
   ),
   Content: (props: WrapperProps) => (
-    <KDialog.Content
-      {...(props as KDialog.DialogContentProps)}
+    <DialogPrimitive.Content
+      {...(props as DialogPrimitive.DialogContentProps)}
       class={cn('ui-dialog__content', props.class)}
     >
       {props.children}
-    </KDialog.Content>
+    </DialogPrimitive.Content>
   ),
   Title: (props: WrapperProps) => (
-    <KDialog.Title {...(props as KDialog.DialogTitleProps)}>
+    <DialogPrimitive.Title {...(props as DialogPrimitive.DialogTitleProps)}>
       {props.children}
-    </KDialog.Title>
+    </DialogPrimitive.Title>
   ),
   Description: (props: WrapperProps) => (
-    <KDialog.Description
-      {...(props as KDialog.DialogDescriptionProps)}
+    <DialogPrimitive.Description
+      {...(props as DialogPrimitive.DialogDescriptionProps)}
       class={cn('ui-subtitle', props.class)}
     >
       {props.children}
-    </KDialog.Description>
+    </DialogPrimitive.Description>
   ),
   CloseButton: (props: WrapperProps) => (
-    <KDialog.CloseButton
-      {...(props as KDialog.DialogCloseButtonProps)}
+    <DialogPrimitive.CloseButton
+      {...(props as DialogPrimitive.DialogCloseButtonProps)}
       class={cn('ui-button', props.class)}
     >
       {props.children}
-    </KDialog.CloseButton>
+    </DialogPrimitive.CloseButton>
   ),
 };

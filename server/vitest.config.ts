@@ -1,9 +1,8 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from 'vitest/config';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const moduleDir = import.meta.dirname;
 
 export default defineConfig({
   test: {
@@ -14,7 +13,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(moduleDir, './src'),
     },
     // Allow `.js` import specifiers in `.ts` files (NodeNext convention)
     extensionAlias: {
