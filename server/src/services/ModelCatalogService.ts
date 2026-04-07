@@ -147,12 +147,13 @@ export class ModelCatalogService {
       );
     }
 
-    const payload = await response.json().catch(() => ({}) as any);
-    const data =
-      payload &&
+    const payload: unknown = await response.json().catch(() => ({}));
+    const data: unknown[] =
       typeof payload === 'object' &&
-      Array.isArray((payload as any).data)
-        ? (payload as any).data
+      payload !== null &&
+      'data' in payload &&
+      Array.isArray(payload.data)
+        ? payload.data
         : [];
 
     const seen = new Set<string>();
@@ -160,7 +161,12 @@ export class ModelCatalogService {
     const models: string[] = [];
 
     for (const item of data) {
-      if (!item || typeof item !== 'object' || typeof item.id !== 'string') {
+      if (
+        typeof item !== 'object' ||
+        item === null ||
+        !('id' in item) ||
+        typeof item.id !== 'string'
+      ) {
         continue;
       }
       const modelId = this.normalizeModelId(item.id);

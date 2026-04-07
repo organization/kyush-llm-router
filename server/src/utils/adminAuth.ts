@@ -1,23 +1,24 @@
-import { getSessionTokenFromCookies, hashAdminToken } from './adminSecurity.js';
+import { getSessionTokenFromContext, hashAdminToken } from './adminSecurity.js';
 
 import { getTrustedProxyIps } from '../config/admin-auth.js';
 
 import { AdminApiTokenModel } from '../models/AdminApiToken.js';
-
 import { AdminSessionModel } from '../models/AdminSession.js';
 
 import type { Context, MiddlewareHandler } from 'hono';
-import type { AdminPrincipal } from '../../../shared/types.js';
 
+import type { AdminPrincipal } from '../../../shared/types.js';
 import type { AdminAuthContext, AppEnv } from '../types/hono.js';
 
-function toPrincipal(data: {
+interface PrincipalRow {
   provider: 'env' | 'oidc';
   subject: string;
   username?: string;
   email?: string;
   display_name: string;
-}): AdminPrincipal {
+}
+
+function toPrincipal(data: PrincipalRow): AdminPrincipal {
   return {
     provider: data.provider,
     subject: data.subject,
@@ -27,26 +28,34 @@ function toPrincipal(data: {
   };
 }
 
+/**
+ * Type guard for `@hono/node-server`'s context env shape. The Node adapter
+ * exposes the underlying `IncomingMessage` as `c.env.incoming`; we narrow it
+ * here so the rest of the file never has to touch `as` casts.
+ */
+function getNodeIncomingSocket(
+  env: unknown,
+): { remoteAddress?: string } | undefined {
+  if (typeof env !== 'object' || env === null) return undefined;
+  if (!('incoming' in env)) return undefined;
+  const incoming = (env as { incoming: unknown }).incoming;
+  if (typeof incoming !== 'object' || incoming === null) return undefined;
+  if (!('socket' in incoming)) return undefined;
+  const socket = (incoming as { socket: unknown }).socket;
+  if (typeof socket !== 'object' || socket === null) return undefined;
+  return socket as { remoteAddress?: string };
+}
+
 function getRemoteIp(c: Context): string {
   const forwarded = c.req.header('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0]?.trim() ?? '';
-  }
-  // @hono/node-server exposes the underlying IncomingMessage as c.env.incoming
-  const incoming = (
-    c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined
-  )?.incoming;
-  return incoming?.socket?.remoteAddress ?? '';
+  if (forwarded) return forwarded.split(',')[0]?.trim() ?? '';
+  return getNodeIncomingSocket(c.env)?.remoteAddress ?? '';
 }
 
 function passesTrustedProxyGuard(c: Context): boolean {
   const allowedIps = getTrustedProxyIps();
-  if (allowedIps.length === 0) {
-    return true;
-  }
-
-  const remoteIp = getRemoteIp(c);
-  return allowedIps.includes(remoteIp);
+  if (allowedIps.length === 0) return true;
+  return allowedIps.includes(getRemoteIp(c));
 }
 
 export function resolveAdminAuth(
@@ -70,17 +79,14 @@ export function resolveAdminAuth(
     }
   }
 
-  const sessionToken = getSessionTokenFromCookies(c.req.header('cookie'));
-  if (!sessionToken) {
-    return undefined;
-  }
+  // Cookie reads now go through hono/cookie's helper inside getSessionTokenFromContext.
+  const sessionToken = getSessionTokenFromContext(c);
+  if (!sessionToken) return undefined;
 
   const session = AdminSessionModel.findByTokenHash(
     hashAdminToken(sessionToken),
   );
-  if (!session) {
-    return undefined;
-  }
+  if (!session) return undefined;
 
   AdminSessionModel.touch(session.id);
   const ctx: AdminAuthContext = {
@@ -113,14 +119,13 @@ export const requireAdminAccess: MiddlewareHandler<AppEnv> = async (
   return;
 };
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 export const requireSessionCsrf: MiddlewareHandler<AppEnv> = async (
   c,
   next,
 ) => {
-  const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(
-    c.req.method.toUpperCase(),
-  );
-  if (!unsafeMethod) {
+  if (SAFE_METHODS.has(c.req.method.toUpperCase())) {
     await next();
     return;
   }
