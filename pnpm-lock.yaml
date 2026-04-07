@@ -59,6 +59,9 @@ importers:
       d3:
         specifier: ^7.9.0
         version: 7.9.0
+      ky:
+        specifier: ^1.7.5
+        version: 1.14.3
       lucide-solid:
         specifier: ^1.1.0
         version: 1.1.0(solid-js@1.9.11)
@@ -2276,6 +2279,10 @@ packages:
 
   known-css-properties@0.30.0:
     resolution: {integrity: sha512-VSWXYUnsPu9+WYKkfmJyLKtIvaRJi1kXUqVmBACORXZQxT5oZDsoZ2vQP+bQFDnWtpI/4eq3MLoRMjI2fnLzTQ==}
+
+  ky@1.14.3:
+    resolution: {integrity: sha512-9zy9lkjac+TR1c2tG+mkNSVlyOpInnWdSMiue4F+kq8TwJSgv6o8jhLRg8Ho6SnZ9wOYUq/yozts9qQCfk7bIw==}
+    engines: {node: '>=18'}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -5354,6 +5361,8 @@ snapshots:
       json-buffer: 3.0.1
 
   known-css-properties@0.30.0: {}
+
+  ky@1.14.3: {}
 
   levn@0.4.1:
     dependencies:
