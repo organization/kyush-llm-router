@@ -1,16 +1,12 @@
+import { useQuery } from '@tanstack/solid-query';
 import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
-import {
-  Show,
-  createMemo,
-  createResource,
-  createSignal,
-  type Component,
-  For,
-} from 'solid-js';
+import { Show, createSignal, type Component, For } from 'solid-js';
 
 import { api } from '../api/client';
+import { queryKeys } from '../api/query-keys';
 import { Layout } from '../components/Layout';
 import {
+  Button,
   ChartLegend,
   ComboChart,
   CommandBar,
@@ -57,29 +53,41 @@ const Dashboard: Component = () => {
     new Set(),
   );
 
-  const windowDays = createMemo(() => Number(days()));
-  const [summary, { refetch }] = createResource(windowDays, (value) =>
-    api.dashboard.getSummary(value),
-  );
-  const [backends] = createResource(() => api.backends.getAll());
+  // Reactive data: TanStack Query handles fetching, caching, and refetch.
+  // The query key tracks `windowDays()` so changing the time window kicks off
+  // a fresh fetch automatically.
+  const windowDays = () => Number(days());
+  const summaryQuery = useQuery(() => ({
+    queryKey: queryKeys.dashboard.summary(windowDays()),
+    queryFn: () => api.dashboard.getSummary(windowDays()),
+  }));
+  const backendsQuery = useQuery(() => ({
+    queryKey: queryKeys.backends.all(),
+    queryFn: () => api.backends.getAll(),
+  }));
 
-  const backendNameById = createMemo(() => {
+  const summary = () => summaryQuery.data;
+  const backends = () => backendsQuery.data;
+  const refetch = () => summaryQuery.refetch();
+
+  // Inline derivations — Solid's reactive prop reads keep these cheap, no
+  // need to wrap in createMemo for what amounts to a single Map build.
+  const backendNameById = (): ReadonlyMap<number, string> => {
     const entries = new Map<number, string>();
     for (const backend of backends() ?? []) {
       entries.set(backend.id, backend.name);
     }
     return entries;
-  });
+  };
 
-  const trafficRows = createMemo(() =>
+  const trafficRows = () =>
     (summary()?.series.daily_totals ?? []).map((row) => ({
       date: row.date,
       requests: row.total_requests,
       tokens: row.total_tokens,
-    })),
-  );
+    }));
 
-  const reliabilityRows = createMemo(() => {
+  const reliabilityRows = () => {
     const grouped = new Map<string, { requests: number; errors: number }>();
     for (const row of summary()?.series.backend_quality ?? []) {
       const entry = grouped.get(row.date) ?? { requests: 0, errors: 0 };
@@ -98,9 +106,9 @@ const Dashboard: Component = () => {
             : ((value.requests - value.errors) / value.requests) * 100,
         barValue: value.errors,
       }));
-  });
+  };
 
-  const latencyRows = createMemo(() => {
+  const latencyRows = (): DashboardChartRow[] => {
     const grouped = new Map<string, DashboardChartRow>();
     for (const row of summary()?.series.backend_quality ?? []) {
       const entry: DashboardChartRow = grouped.get(row.date) ?? {
@@ -112,9 +120,9 @@ const Dashboard: Component = () => {
     return Array.from(grouped.values()).sort((left, right) =>
       left.date.localeCompare(right.date),
     );
-  });
+  };
 
-  const latencySeries = createMemo(() => {
+  const latencySeries = () => {
     const ids = Array.from(
       new Set(
         (summary()?.series.backend_quality ?? []).map((row) => row.backend_id),
@@ -125,9 +133,9 @@ const Dashboard: Component = () => {
       label: backendNameById().get(backendId) ?? `Backend ${backendId}`,
       color: palette[index % palette.length],
     }));
-  });
+  };
 
-  const modelRows = createMemo(() => {
+  const modelRows = (): DashboardChartRow[] => {
     const grouped = new Map<string, DashboardChartRow>();
     for (const row of summary()?.series.model_trends ?? []) {
       const entry: DashboardChartRow = grouped.get(row.date) ?? {
@@ -139,9 +147,9 @@ const Dashboard: Component = () => {
     return Array.from(grouped.values()).sort((left, right) =>
       left.date.localeCompare(right.date),
     );
-  });
+  };
 
-  const modelSeries = createMemo(() => {
+  const modelSeries = () => {
     const models = Array.from(
       new Set((summary()?.series.model_trends ?? []).map((row) => row.model)),
     );
@@ -150,9 +158,9 @@ const Dashboard: Component = () => {
       label: model,
       color: palette[index % palette.length],
     }));
-  });
+  };
 
-  const summaryItems = createMemo(() => {
+  const summaryItems = () => {
     const payload = summary();
     const latestTraffic =
       payload?.series.daily_totals[payload.series.daily_totals.length - 1];
@@ -183,9 +191,9 @@ const Dashboard: Component = () => {
           : 'No traffic in window',
       },
     ];
-  });
+  };
 
-  const cacheStateItems = createMemo(() => {
+  const cacheStateItems = () => {
     const counts = summary()?.health.cache_state_counts;
     if (!counts) return [];
     return [
@@ -194,9 +202,9 @@ const Dashboard: Component = () => {
       { key: 'Error', value: String(counts.error) },
       { key: 'Inactive', value: String(counts.inactive) },
     ];
-  });
+  };
 
-  const scriptItems = createMemo(() => {
+  const scriptItems = () => {
     const payload = summary();
     if (!payload) return [];
 
@@ -214,9 +222,9 @@ const Dashboard: Component = () => {
         value: `${payload.scripts.active_by_type['per-user-backend']} active / ${payload.scripts.total_by_type['per-user-backend']} total`,
       },
     ];
-  });
+  };
 
-  const accessItems = createMemo(() => {
+  const accessItems = () => {
     const payload = summary();
     if (!payload) return [];
 
@@ -238,7 +246,7 @@ const Dashboard: Component = () => {
         value: String(payload.logging.backends_with_detail_logging),
       },
     ];
-  });
+  };
 
   const toggleHiddenKey = (
     setter: (
@@ -262,14 +270,10 @@ const Dashboard: Component = () => {
       <div class="ui-app-page">
         <PageHeader
           actions={
-            <button
-              class="ui-button"
-              onClick={() => void refetch()}
-              type="button"
-            >
-              <RefreshCcw />
+            <Button onClick={() => void refetch()} type="button">
+              <RefreshCcw aria-hidden="true" size={14} />
               Refresh
-            </button>
+            </Button>
           }
           description="Operations cockpit for router health, traffic shape, and the configuration context behind current behavior."
           title="Dashboard"
@@ -292,8 +296,8 @@ const Dashboard: Component = () => {
           fallback={
             <Panel
               description={
-                summary.error instanceof Error
-                  ? summary.error.message
+                summaryQuery.error instanceof Error
+                  ? summaryQuery.error.message
                   : 'Failed to load dashboard summary.'
               }
               title="Dashboard unavailable"
@@ -304,7 +308,7 @@ const Dashboard: Component = () => {
               />
             </Panel>
           }
-          when={!summary.error}
+          when={!summaryQuery.isError}
         >
           <div class="ui-section-grid">
             <Panel
