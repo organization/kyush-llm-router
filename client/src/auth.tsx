@@ -10,6 +10,7 @@ import {
   createEffect,
   onCleanup,
   useContext,
+  type JSX,
   type ParentComponent,
 } from 'solid-js';
 
@@ -98,9 +99,7 @@ function useSessionQuery() {
   }));
 }
 
-function AuthContextProvider(props: {
-  children: import('solid-js').JSX.Element;
-}) {
+function AuthContextProvider(props: { children: JSX.Element }) {
   const queryClient = useQueryClient();
   const sessionQuery = useSessionQuery();
 
