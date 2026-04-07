@@ -15,7 +15,7 @@
 
 import path from 'node:path';
 
-import type { AdminAuthMode } from '../../../shared/types.js';
+import type { AdminAuthMode } from '../../../shared/types';
 
 const DEFAULT_DB_DIR = path.join(process.cwd(), 'data');
 const DEFAULT_TIME_ZONE = 'UTC';

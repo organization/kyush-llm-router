@@ -1,8 +1,8 @@
 import { serve } from '@hono/node-server';
 
-import { env } from './config/env.js';
-import app from './index.js';
-import { logger } from './utils/logger.js';
+import { env } from './config/env';
+import app from './index';
+import { logger } from './utils/logger';
 
 serve(
   {

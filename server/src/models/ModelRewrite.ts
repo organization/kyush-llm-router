@@ -1,11 +1,11 @@
-import { getDb } from '../config/database.js';
-import { getUtcTimestamp } from '../utils/time.js';
+import { getDb } from '../config/database';
+import { getUtcTimestamp } from '../utils/time';
 
 import type {
   CreateModelRewriteData,
   ModelRewriteRule,
   UpdateModelRewriteData,
-} from '../../../shared/types.js';
+} from '../../../shared/types';
 
 function asRule(row: any): ModelRewriteRule {
   row.is_active = !!row.is_active;

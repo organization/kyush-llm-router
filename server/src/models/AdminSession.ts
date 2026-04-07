@@ -1,7 +1,7 @@
-import { getDb } from '../config/database.js';
-import { getUtcTimestamp } from '../utils/time.js';
+import { getDb } from '../config/database';
+import { getUtcTimestamp } from '../utils/time';
 
-import type { AdminPrincipal } from '../../../shared/types.js';
+import type { AdminPrincipal } from '../../../shared/types';
 
 export interface AdminSessionRecord {
   id: number;

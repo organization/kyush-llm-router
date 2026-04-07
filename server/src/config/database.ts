@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 import Database from 'better-sqlite3';
 
-import { ensureDir, getCoreDbPath } from './db-paths.js';
+import { ensureDir, getCoreDbPath } from './db-paths';
 
 // Node 20.11+ exposes import.meta.dirname directly — no fileURLToPath needed.
 const moduleDir = import.meta.dirname;

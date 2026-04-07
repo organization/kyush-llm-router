@@ -1,4 +1,4 @@
-import { env } from '../config/env.js';
+import { env } from '../config/env';
 
 function getFormatter(
   timeZone: string,

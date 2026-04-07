@@ -7,11 +7,11 @@ import {
   UpdateScriptInputSchema,
 } from '@kyush/shared';
 
-import { ScriptModel } from '../models/Script.js';
-import { CompiledScript } from '../services/ScriptExecutor.js';
+import { ScriptModel } from '../models/Script';
+import { CompiledScript } from '../services/ScriptExecutor';
 
-import type { ScriptContextData } from '../../../shared/types.js';
-import type { AppEnv } from '../types/hono.js';
+import type { ScriptContextData } from '../../../shared/types';
+import type { AppEnv } from '../types/hono';
 
 const router = new Hono<AppEnv>();
 

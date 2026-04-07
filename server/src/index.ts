@@ -8,16 +8,16 @@ import { bodyLimit } from 'hono/body-limit';
 import { serveStatic } from '@hono/node-server/serve-static';
 import dotenv from 'dotenv';
 
-import { env } from './config/env.js';
-import adminRoutes from './routes/admin.js';
-import adminAuthRoutes from './routes/admin-auth.js';
-import apiRoutes from './routes/api.js';
-import analyticsRoutes from './routes/analytics.js';
-import { requireAdminAccess, requireSessionCsrf } from './utils/adminAuth.js';
-import { getUtcTimestamp } from './utils/time.js';
-import { ModelCatalogService } from './services/ModelCatalogService.js';
+import { env } from './config/env';
+import adminRoutes from './routes/admin';
+import adminAuthRoutes from './routes/admin-auth';
+import apiRoutes from './routes/api';
+import analyticsRoutes from './routes/analytics';
+import { requireAdminAccess, requireSessionCsrf } from './utils/adminAuth';
+import { getUtcTimestamp } from './utils/time';
+import { ModelCatalogService } from './services/ModelCatalogService';
 
-import type { AppEnv } from './types/hono.js';
+import type { AppEnv } from './types/hono';
 
 const moduleDir = import.meta.dirname;
 

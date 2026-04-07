@@ -1,4 +1,4 @@
-import type { AdminPrincipal, User } from '../../../shared/types.js';
+import type { AdminPrincipal, User } from '../../../shared/types';
 
 export interface AdminAuthContext {
   principal: AdminPrincipal;

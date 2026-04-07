@@ -2,26 +2,26 @@ import {
   type RequestLogInsert,
   type RequestLogQuery,
   RequestLogService,
-} from './RequestLogService.js';
+} from './RequestLogService';
 
-import { ModelCatalogService } from './ModelCatalogService.js';
+import { ModelCatalogService } from './ModelCatalogService';
 
-import { getAnalyticsDb } from '../config/analytics-db.js';
+import { getAnalyticsDb } from '../config/analytics-db';
 
-import { getLocalDateKey, getUtcTimestamp } from '../utils/time.js';
+import { getLocalDateKey, getUtcTimestamp } from '../utils/time';
 import {
   getRequestLogsDb,
   listRequestLogMonths,
-} from '../config/request-logs-db.js';
-import { UserModel } from '../models/User.js';
-import { PermissionModel } from '../models/Permission.js';
-import { ScriptModel } from '../models/Script.js';
+} from '../config/request-logs-db';
+import { UserModel } from '../models/User';
+import { PermissionModel } from '../models/Permission';
+import { ScriptModel } from '../models/Script';
 
 import type {
   DashboardSummaryResponse,
   RequestLogPage,
   ScriptType,
-} from '../../../shared/types.js';
+} from '../../../shared/types';
 
 type AnalyticsLogInput = RequestLogInsert;
 type RequestLogFilter = {

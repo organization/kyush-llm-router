@@ -1,9 +1,9 @@
-import { env } from '../config/env.js';
-import { BackendModel } from '../models/Backend.js';
-import { BackendModelSnapshotModel } from '../models/BackendModelSnapshot.js';
-import { ModelRewriteModel } from '../models/ModelRewrite.js';
-import { getUtcTimestamp } from '../utils/time.js';
-import { logger } from '../utils/logger.js';
+import { env } from '../config/env';
+import { BackendModel } from '../models/Backend';
+import { BackendModelSnapshotModel } from '../models/BackendModelSnapshot';
+import { ModelRewriteModel } from '../models/ModelRewrite';
+import { getUtcTimestamp } from '../utils/time';
+import { logger } from '../utils/logger';
 
 import type {
   Backend,
@@ -12,7 +12,7 @@ import type {
   BackendModelsResponse,
   ModelCacheOverview,
   ModelRewriteRule,
-} from '../../../shared/types.js';
+} from '../../../shared/types';
 
 interface BackendCacheEntry {
   backendId: number;

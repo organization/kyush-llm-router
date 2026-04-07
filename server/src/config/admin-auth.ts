@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import { env } from './env.js';
+import { env } from './env';
 
-import type { AdminAuthMode } from '../../../shared/types.js';
+import type { AdminAuthMode } from '../../../shared/types';
 
 export function getAdminAuthMode(): AdminAuthMode {
   return env.ADMIN_AUTH_MODE;

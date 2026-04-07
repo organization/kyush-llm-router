@@ -1,7 +1,7 @@
-import { getDb } from '../config/database.js';
-import { getUtcTimestamp } from '../utils/time.js';
+import { getDb } from '../config/database';
+import { getUtcTimestamp } from '../utils/time';
 
-import type { BackendModelSnapshot } from '../../../shared/types.js';
+import type { BackendModelSnapshot } from '../../../shared/types';
 
 function asSnapshot(row: any): BackendModelSnapshot {
   return row as BackendModelSnapshot;

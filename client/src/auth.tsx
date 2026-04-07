@@ -9,6 +9,7 @@ import {
   createContext,
   createEffect,
   onCleanup,
+  onMount,
   useContext,
   type JSX,
   type ParentComponent,
@@ -109,9 +110,11 @@ function AuthContextProvider(props: { children: JSX.Element }) {
     setAdminCsrfToken(data?.csrfToken ?? null);
   });
 
-  // Wire the api client's 401 handler — when an unauthorized response surfaces,
-  // immediately collapse the cached session to the unauthenticated fallback.
-  createEffect(() => {
+  // Wire the api client's 401 handler once at mount — when an unauthorized
+  // response surfaces, immediately collapse the cached session to the
+  // unauthenticated fallback. There are no reactive reads in this block, so
+  // `onMount` (one-shot) is a more honest fit than `createEffect`.
+  onMount(() => {
     setUnauthorizedHandler(() => {
       queryClient.setQueryData<AdminSessionResponse>(
         authKeys.session,

@@ -1,8 +1,8 @@
-import { UserModel } from '../models/User.js';
-import { PermissionModel } from '../models/Permission.js';
+import { UserModel } from '../models/User';
+import { PermissionModel } from '../models/Permission';
 
 import type { MiddlewareHandler } from 'hono';
-import type { AppEnv } from '../types/hono.js';
+import type { AppEnv } from '../types/hono';
 
 export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
   const authHeader = c.req.header('authorization');

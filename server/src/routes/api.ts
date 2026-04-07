@@ -7,24 +7,24 @@ import {
   type ChatCompletionRequest as ChatCompletionRequestType,
 } from '@kyush/shared';
 
-import { authenticate } from './auth.js';
+import { authenticate } from './auth';
 
-import { BackendModel } from '../models/Backend.js';
-import { RouterService } from '../services/RouterService.js';
-import { AnalyticsService } from '../services/AnalyticsService.js';
-import { ScriptEngine } from '../services/ScriptEngine.js';
-import { logger } from '../utils/logger.js';
-import { ModelCatalogService } from '../services/ModelCatalogService.js';
+import { BackendModel } from '../models/Backend';
+import { RouterService } from '../services/RouterService';
+import { AnalyticsService } from '../services/AnalyticsService';
+import { ScriptEngine } from '../services/ScriptEngine';
+import { logger } from '../utils/logger';
+import { ModelCatalogService } from '../services/ModelCatalogService';
 
 import {
   ChatCompletionRequest,
   ChatCompletionResponse,
   ModelListResponse,
   ModelNotAvailableResponse,
-} from '../schemas/v1.js';
-import { ErrorResponse } from '../schemas/common.js';
+} from '../schemas/v1';
+import { ErrorResponse } from '../schemas/common';
 
-import type { AppEnv } from '../types/hono.js';
+import type { AppEnv } from '../types/hono';
 
 const router = new OpenAPIHono<AppEnv>();
 

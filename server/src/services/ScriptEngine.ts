@@ -1,9 +1,9 @@
-import { CompiledScript } from './ScriptExecutor.js';
+import { CompiledScript } from './ScriptExecutor';
 
-import { ScriptModel } from '../models/Script.js';
-import { logger } from '../utils/logger.js';
+import { ScriptModel } from '../models/Script';
+import { logger } from '../utils/logger';
 
-import type { ScriptContextData } from '../../../shared/types.js';
+import type { ScriptContextData } from '../../../shared/types';
 
 export interface ScriptChainResult {
   success: boolean;

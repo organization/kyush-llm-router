@@ -1,13 +1,13 @@
-import { getDb } from '../config/database.js';
+import { getDb } from '../config/database';
 
-import { generateApiKey } from '../utils/apiKey.js';
-import { getUtcTimestamp } from '../utils/time.js';
+import { generateApiKey } from '../utils/apiKey';
+import { getUtcTimestamp } from '../utils/time';
 
 import type {
   User,
   CreateUserData,
   UpdateUserData,
-} from '../../../shared/types.js';
+} from '../../../shared/types';
 
 export class UserModel {
   static asUser(row: any): User {

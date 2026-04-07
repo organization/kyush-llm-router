@@ -1,6 +1,6 @@
-import { BackendModel } from '../models/Backend.js';
+import { BackendModel } from '../models/Backend';
 
-import type { Backend } from '../../../shared/types.js';
+import type { Backend } from '../../../shared/types';
 
 interface BackendForwardError {
   error: string;

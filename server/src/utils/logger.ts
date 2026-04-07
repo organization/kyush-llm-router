@@ -1,4 +1,4 @@
-import { getUtcTimestamp } from './time.js';
+import { getUtcTimestamp } from './time';
 
 const colors = {
   reset: '\x1b[0m',

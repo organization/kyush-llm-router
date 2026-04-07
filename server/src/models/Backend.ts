@@ -1,12 +1,12 @@
-import { getDb } from '../config/database.js';
+import { getDb } from '../config/database';
 
-import { getUtcTimestamp } from '../utils/time.js';
+import { getUtcTimestamp } from '../utils/time';
 
 import type {
   Backend,
   CreateBackendData,
   UpdateBackendData,
-} from '../../../shared/types.js';
+} from '../../../shared/types';
 
 export class BackendModel {
   static asBackend(row: any): Backend {

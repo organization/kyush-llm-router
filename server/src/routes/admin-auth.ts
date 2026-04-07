@@ -6,8 +6,8 @@ import {
   CreateAdminTokenInputSchema,
 } from '@kyush/shared';
 
-import { AdminApiTokenModel } from '../models/AdminApiToken.js';
-import { AdminSessionModel } from '../models/AdminSession.js';
+import { AdminApiTokenModel } from '../models/AdminApiToken';
+import { AdminSessionModel } from '../models/AdminSession';
 import {
   getAdminApiTokenTtlDays,
   getAdminAuthMode,
@@ -17,12 +17,12 @@ import {
   getOidcConfig,
   isEnvAdminEnabled,
   isOidcEnabled,
-} from '../config/admin-auth.js';
+} from '../config/admin-auth';
 import {
   requireAdminAccess,
   requireSessionCsrf,
   resolveAdminAuth,
-} from '../utils/adminAuth.js';
+} from '../utils/adminAuth';
 import {
   clearAdminSessionCookie,
   createCsrfToken,
@@ -31,13 +31,13 @@ import {
   issueAdminSessionCookie,
   tokenPrefix,
   verifyAdminPassword,
-} from '../utils/adminSecurity.js';
+} from '../utils/adminSecurity';
 
 import type {
   AdminPrincipal,
   AdminSessionResponse,
-} from '../../../shared/types.js';
-import type { AppEnv, AdminAuthContext } from '../types/hono.js';
+} from '../../../shared/types';
+import type { AppEnv, AdminAuthContext } from '../types/hono';
 import type { Context } from 'hono';
 
 const router = new Hono<AppEnv>();

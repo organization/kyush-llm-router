@@ -11,18 +11,18 @@ import {
   UpdateUserInputSchema,
 } from '@kyush/shared';
 
-import scriptRoutes from './scripts.js';
+import scriptRoutes from './scripts';
 
-import { UserModel } from '../models/User.js';
-import { BackendModel } from '../models/Backend.js';
-import { ModelRewriteModel } from '../models/ModelRewrite.js';
-import { PermissionModel } from '../models/Permission.js';
+import { UserModel } from '../models/User';
+import { BackendModel } from '../models/Backend';
+import { ModelRewriteModel } from '../models/ModelRewrite';
+import { PermissionModel } from '../models/Permission';
 
-import { getUtcTimestamp } from '../utils/time.js';
-import { ModelCatalogService } from '../services/ModelCatalogService.js';
-import { AnalyticsService } from '../services/AnalyticsService.js';
+import { getUtcTimestamp } from '../utils/time';
+import { ModelCatalogService } from '../services/ModelCatalogService';
+import { AnalyticsService } from '../services/AnalyticsService';
 
-import type { AppEnv } from '../types/hono.js';
+import type { AppEnv } from '../types/hono';
 
 const router = new Hono<AppEnv>();
 

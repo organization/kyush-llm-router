@@ -1,11 +1,8 @@
-import { getDb } from '../config/database.js';
+import { getDb } from '../config/database';
 
-import { getUtcTimestamp } from '../utils/time.js';
+import { getUtcTimestamp } from '../utils/time';
 
-import type {
-  Permission,
-  CreatePermissionData,
-} from '../../../shared/types.js';
+import type { Permission, CreatePermissionData } from '../../../shared/types';
 
 export class PermissionModel {
   static findAll(): Permission[] {

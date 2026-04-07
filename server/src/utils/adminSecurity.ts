@@ -12,7 +12,7 @@ import {
   getAdminSessionTtlHours,
   getCookieSecure,
   hashOpaqueToken,
-} from '../config/admin-auth.js';
+} from '../config/admin-auth';
 
 import type { Context } from 'hono';
 

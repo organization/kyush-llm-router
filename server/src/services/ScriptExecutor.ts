@@ -1,9 +1,9 @@
 import ivmImport from 'isolated-vm';
 
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 
 import type { Context, Isolate, Reference } from 'isolated-vm';
-import type { ScriptContextData } from '../../../shared/types.js';
+import type { ScriptContextData } from '../../../shared/types';
 
 const SCRIPT_TIMEOUT_MS = 5000;
 const MEMORY_LIMIT_MB = 50;

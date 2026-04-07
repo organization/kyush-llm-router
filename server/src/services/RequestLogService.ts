@@ -1,16 +1,16 @@
 import {
   listRequestLogMonths,
   getRequestLogsDb,
-} from '../config/request-logs-db.js';
+} from '../config/request-logs-db';
 
 import {
   getLocalDateKey,
   getLocalMonthKey,
   getMonthKeyFromDateString,
   getUtcTimestamp,
-} from '../utils/time.js';
+} from '../utils/time';
 
-import type { RequestLog, RequestLogPage } from '../../../shared/types.js';
+import type { RequestLog, RequestLogPage } from '../../../shared/types';
 
 export interface RequestLogInsert {
   user_id: number;

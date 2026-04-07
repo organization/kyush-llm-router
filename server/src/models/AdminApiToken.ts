@@ -1,10 +1,10 @@
-import { getDb } from '../config/database.js';
-import { getUtcTimestamp } from '../utils/time.js';
+import { getDb } from '../config/database';
+import { getUtcTimestamp } from '../utils/time';
 
 import type {
   AdminApiTokenSummary,
   AdminPrincipal,
-} from '../../../shared/types.js';
+} from '../../../shared/types';
 
 export interface AdminApiTokenRecord extends AdminApiTokenSummary {
   token_hash: string;

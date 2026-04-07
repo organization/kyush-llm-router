@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { env } from './env.js';
+import { env } from './env';
 
 export function getDbRootDir(): string {
   return env.DB_DIR;

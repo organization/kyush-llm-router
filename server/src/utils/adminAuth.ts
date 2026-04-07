@@ -1,14 +1,14 @@
-import { getSessionTokenFromContext, hashAdminToken } from './adminSecurity.js';
+import { getSessionTokenFromContext, hashAdminToken } from './adminSecurity';
 
-import { getTrustedProxyIps } from '../config/admin-auth.js';
+import { getTrustedProxyIps } from '../config/admin-auth';
 
-import { AdminApiTokenModel } from '../models/AdminApiToken.js';
-import { AdminSessionModel } from '../models/AdminSession.js';
+import { AdminApiTokenModel } from '../models/AdminApiToken';
+import { AdminSessionModel } from '../models/AdminSession';
 
 import type { Context, MiddlewareHandler } from 'hono';
 
-import type { AdminPrincipal } from '../../../shared/types.js';
-import type { AdminAuthContext, AppEnv } from '../types/hono.js';
+import type { AdminPrincipal } from '../../../shared/types';
+import type { AdminAuthContext, AppEnv } from '../types/hono';
 
 interface PrincipalRow {
   provider: 'env' | 'oidc';

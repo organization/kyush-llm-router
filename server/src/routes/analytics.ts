@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 
-import { AnalyticsService } from '../services/AnalyticsService.js';
+import { AnalyticsService } from '../services/AnalyticsService';
 
-import type { AppEnv } from '../types/hono.js';
+import type { AppEnv } from '../types/hono';
 
 const router = new Hono<AppEnv>();
 

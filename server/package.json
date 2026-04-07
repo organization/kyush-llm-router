@@ -2,11 +2,11 @@
   "name": "server",
   "version": "1.0.0",
   "description": "LLM Router Server",
-  "main": "dist/server/src/index.js",
+  "main": "src/main.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc && node scripts/copy-schemas.mjs",
-    "start": "node dist/server/src/main.js",
+    "build": "tsc --noEmit && node scripts/copy-schemas.mjs",
+    "start": "tsx src/main.ts",
     "dev": "tsx watch src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -24,11 +24,12 @@
     "@hono/zod-validator": "^0.4.2",
     "@kyush/shared": "workspace:*",
     "better-sqlite3": "^12.6.2",
-    "es-toolkit": "^1.32.0",
     "dotenv": "^17.3.1",
+    "es-toolkit": "^1.32.0",
     "hono": "^4.6.14",
     "isolated-vm": "^6.0.2",
     "node-fetch": "^3.3.2",
+    "tsx": "^4.21.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -38,7 +39,6 @@
     "chalk": "^5.6.0",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.0",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }

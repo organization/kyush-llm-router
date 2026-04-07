@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import { ensureDir, getAnalyticsDbPath } from './db-paths.js';
+import { ensureDir, getAnalyticsDbPath } from './db-paths';
 
 const moduleDir = import.meta.dirname;
 

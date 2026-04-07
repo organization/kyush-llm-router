@@ -3,13 +3,9 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import {
-  ensureDir,
-  getRequestLogsDbPath,
-  getRequestLogsDir,
-} from './db-paths.js';
+import { ensureDir, getRequestLogsDbPath, getRequestLogsDir } from './db-paths';
 
-import { getLocalMonthKey } from '../utils/time.js';
+import { getLocalMonthKey } from '../utils/time';
 
 const moduleDir = import.meta.dirname;
 
