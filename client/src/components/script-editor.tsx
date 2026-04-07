@@ -51,7 +51,9 @@ export async function onResponse(ctx) {
 }
 `;
 
-function readThemePreference(): 'vs' | 'vs-dark' {
+type EditorTheme = 'vs' | 'vs-dark';
+
+function readThemePreference(): EditorTheme {
   const root = document.documentElement;
   const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
   const explicit = root.dataset.theme;
@@ -62,30 +64,48 @@ function readThemePreference(): 'vs' | 'vs-dark' {
   return isDark ? 'vs-dark' : 'vs';
 }
 
-function ScriptEditor(props: ScriptEditorProps) {
-  const [editorTheme, setEditorTheme] = createSignal<'vs' | 'vs-dark'>(
-    'vs-dark',
-  );
+/**
+ * Tracks the user's preferred Monaco theme. Watches three sources of truth:
+ *   1. `localStorage[kyush-theme]` (explicit user choice)
+ *   2. `<html data-theme="…">` (set by the app shell)
+ *   3. `prefers-color-scheme` media query (system fallback)
+ *
+ * Both the MutationObserver and the media-query listener are wired up in
+ * `onMount` (so they're guaranteed to run only on the client) and torn down
+ * via the matching `onCleanup` registered in the same effect — that
+ * registration is owned by the surrounding component scope, so it always
+ * fires on unmount.
+ */
+function createEditorThemeSignal() {
+  const [theme, setTheme] = createSignal<EditorTheme>('vs-dark');
 
   onMount(() => {
     const root = document.documentElement;
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-    const syncTheme = () => setEditorTheme(readThemePreference());
+    const sync = () => setTheme(readThemePreference());
 
-    const observer = new MutationObserver(syncTheme);
+    const observer = new MutationObserver(sync);
     observer.observe(root, {
       attributes: true,
       attributeFilter: ['data-theme'],
     });
-    mediaQuery.addEventListener('change', syncTheme);
-    syncTheme();
+    mediaQuery.addEventListener('change', sync);
+    sync();
 
     onCleanup(() => {
+      // Both subscriptions are paired with their teardown in the same closure
+      // so it's impossible to add one without removing the other.
       observer.disconnect();
-      mediaQuery.removeEventListener('change', syncTheme);
+      mediaQuery.removeEventListener('change', sync);
     });
   });
+
+  return theme;
+}
+
+function ScriptEditor(props: ScriptEditorProps) {
+  const editorTheme = createEditorThemeSignal();
 
   return (
     <div class="script-editor">
