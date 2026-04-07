@@ -52,7 +52,7 @@ export function getAdminApiTokenTtlDays(): number {
 }
 
 export function getCookieSecure(): boolean {
-  return process.env.NODE_ENV === 'production';
+  return process.env.NODE_ENV === 'production' && process.env.ADMIN_COOKIE_SECURE !== 'false';
 }
 
 export function getAllowedOidcEmails(): string[] {

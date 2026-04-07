@@ -66,6 +66,7 @@ pnpm run bench      # 벤치마크 실행
 | `ADMIN_AUTH_MODE` | `both` | 관리자 로그인 모드 (`env`, `oidc`, `both`) |
 | `ADMIN_USERNAME` | `admin` 예시 | ENV 관리자 로그인 아이디 |
 | `ADMIN_PASSWORD_HASH` | (권장 필수) | 관리자 비밀번호 hash (`sha256$...` 또는 `scrypt$...`) |
+| `ADMIN_COOKIE_SECURE` | `true` | `false`로 설정해야 http에서 로그인 가능 |
 | `ADMIN_SESSION_SECRET` | (필수) | 관리자 세션/토큰 hash salt 및 비밀값 |
 | `ADMIN_SESSION_TTL_HOURS` | `12` | 관리자 세션 만료 시간 |
 | `ADMIN_API_TOKEN_TTL_DAYS` | `30` | 관리자 API 토큰 만료 일수 |

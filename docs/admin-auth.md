@@ -65,6 +65,7 @@ OpenAI 호환 라우터 표면은 그대로 유지된다.
 |----------|-------------|
 | `ADMIN_USERNAME` | 관리자 로그인 아이디 |
 | `ADMIN_PASSWORD_HASH` | 비밀번호 hash |
+| `ADMIN_COOKIE_SECURE` | `false`로 설정해야 http에서 로그인 가능 (기본값: `true`) |
 | `ADMIN_SESSION_SECRET` | 세션/토큰용 비밀값 |
 
 지원하는 hash 형식:
