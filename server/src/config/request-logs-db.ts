@@ -3,11 +3,14 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import { ensureDir, getRequestLogsDbPath, getRequestLogsDir } from './db-paths';
+import {
+  ensureDir,
+  getRequestLogsDbPath,
+  getRequestLogsDir,
+  getSchemaPath,
+} from './db-paths';
 
 import { getLocalMonthKey } from '../utils/time';
-
-const moduleDir = import.meta.dirname;
 
 const connections = new Map<string, Database.Database>();
 
@@ -32,15 +35,10 @@ function hasColumn(
 }
 
 function initRequestLogsSchema(db: Database.Database): void {
-  const schemaPath = path.join(
-    moduleDir,
-    '..',
-    '..',
-    '..',
-    'database',
-    'request-logs-schema.sql',
+  const schema = fs.readFileSync(
+    getSchemaPath('request-logs-schema.sql'),
+    'utf-8',
   );
-  const schema = fs.readFileSync(schemaPath, 'utf-8');
   db.exec(schema);
   if (!hasColumn(db, 'request_logs', 'routed_model')) {
     db.exec('ALTER TABLE request_logs ADD COLUMN routed_model TEXT');

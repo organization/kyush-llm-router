@@ -3,22 +3,15 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import { ensureDir, getAnalyticsDbPath } from './db-paths';
-
-const moduleDir = import.meta.dirname;
+import { ensureDir, getAnalyticsDbPath, getSchemaPath } from './db-paths';
 
 let db: Database.Database | undefined;
 
 function loadSchema(database: Database.Database): void {
-  const schemaPath = path.join(
-    moduleDir,
-    '..',
-    '..',
-    '..',
-    'database',
-    'analytics-schema.sql',
+  const schema = fs.readFileSync(
+    getSchemaPath('analytics-schema.sql'),
+    'utf-8',
   );
-  const schema = fs.readFileSync(schemaPath, 'utf-8');
   database.exec(schema);
 }
 

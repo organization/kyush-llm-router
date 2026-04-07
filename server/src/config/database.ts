@@ -1,12 +1,9 @@
-import path from 'node:path';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import { ensureDir, getCoreDbPath } from './db-paths';
-
-// Node 20.11+ exposes import.meta.dirname directly — no fileURLToPath needed.
-const moduleDir = import.meta.dirname;
+import { ensureDir, getCoreDbPath, getSchemaPath } from './db-paths';
 
 // Lazy singleton — `getDb()` instantiates on first access, `closeDb()` resets
 // it back to `undefined` so the next `getDb()` reopens a fresh handle.
@@ -41,15 +38,7 @@ function runCoreMigrations(database: Database.Database): void {
 }
 
 function loadSchema(database: Database.Database): void {
-  const schemaPath = path.join(
-    moduleDir,
-    '..',
-    '..',
-    '..',
-    'database',
-    'schema.sql',
-  );
-  const schema = fs.readFileSync(schemaPath, 'utf-8');
+  const schema = fs.readFileSync(getSchemaPath('schema.sql'), 'utf-8');
   database.exec(schema);
 }
 
