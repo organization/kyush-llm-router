@@ -1,48 +1,25 @@
-import { Request, Response, NextFunction } from 'express';
-import { UserModel } from '../models/User';
-import { PermissionModel } from '../models/Permission';
-import { User } from '../../../shared/types';
+import { UserModel } from '../models/User.js';
+import { PermissionModel } from '../models/Permission.js';
 
-export interface AuthenticatedRequest extends Request {
-  user?: User;
-  allowedBackendIds?: number[];
-}
+import type { MiddlewareHandler } from 'hono';
+import type { AppEnv } from '../types/hono.js';
 
-export function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
-  const authHeader = req.headers.authorization;
+export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const authHeader = c.req.header('authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing or invalid authorization header' });
-    return;
+    return c.json({ error: 'Missing or invalid authorization header' }, 401);
   }
 
   const apiKey = authHeader.substring(7);
   const user = UserModel.findByApiKey(apiKey);
 
   if (!user) {
-    res.status(401).json({ error: 'Invalid API key' });
-    return;
+    return c.json({ error: 'Invalid API key' }, 401);
   }
 
-  req.user = user;
-  req.allowedBackendIds = PermissionModel.getUserBackendIds(user.id);
-  next();
-}
-
-export function requireBackendPermission(backendId?: number) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
-
-    const targetBackendId = backendId || Number(req.params.backendId);
-
-    if (!req.allowedBackendIds?.includes(targetBackendId)) {
-      res.status(403).json({ error: 'Access denied to this backend' });
-      return;
-    }
-
-    next();
-  };
-}
+  c.set('user', user);
+  c.set('allowedBackendIds', PermissionModel.getUserBackendIds(user.id));
+  await next();
+  return;
+};

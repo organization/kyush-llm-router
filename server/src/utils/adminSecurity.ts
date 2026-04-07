@@ -1,6 +1,20 @@
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
-import { Response } from 'express';
-import { getCookieSecure, getAdminPasswordHash, getAdminSessionTtlHours, hashOpaqueToken } from '../config/admin-auth';
+import {
+  createHash,
+  randomBytes,
+  scryptSync,
+  timingSafeEqual,
+} from 'node:crypto';
+
+import { setCookie, deleteCookie } from 'hono/cookie';
+
+import {
+  getCookieSecure,
+  getAdminPasswordHash,
+  getAdminSessionTtlHours,
+  hashOpaqueToken,
+} from '../config/admin-auth.js';
+
+import type { Context } from 'hono';
 
 const SESSION_COOKIE_NAME = 'kyush_admin_session';
 
@@ -24,39 +38,30 @@ export function tokenPrefix(token: string): string {
   return token.slice(0, 12);
 }
 
-export function issueAdminSessionCookie(res: Response, sessionToken: string, maxAgeMs: number): void {
-  const parts = [
-    `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    `Max-Age=${Math.max(1, Math.floor(maxAgeMs / 1000))}`,
-  ];
-
-  if (getCookieSecure()) {
-    parts.push('Secure');
-  }
-
-  res.append('Set-Cookie', parts.join('; '));
+export function issueAdminSessionCookie(
+  c: Context,
+  sessionToken: string,
+  maxAgeMs: number,
+): void {
+  setCookie(c, SESSION_COOKIE_NAME, sessionToken, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: getCookieSecure(),
+    maxAge: Math.max(1, Math.floor(maxAgeMs / 1000)),
+  });
 }
 
-export function clearAdminSessionCookie(res: Response): void {
-  const parts = [
-    `${SESSION_COOKIE_NAME}=`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    'Max-Age=0',
-  ];
-
-  if (getCookieSecure()) {
-    parts.push('Secure');
-  }
-
-  res.append('Set-Cookie', parts.join('; '));
+export function clearAdminSessionCookie(c: Context): void {
+  deleteCookie(c, SESSION_COOKIE_NAME, {
+    path: '/',
+    secure: getCookieSecure(),
+  });
 }
 
-export function parseCookies(cookieHeader?: string): Record<string, string> {
+export function parseCookies(
+  cookieHeader?: string | null,
+): Record<string, string> {
   if (!cookieHeader) {
     return {};
   }
@@ -73,7 +78,9 @@ export function parseCookies(cookieHeader?: string): Record<string, string> {
   }, {});
 }
 
-export function getSessionTokenFromCookies(cookieHeader?: string): string | null {
+export function getSessionTokenFromCookies(
+  cookieHeader?: string | null,
+): string | null {
   const cookies = parseCookies(cookieHeader);
   return cookies[SESSION_COOKIE_NAME] || null;
 }
@@ -95,14 +102,20 @@ export function verifyAdminPassword(password: string): boolean {
     if (!saltHex || !expectedHex) {
       return false;
     }
-    const derived = scryptSync(password, Buffer.from(saltHex, 'hex'), expectedHex.length / 2);
+    const derived = scryptSync(
+      password,
+      Buffer.from(saltHex, 'hex'),
+      expectedHex.length / 2,
+    );
     return timingSafeEqual(derived, Buffer.from(expectedHex, 'hex'));
   }
 
   return false;
 }
 
-export function computeExpiry(hours: number = getAdminSessionTtlHours()): string {
+export function computeExpiry(
+  hours: number = getAdminSessionTtlHours(),
+): string {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 

@@ -8,7 +8,9 @@
     "start": "pnpm --parallel start",
     "test": "pnpm -r --filter server test",
     "bench": "pnpm -r --filter server run bench",
-    "storybook": "pnpm -r --filter client storybook"
+    "storybook": "pnpm -r --filter client storybook",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "keywords": [
     "llm",
@@ -24,5 +26,20 @@
   ],
   "engines": {
     "node": ">=24.13.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@stylistic/eslint-plugin": "^2.12.1",
+    "@types/node": "^25.3.3",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "eslint-plugin-solid": "^0.14.5",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.18.2"
   }
 }

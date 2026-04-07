@@ -1,6 +1,7 @@
-import { BackendModelSnapshot } from '../../../shared/types';
-import { getDb } from '../config/database';
-import { getUtcTimestamp } from '../utils/time';
+import { getDb } from '../config/database.js';
+import { getUtcTimestamp } from '../utils/time.js';
+
+import type { BackendModelSnapshot } from '../../../shared/types.js';
 
 function asSnapshot(row: any): BackendModelSnapshot {
   return row as BackendModelSnapshot;
@@ -9,16 +10,24 @@ function asSnapshot(row: any): BackendModelSnapshot {
 export class BackendModelSnapshotModel {
   static findByBackendId(backendId: number): BackendModelSnapshot[] {
     return getDb()
-      .prepare('SELECT * FROM backend_models WHERE backend_id = ? ORDER BY model_id')
+      .prepare(
+        'SELECT * FROM backend_models WHERE backend_id = ? ORDER BY model_id',
+      )
       .all(backendId)
       .map(asSnapshot);
   }
 
-  static replaceForBackend(backendId: number, models: Array<{ model_id: string; raw_json?: string }>, fetchedAt: string): void {
+  static replaceForBackend(
+    backendId: number,
+    models: Array<{ model_id: string; raw_json?: string }>,
+    fetchedAt: string,
+  ): void {
     const db = getDb();
     const timestamp = getUtcTimestamp();
     const transaction = db.transaction(() => {
-      db.prepare('DELETE FROM backend_models WHERE backend_id = ?').run(backendId);
+      db.prepare('DELETE FROM backend_models WHERE backend_id = ?').run(
+        backendId,
+      );
 
       const stmt = db.prepare(`
         INSERT INTO backend_models (backend_id, model_id, raw_json, fetched_at, created_at, updated_at)
@@ -32,7 +41,7 @@ export class BackendModelSnapshotModel {
           model.raw_json || null,
           fetchedAt,
           timestamp,
-          timestamp
+          timestamp,
         );
       }
     });

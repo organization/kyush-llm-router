@@ -1,6 +1,8 @@
 import { For, Show, createEffect, createMemo, createSignal } from 'solid-js';
-import { Button } from '../primitives/Button';
+
 import { StatusBadge, type StatusTone } from './StatusBadge';
+
+import { Button } from '../primitives/Button';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'success';
 
@@ -40,7 +42,9 @@ const allLevels: LogLevel[] = ['debug', 'info', 'warn', 'error', 'success'];
 
 export function LogConsole(props: LogConsoleProps) {
   let surfaceRef: HTMLDivElement | undefined;
-  const [internalLevels, setInternalLevels] = createSignal<LogLevel[]>(props.levelFilter ?? allLevels);
+  const [internalLevels, setInternalLevels] = createSignal<LogLevel[]>(
+    props.levelFilter ?? allLevels,
+  );
 
   const activeLevels = createMemo(() => props.levelFilter ?? internalLevels());
 
@@ -50,7 +54,11 @@ export function LogConsole(props: LogConsoleProps) {
     }
   });
 
-  const visibleEntries = createMemo(() => props.entries.filter((entry) => !entry.level || activeLevels().includes(entry.level)));
+  const visibleEntries = createMemo(() =>
+    props.entries.filter(
+      (entry) => !entry.level || activeLevels().includes(entry.level),
+    ),
+  );
 
   const copyText = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -75,7 +83,10 @@ export function LogConsole(props: LogConsoleProps) {
         <div class="ui-cluster">
           <For each={allLevels}>
             {(level) => (
-              <button class="ui-pagination__button" onClick={() => toggleLevel(level)}>
+              <button
+                class="ui-pagination__button"
+                onClick={() => toggleLevel(level)}
+              >
                 <StatusBadge tone={levelTones[level]}>{level}</StatusBadge>
               </button>
             )}
@@ -88,7 +99,11 @@ export function LogConsole(props: LogConsoleProps) {
           <Button
             onClick={async () => {
               props.onCopyAll?.();
-              await copyText(visibleEntries().map((entry) => entry.message).join('\n'));
+              await copyText(
+                visibleEntries()
+                  .map((entry) => entry.message)
+                  .join('\n'),
+              );
             }}
           >
             Copy all
@@ -103,22 +118,40 @@ export function LogConsole(props: LogConsoleProps) {
         <Show when={!props.loading && props.error}>
           <div>{props.error}</div>
         </Show>
-        <Show when={!props.loading && !props.error && visibleEntries().length === 0}>
+        <Show
+          when={!props.loading && !props.error && visibleEntries().length === 0}
+        >
           <div>{props.emptyMessage ?? 'No log entries.'}</div>
         </Show>
         <For each={visibleEntries()}>
           {(entry, index) => (
             <div class="ui-log-console__line" tabindex={0}>
-              <span class="ui-log-console__line-number">{String(index() + 1).padStart(3, '0')}</span>
+              <span class="ui-log-console__line-number">
+                {String(index() + 1).padStart(3, '0')}
+              </span>
               <Show when={props.showTimestamp !== false}>
-                <span class="ui-log-console__timestamp">{entry.timestamp ?? '--:--:--'}</span>
+                <span class="ui-log-console__timestamp">
+                  {entry.timestamp ?? '--:--:--'}
+                </span>
               </Show>
               <Show when={props.showLevel !== false}>
-                <StatusBadge tone={entry.level ? levelTones[entry.level] : 'neutral'}>{entry.level ?? 'info'}</StatusBadge>
+                <StatusBadge
+                  tone={entry.level ? levelTones[entry.level] : 'neutral'}
+                >
+                  {entry.level ?? 'info'}
+                </StatusBadge>
               </Show>
-              <div class={props.wrapLines === false ? 'ui-log-console__message ui-log-console__message--nowrap' : 'ui-log-console__message'}>
+              <div
+                class={
+                  props.wrapLines === false
+                    ? 'ui-log-console__message ui-log-console__message--nowrap'
+                    : 'ui-log-console__message'
+                }
+              >
                 <Show when={entry.context}>
-                  <span style={{ color: 'var(--color-text-soft)' }}>{entry.context} </span>
+                  <span style={{ color: 'var(--color-text-soft)' }}>
+                    {entry.context}{' '}
+                  </span>
                 </Show>
                 {entry.message}
               </div>

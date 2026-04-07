@@ -1,4 +1,5 @@
 import { For, createSignal, type Component } from 'solid-js';
+
 import { Button, Checkbox, FormDialog, TextField } from '../ui';
 
 type FieldType = 'text' | 'email' | 'checkbox';
@@ -42,7 +43,9 @@ export const EditModal: Component<EditModalProps> = (props) => {
       await props.onSubmit(data);
       props.onClose();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Update failed.');
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Update failed.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -50,38 +53,54 @@ export const EditModal: Component<EditModalProps> = (props) => {
 
   return (
     <FormDialog
-      open={props.isOpen}
-      onOpenChange={(open) => {
-        if (!open) props.onClose();
-      }}
-      title={props.title}
+      class="ui-dialog__content--compact"
       footer={
         <>
-          <Button onClick={props.onClose} disabled={submitting()}>
+          <Button disabled={submitting()} onClick={props.onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" form="legacy-edit-form" disabled={submitting()}>
+          <Button
+            disabled={submitting()}
+            form="legacy-edit-form"
+            type="submit"
+            variant="primary"
+          >
             Update
           </Button>
         </>
       }
-      class="ui-dialog__content--compact"
+      onOpenChange={(open) => {
+        if (!open) props.onClose();
+      }}
+      open={props.isOpen}
+      title={props.title}
     >
-      <form id="legacy-edit-form" class="ui-form" onSubmit={(event) => void handleSubmit(event)}>
+      <form
+        class="ui-form"
+        id="legacy-edit-form"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
         <For each={props.fields}>
           {(field) =>
             field.type === 'checkbox' ? (
               <Checkbox
-                label={field.label}
                 checked={Boolean(formData()[field.name])}
-                onChange={(checked) => setFormData({ ...formData(), [field.name]: checked })}
+                label={field.label}
+                onChange={(checked) =>
+                  setFormData({ ...formData(), [field.name]: checked })
+                }
               />
             ) : (
               <TextField
                 label={field.label}
-                value={String(formData()[field.name] ?? '')}
+                onInput={(event) =>
+                  setFormData({
+                    ...formData(),
+                    [field.name]: event.currentTarget.value,
+                  })
+                }
                 placeholder={field.placeholder}
-                onInput={(event) => setFormData({ ...formData(), [field.name]: event.currentTarget.value })}
+                value={String(formData()[field.name] ?? '')}
               />
             )
           }

@@ -1,16 +1,17 @@
-import {
+import { BackendModel } from '../models/Backend.js';
+import { BackendModelSnapshotModel } from '../models/BackendModelSnapshot.js';
+import { ModelRewriteModel } from '../models/ModelRewrite.js';
+import { getUtcTimestamp } from '../utils/time.js';
+import { logger } from '../utils/logger.js';
+
+import type {
   Backend,
   BackendModelCacheStatus,
   BackendModelCatalogEntry,
   BackendModelsResponse,
   ModelCacheOverview,
   ModelRewriteRule,
-} from '../../../shared/types';
-import { BackendModel } from '../models/Backend';
-import { BackendModelSnapshotModel } from '../models/BackendModelSnapshot';
-import { ModelRewriteModel } from '../models/ModelRewrite';
-import { getUtcTimestamp } from '../utils/time';
-import { logger } from '../utils/logger';
+} from '../../../shared/types.js';
 
 interface BackendCacheEntry {
   backendId: number;
@@ -46,17 +47,25 @@ interface RewriteConfig {
 const DEFAULT_REFRESH_MIN_MS = 5 * 60 * 1000;
 
 export class ModelCatalogService {
-  private static backendModelsByBackendId = new Map<number, BackendCacheEntry>();
+  private static backendModelsByBackendId = new Map<
+    number,
+    BackendCacheEntry
+  >();
   private static backendIdsByModel = new Map<string, Set<number>>();
   private static modelRewriteMap = new Map<string, RewriteConfig>();
-  private static inFlightRefreshes = new Map<number, Promise<BackendModelCacheStatus>>();
+  private static inFlightRefreshes = new Map<
+    number,
+    Promise<BackendModelCacheStatus>
+  >();
   private static initialized = false;
 
   private static getRefreshMinMs(): number {
     const raw = process.env.MODEL_CATALOG_REFRESH_MIN_MS;
     if (!raw) return DEFAULT_REFRESH_MIN_MS;
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_REFRESH_MIN_MS;
+    return Number.isFinite(parsed) && parsed >= 0
+      ? parsed
+      : DEFAULT_REFRESH_MIN_MS;
   }
 
   private static normalizeModelId(modelId: string): string {
@@ -76,7 +85,10 @@ export class ModelCatalogService {
     return created;
   }
 
-  private static statusFromEntry(entry: BackendCacheEntry, backend?: Backend): BackendModelCacheStatus {
+  private static statusFromEntry(
+    entry: BackendCacheEntry,
+    backend?: Backend,
+  ): BackendModelCacheStatus {
     const active = backend ? backend.is_active : true;
     let state: BackendModelCacheStatus['state'];
     if (!active) {
@@ -102,7 +114,9 @@ export class ModelCatalogService {
 
   private static rebuildModelIndex(): void {
     this.backendIdsByModel.clear();
-    const backends = new Map(BackendModel.findAll().map((backend) => [backend.id, backend]));
+    const backends = new Map(
+      BackendModel.findAll().map((backend) => [backend.id, backend]),
+    );
 
     for (const entry of this.backendModelsByBackendId.values()) {
       const backend = backends.get(entry.backendId);
@@ -119,7 +133,9 @@ export class ModelCatalogService {
     }
   }
 
-  private static async fetchBackendModels(backend: Backend): Promise<FetchModelsResponse> {
+  private static async fetchBackendModels(
+    backend: Backend,
+  ): Promise<FetchModelsResponse> {
     let backendPath = '/v1/models';
     if (backend.base_url.includes('/v1')) {
       backendPath = '/models';
@@ -132,13 +148,18 @@ export class ModelCatalogService {
 
     const response = await fetch(url, { method: 'GET', headers });
     if (!response.ok) {
-      throw new Error(`Backend model fetch failed with HTTP ${response.status}`);
+      throw new Error(
+        `Backend model fetch failed with HTTP ${response.status}`,
+      );
     }
 
-    const payload = await response.json().catch(() => ({} as any));
-    const data = payload && typeof payload === 'object' && Array.isArray((payload as any).data)
-      ? (payload as any).data
-      : [];
+    const payload = await response.json().catch(() => ({}) as any);
+    const data =
+      payload &&
+      typeof payload === 'object' &&
+      Array.isArray((payload as any).data)
+        ? (payload as any).data
+        : [];
 
     const seen = new Set<string>();
     const rawModels: Array<{ model_id: string; raw_json?: string }> = [];
@@ -173,7 +194,11 @@ export class ModelCatalogService {
 
     this.initialized = true;
     const activeBackends = BackendModel.findActive();
-    await Promise.allSettled(activeBackends.map((backend) => this.refreshBackendModels(backend.id, { reason: 'startup' })));
+    await Promise.allSettled(
+      activeBackends.map((backend) =>
+        this.refreshBackendModels(backend.id, { reason: 'startup' }),
+      ),
+    );
   }
 
   static reset(): void {
@@ -216,7 +241,10 @@ export class ModelCatalogService {
     this.rebuildModelIndex();
   }
 
-  static resolveRequestedModel(modelId: string, allowedBackendIds: number[]): RewriteResolution {
+  static resolveRequestedModel(
+    modelId: string,
+    allowedBackendIds: number[],
+  ): RewriteResolution {
     const requestedModel = this.normalizeModelId(modelId);
     const rewrite = this.modelRewriteMap.get(requestedModel);
     if (!rewrite) {
@@ -237,7 +265,10 @@ export class ModelCatalogService {
       };
     }
 
-    const originalCandidates = this.getCandidateBackendIds(requestedModel, allowedBackendIds);
+    const originalCandidates = this.getCandidateBackendIds(
+      requestedModel,
+      allowedBackendIds,
+    );
     if (originalCandidates.length > 0) {
       return {
         requestedModel,
@@ -280,20 +311,27 @@ export class ModelCatalogService {
     });
   }
 
-  static async ensureInitializedForBackends(backendIds: number[]): Promise<void> {
+  static async ensureInitializedForBackends(
+    backendIds: number[],
+  ): Promise<void> {
     const refreshes: Promise<BackendModelCacheStatus>[] = [];
     for (const backendId of backendIds) {
       const backend = BackendModel.findById(backendId);
       if (!backend?.is_active) continue;
       const entry = this.getCacheEntry(backendId);
       if (!entry.initialized) {
-        refreshes.push(this.refreshBackendModels(backendId, { reason: 'lazy-init' }));
+        refreshes.push(
+          this.refreshBackendModels(backendId, { reason: 'lazy-init' }),
+        );
       }
     }
     await Promise.allSettled(refreshes);
   }
 
-  static async refreshBackendModels(backendId: number, options: RefreshOptions = {}): Promise<BackendModelCacheStatus> {
+  static async refreshBackendModels(
+    backendId: number,
+    options: RefreshOptions = {},
+  ): Promise<BackendModelCacheStatus> {
     const backend = BackendModel.findById(backendId);
     const entry = this.getCacheEntry(backendId);
 
@@ -312,8 +350,14 @@ export class ModelCatalogService {
     }
 
     const now = Date.now();
-    const lastAttempt = entry.lastAttemptedAt ? Date.parse(entry.lastAttemptedAt) : 0;
-    if (!options.force && lastAttempt && now - lastAttempt < this.getRefreshMinMs()) {
+    const lastAttempt = entry.lastAttemptedAt
+      ? Date.parse(entry.lastAttemptedAt)
+      : 0;
+    if (
+      !options.force &&
+      lastAttempt &&
+      now - lastAttempt < this.getRefreshMinMs()
+    ) {
       return this.statusFromEntry(entry, backend);
     }
 
@@ -331,15 +375,26 @@ export class ModelCatalogService {
         entry.initialized = true;
         entry.lastSyncedAt = fetchedAt;
         entry.lastError = undefined;
-        BackendModelSnapshotModel.replaceForBackend(backendId, rawModels, fetchedAt);
+        BackendModelSnapshotModel.replaceForBackend(
+          backendId,
+          rawModels,
+          fetchedAt,
+        );
         this.rebuildModelIndex();
-        logger.info(`Model catalog refreshed for backend ${backendId}${options.reason ? ` (${options.reason})` : ''}`);
+        logger.info(
+          `Model catalog refreshed for backend ${backendId}${options.reason ? ` (${options.reason})` : ''}`,
+        );
       } catch (error) {
         entry.initialized = true;
         entry.modelIds = [];
-        entry.lastError = error instanceof Error ? error.message : 'Unknown model refresh error';
+        entry.lastError =
+          error instanceof Error
+            ? error.message
+            : 'Unknown model refresh error';
         this.rebuildModelIndex();
-        logger.warn(`Model catalog refresh failed for backend ${backendId}: ${entry.lastError}`);
+        logger.warn(
+          `Model catalog refresh failed for backend ${backendId}: ${entry.lastError}`,
+        );
       } finally {
         this.inFlightRefreshes.delete(backendId);
       }
@@ -374,39 +429,60 @@ export class ModelCatalogService {
       return;
     }
 
-    await this.refreshBackendModels(backendId, { force: true, reason: 'admin-update' });
+    await this.refreshBackendModels(backendId, {
+      force: true,
+      reason: 'admin-update',
+    });
   }
 
-  static getCandidateBackendIds(modelId: string, allowedBackendIds: number[]): number[] {
+  static getCandidateBackendIds(
+    modelId: string,
+    allowedBackendIds: number[],
+  ): number[] {
     const normalized = this.normalizeModelId(modelId);
     const backendIds = this.backendIdsByModel.get(normalized);
     if (!backendIds) return [];
 
     const allowed = new Set(allowedBackendIds);
-    const active = new Set(BackendModel.findActive().map((backend) => backend.id));
-    return Array.from(backendIds).filter((backendId) => allowed.has(backendId) && active.has(backendId));
+    const active = new Set(
+      BackendModel.findActive().map((backend) => backend.id),
+    );
+    return Array.from(backendIds).filter(
+      (backendId) => allowed.has(backendId) && active.has(backendId),
+    );
   }
 
-  static getModelsForAllowedBackends(allowedBackendIds: number[]): BackendModelCatalogEntry[] {
+  static getModelsForAllowedBackends(
+    allowedBackendIds: number[],
+  ): BackendModelCatalogEntry[] {
     const allowed = new Set(allowedBackendIds);
     const entries: BackendModelCatalogEntry[] = [];
     for (const [modelId, backendIds] of this.backendIdsByModel.entries()) {
-      const matched = Array.from(backendIds).filter((backendId) => allowed.has(backendId));
+      const matched = Array.from(backendIds).filter((backendId) =>
+        allowed.has(backendId),
+      );
       if (matched.length > 0) {
-        entries.push({ model_id: modelId, backend_ids: matched.sort((a, b) => a - b) });
+        entries.push({
+          model_id: modelId,
+          backend_ids: matched.sort((a, b) => a - b),
+        });
       }
     }
     return entries.sort((a, b) => a.model_id.localeCompare(b.model_id));
   }
 
-  static getBackendModelsResponse(backendId: number): BackendModelsResponse | null {
+  static getBackendModelsResponse(
+    backendId: number,
+  ): BackendModelsResponse | null {
     const backend = BackendModel.findById(backendId);
     if (!backend) return null;
 
     return {
       backend: {
         ...backend,
-        ...(this.getBackendsWithSummary().find((item) => item.id === backendId) || {}),
+        ...(this.getBackendsWithSummary().find(
+          (item) => item.id === backendId,
+        ) || {}),
       },
       cache: this.getBackendCacheStatus(backendId),
       snapshots: BackendModelSnapshotModel.findByBackendId(backendId),
@@ -416,7 +492,9 @@ export class ModelCatalogService {
 
   static getCacheOverview(): ModelCacheOverview {
     const backends = BackendModel.findAll()
-      .map((backend) => this.statusFromEntry(this.getCacheEntry(backend.id), backend))
+      .map((backend) =>
+        this.statusFromEntry(this.getCacheEntry(backend.id), backend),
+      )
       .sort((a, b) => a.backend_id - b.backend_id);
 
     const models = Array.from(this.backendIdsByModel.entries())

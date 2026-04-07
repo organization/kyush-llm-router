@@ -1,7 +1,13 @@
-import { getDb } from '../config/database';
-import { User, CreateUserData, UpdateUserData } from '../../../shared/types';
-import { generateApiKey } from '../utils/apiKey';
-import { getUtcTimestamp } from '../utils/time';
+import { getDb } from '../config/database.js';
+
+import { generateApiKey } from '../utils/apiKey.js';
+import { getUtcTimestamp } from '../utils/time.js';
+
+import type {
+  User,
+  CreateUserData,
+  UpdateUserData,
+} from '../../../shared/types.js';
 
 export class UserModel {
   static asUser(row: any): User {
@@ -16,15 +22,24 @@ export class UserModel {
   }
 
   static findAll(): User[] {
-    return getDb().prepare('SELECT * FROM users ORDER BY created_at DESC').all().map(this.asUser);
+    return getDb()
+      .prepare('SELECT * FROM users ORDER BY created_at DESC')
+      .all()
+      .map(this.asUser);
   }
 
   static findById(id: number): User | undefined {
-    return this.mightBeUser(getDb().prepare('SELECT * FROM users WHERE id = ?').get(id));
+    return this.mightBeUser(
+      getDb().prepare('SELECT * FROM users WHERE id = ?').get(id),
+    );
   }
 
   static findByApiKey(apiKey: string): User | undefined {
-    return this.mightBeUser(getDb().prepare('SELECT * FROM users WHERE api_key = ? AND is_active = 1').get(apiKey));
+    return this.mightBeUser(
+      getDb()
+        .prepare('SELECT * FROM users WHERE api_key = ? AND is_active = 1')
+        .get(apiKey),
+    );
   }
 
   static create(data: CreateUserData): User {
@@ -32,10 +47,17 @@ export class UserModel {
     const timestamp = getUtcTimestamp();
     const detailLogging = data.detail_logging ?? false;
     const stmt = getDb().prepare(
-      'INSERT INTO users (api_key, name, email, detail_logging, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (api_key, name, email, detail_logging, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
     );
-    const result = stmt.run(apiKey, data.name, data.email || null, detailLogging ? 1 : 0, timestamp, timestamp);
-    
+    const result = stmt.run(
+      apiKey,
+      data.name,
+      data.email || null,
+      detailLogging ? 1 : 0,
+      timestamp,
+      timestamp,
+    );
+
     return {
       id: result.lastInsertRowid as number,
       api_key: apiKey,
@@ -81,7 +103,9 @@ export class UserModel {
     values.push(getUtcTimestamp());
     values.push(id);
 
-    getDb().prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    getDb()
+      .prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)
+      .run(...values);
     return this.findById(id);
   }
 
@@ -91,7 +115,9 @@ export class UserModel {
   }
 
   static deactivate(id: number): boolean {
-    const result = getDb().prepare('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?').run(getUtcTimestamp(), id);
+    const result = getDb()
+      .prepare('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?')
+      .run(getUtcTimestamp(), id);
     return result.changes > 0;
   }
 
@@ -100,7 +126,9 @@ export class UserModel {
     if (!user) return null;
 
     const newApiKey = generateApiKey();
-    getDb().prepare('UPDATE users SET api_key = ?, updated_at = ? WHERE id = ?').run(newApiKey, getUtcTimestamp(), id);
+    getDb()
+      .prepare('UPDATE users SET api_key = ?, updated_at = ? WHERE id = ?')
+      .run(newApiKey, getUtcTimestamp(), id);
     return newApiKey;
   }
 }

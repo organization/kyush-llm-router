@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import request from 'supertest';
+
+import { request } from '../utils/httpClient';
 import { createTestApp } from '../utils/testApp';
 import { initDb } from '../../src/config/database';
 import { createAdminClient } from '../utils/adminClient';
@@ -22,12 +23,14 @@ describe('Script API Endpoints', () => {
 
   // Setup: Create user and backend for testing
   beforeAll(async () => {
-    const userResponse = await admin.post('/admin/users').send({ name: 'Script Test User' });
+    const userResponse = await admin
+      .post('/admin/users')
+      .send({ name: 'Script Test User' });
     userId = userResponse.body.id;
 
     const backendResponse = await admin.post('/admin/backends').send({
       name: 'Script Test Backend',
-      base_url: 'http://localhost:8006/v1'
+      base_url: 'http://localhost:8006/v1',
     });
     backendId = backendResponse.body.id;
   });
@@ -41,7 +44,7 @@ describe('Script API Endpoints', () => {
   describe('GET /admin/scripts', () => {
     it('should return empty array initially', async () => {
       const response = await admin.get('/admin/scripts');
-      
+
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
     });
@@ -65,11 +68,11 @@ export const onResponse = (context) => {
   return context;
 };
 `,
-        is_active: true
+        is_active: true,
       };
 
       const response = await admin.post('/admin/scripts').send(scriptData);
-      
+
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('id');
       expect(response.body.name).toBe(scriptData.name);
@@ -77,7 +80,7 @@ export const onResponse = (context) => {
       expect(response.body.target_user_id).toBe(userId);
       expect(response.body.target_backend_id).toBe(backendId);
       expect(response.body.is_active).toBe(true);
-      
+
       scriptId = response.body.id;
     });
 
@@ -91,11 +94,11 @@ export const onRequest = (context) => {
   return context;
 };
 `,
-        is_active: true
+        is_active: true,
       };
 
       const response = await admin.post('/admin/scripts').send(scriptData);
-      
+
       expect(response.status).toBe(201);
       expect(response.body.script_type).toBe(scriptData.script_type);
       expect(response.body.target_user_id).toBeNull();
@@ -111,11 +114,11 @@ export const onResponse = (context) => {
   return context;
 };
 `,
-        is_active: true
+        is_active: true,
       };
 
       const response = await admin.post('/admin/scripts').send(scriptData);
-      
+
       expect(response.status).toBe(201);
       expect(response.body.script_type).toBe(scriptData.script_type);
       expect(response.body.target_backend_id).toBeNull();
@@ -125,9 +128,9 @@ export const onResponse = (context) => {
       const response = await admin.post('/admin/scripts').send({
         script_type: 'per-backend',
         target_backend_id: backendId,
-        script_code: 'export const onRequest = (context) => context;'
+        script_code: 'export const onRequest = (context) => context;',
       });
-      
+
       expect(response.status).toBe(400);
       expect(response.body).toHaveProperty('error');
     });
@@ -136,18 +139,18 @@ export const onResponse = (context) => {
       const response = await admin.post('/admin/scripts').send({
         name: 'Missing Code',
         script_type: 'per-backend',
-        target_backend_id: backendId
+        target_backend_id: backendId,
       });
-      
+
       expect(response.status).toBe(400);
     });
 
     it('should return 400 if script_type is missing', async () => {
       const response = await admin.post('/admin/scripts').send({
         name: 'Missing Target Type',
-        script_code: 'export const onRequest = (context) => context;'
+        script_code: 'export const onRequest = (context) => context;',
       });
-      
+
       expect(response.status).toBe(400);
     });
 
@@ -155,9 +158,9 @@ export const onResponse = (context) => {
       const response = await admin.post('/admin/scripts').send({
         name: 'Invalid Per-User-Backend',
         script_code: 'export const onRequest = (context) => context;',
-        script_type: 'per-user-backend'
+        script_type: 'per-user-backend',
       });
-      
+
       expect(response.status).toBe(400);
     });
 
@@ -166,11 +169,11 @@ export const onResponse = (context) => {
         name: 'Invalid Code',
         script_code: 'this is invalid javascript {{{',
         script_type: 'per-backend',
-        target_backend_id: backendId
+        target_backend_id: backendId,
       };
 
       const response = await admin.post('/admin/scripts').send(scriptData);
-      
+
       // Code is saved, but will fail at execution time
       expect(response.status).toBe(201);
     });
@@ -184,7 +187,7 @@ export const onResponse = (context) => {
         name: 'Script for Get Test',
         script_code: 'export const onRequest = (context) => context;',
         script_type: 'per-backend',
-        target_backend_id: backendId
+        target_backend_id: backendId,
       });
       testScriptId = response.body.id;
     });
@@ -195,7 +198,7 @@ export const onResponse = (context) => {
 
     it('should return a script by id', async () => {
       const response = await admin.get(`/admin/scripts/${testScriptId}`);
-      
+
       expect(response.status).toBe(200);
       expect(response.body.id).toBe(testScriptId);
       expect(response.body).toHaveProperty('name');
@@ -204,7 +207,7 @@ export const onResponse = (context) => {
 
     it('should return 404 for non-existent script', async () => {
       const response = await admin.get('/admin/scripts/99999');
-      
+
       expect(response.status).toBe(404);
       expect(response.body).toHaveProperty('error');
     });
@@ -218,7 +221,7 @@ export const onResponse = (context) => {
         name: 'Script for Update Test',
         script_code: 'export const onRequest = (context) => context;',
         script_type: 'per-backend',
-        target_backend_id: backendId
+        target_backend_id: backendId,
       });
       testScriptId = response.body.id;
     });
@@ -228,39 +231,39 @@ export const onResponse = (context) => {
     });
 
     it('should update script name', async () => {
-      const response = await admin
-        .put(`/admin/scripts/${testScriptId}`)
-        .send({
-          name: 'Updated Script Name'
-        });
-      
+      const response = await admin.put(`/admin/scripts/${testScriptId}`).send({
+        name: 'Updated Script Name',
+      });
+
       expect(response.status).toBe(200);
       expect(response.body.name).toBe('Updated Script Name');
     });
 
     it('should update script code', async () => {
-      const response = await admin
-        .put(`/admin/scripts/${testScriptId}`)
-        .send({
-          script_code: 'export const onResponse = async (context) => context;'
-        });
-      
+      const response = await admin.put(`/admin/scripts/${testScriptId}`).send({
+        script_code: 'export const onResponse = async (context) => context;',
+      });
+
       expect(response.status).toBe(200);
-      expect(response.body.script_code).toBe('export const onResponse = async (context) => context;');
+      expect(response.body.script_code).toBe(
+        'export const onResponse = async (context) => context;',
+      );
     });
 
     it('should toggle is_active', async () => {
       const response = await admin
         .put(`/admin/scripts/${testScriptId}`)
         .send({ is_active: false });
-      
+
       expect(response.status).toBe(200);
       expect(response.body.is_active).toBe(false);
     });
 
     it('should return 404 for non-existent script', async () => {
-      const response = await admin.put('/admin/scripts/99999').send({ name: 'Test' });
-      
+      const response = await admin
+        .put('/admin/scripts/99999')
+        .send({ name: 'Test' });
+
       expect(response.status).toBe(404);
     });
 
@@ -268,7 +271,7 @@ export const onResponse = (context) => {
       const response = await admin
         .put(`/admin/scripts/${testScriptId}`)
         .send({ script_code: 'invalid javascript {{{' });
-      
+
       // Code is saved, but will fail at execution time
       expect(response.status).toBe(200);
     });
@@ -290,7 +293,7 @@ export const onResponse = (context) => {
 };
 `,
         script_type: 'per-backend',
-        target_backend_id: backendId
+        target_backend_id: backendId,
       });
       testScriptId = response.body.id;
     });
@@ -302,17 +305,21 @@ export const onResponse = (context) => {
     it('should load and validate script syntax', async () => {
       const testPayload = {
         user: { id: userId, name: 'Test User' },
-        backend: { id: backendId, name: 'Test Backend', base_url: 'http://localhost:8006/v1' },
+        backend: {
+          id: backendId,
+          name: 'Test Backend',
+          base_url: 'http://localhost:8006/v1',
+        },
         request: {
           method: 'POST',
           path: '/v1/chat/completions',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'test-model',
-            messages: [{ role: 'user', content: 'Hello' }]
+            messages: [{ role: 'user', content: 'Hello' }],
           }),
-          isStream: false
-        }
+          isStream: false,
+        },
       };
 
       const response = await admin
@@ -328,7 +335,7 @@ export const onResponse = (context) => {
       const response = await admin
         .post('/admin/scripts/99999/test')
         .send({ request: {} });
-      
+
       expect(response.status).toBe(404);
     });
   });
@@ -341,20 +348,20 @@ export const onResponse = (context) => {
         name: 'Script for Delete',
         script_code: 'export const onRequest = (context) => context;',
         script_type: 'per-backend',
-        target_backend_id: backendId
+        target_backend_id: backendId,
       });
       testScriptId = response.body.id;
     });
 
     it('should delete a script', async () => {
       const response = await admin.delete(`/admin/scripts/${testScriptId}`);
-      
+
       expect(response.status).toBe(204);
     });
 
     it('should return 404 for already deleted script', async () => {
       const response = await admin.delete(`/admin/scripts/${testScriptId}`);
-      
+
       expect(response.status).toBe(404);
     });
   });
@@ -381,14 +388,16 @@ export const onResponse = (context) => {
 `,
         script_type: 'per-backend',
         target_backend_id: backendId,
-        is_active: true
+        is_active: true,
       });
       testScriptId = scriptResponse.body.id;
 
       // Create user with permission
-      const userResponse = await admin.post('/admin/users').send({ name: 'Integration User' });
+      const userResponse = await admin
+        .post('/admin/users')
+        .send({ name: 'Integration User' });
       userApiKey = userResponse.body.api_key;
-      
+
       await admin
         .post('/admin/permissions')
         .send({ user_id: userResponse.body.id, backend_id: backendId });
@@ -407,19 +416,23 @@ export const onResponse = (context) => {
         .set('Authorization', `Bearer ${userApiKey}`)
         .send({
           model: 'test-model',
-          messages: [{ role: 'user', content: 'Hello' }]
+          messages: [{ role: 'user', content: 'Hello' }],
         });
 
       // Request will fail (502) because backend is not actually running,
       // but we can verify the script was executed by checking logs
       expect(response.status).toBe(502); // Backend unreachable
-      
+
       // Check that request was logged with script execution
-      const analyticsResponse = await admin.get('/admin/analytics/requests?limit=10');
-      const loggedRequest = analyticsResponse.body.rows.find((r: any) => 
-        r.user_id === parseInt(userApiKey.split('-')[1]) || r.endpoint === '/v1/chat/completions'
+      const analyticsResponse = await admin.get(
+        '/admin/analytics/requests?limit=10',
       );
-      
+      const loggedRequest = analyticsResponse.body.rows.find(
+        (r: any) =>
+          r.user_id === parseInt(userApiKey.split('-')[1]) ||
+          r.endpoint === '/v1/chat/completions',
+      );
+
       expect(loggedRequest).toBeDefined();
     });
   });

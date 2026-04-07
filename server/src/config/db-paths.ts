@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const DEFAULT_DB_DIR = path.join(process.cwd(), 'data');
 
@@ -28,4 +28,3 @@ export function getRequestLogsDir(): string {
 export function getRequestLogsDbPath(monthKey: string): string {
   return path.join(getRequestLogsDir(), `request_logs_${monthKey}.db`);
 }
-

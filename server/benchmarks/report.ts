@@ -1,28 +1,31 @@
+import fs from 'node:fs';
+
 import Table from 'cli-table3';
 import chalk from 'chalk';
-import { BenchmarkResult, calculateOverhead } from './stats';
+
+import { type BenchmarkResult, calculateOverhead } from './stats';
 
 export function printReport(results: BenchmarkResult[], config: any) {
   console.log('\n' + '='.repeat(80));
   console.log(chalk.bold.cyan('  BENCHMARK RESULTS'));
   console.log('='.repeat(80));
-  console.log(`\nConfiguration:`);
+  console.log('\nConfiguration:');
   console.log(`  Concurrent Requests: ${config.concurrent}`);
   console.log(`  Total Requests: ${config.total}`);
   console.log(`  Warmup Requests: ${config.warmup}`);
   console.log(`  Backend Type: ${config.backend}`);
-  
+
   // Group results by scenario
-  const scenarios = [...new Set(results.map(r => r.scenario))];
-  
+  const scenarios = [...new Set(results.map((r) => r.scenario))];
+
   for (const scenario of scenarios) {
-    const scenarioResults = results.filter(r => r.scenario === scenario);
-    const direct = scenarioResults.find(r => r.mode === 'direct');
-    const route = scenarioResults.find(r => r.mode === 'route');
-    
+    const scenarioResults = results.filter((r) => r.scenario === scenario);
+    const direct = scenarioResults.find((r) => r.mode === 'direct');
+    const route = scenarioResults.find((r) => r.mode === 'route');
+
     console.log(`\n${chalk.bold.yellow(`\n${scenario}`)}`);
     console.log('-'.repeat(80));
-    
+
     const table = new Table({
       head: [
         chalk.cyan('Mode'),
@@ -34,13 +37,22 @@ export function printReport(results: BenchmarkResult[], config: any) {
         chalk.cyan('P95 (ms)'),
         chalk.cyan('P99 (ms)'),
         chalk.cyan('Errors'),
-        chalk.cyan('Req/s')
+        chalk.cyan('Req/s'),
       ],
       colAligns: [
-        'left', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right'
-      ]
+        'left',
+        'right',
+        'right',
+        'right',
+        'right',
+        'right',
+        'right',
+        'right',
+        'right',
+        'right',
+      ],
     });
-    
+
     if (direct) {
       table.push([
         chalk.green('Direct'),
@@ -52,14 +64,15 @@ export function printReport(results: BenchmarkResult[], config: any) {
         direct.p95ResponseTime.toFixed(2),
         direct.p99ResponseTime.toFixed(2),
         direct.errors,
-        direct.throughput.toFixed(2)
+        direct.throughput.toFixed(2),
       ]);
     }
-    
+
     if (route) {
       const overhead = direct ? calculateOverhead(direct, route) : 0;
-      const overheadColor = overhead > 20 ? chalk.red : overhead > 10 ? chalk.yellow : chalk.green;
-      
+      const overheadColor =
+        overhead > 20 ? chalk.red : overhead > 10 ? chalk.yellow : chalk.green;
+
       table.push([
         chalk.blue('Route'),
         `${route.successfulRequests}/${route.totalRequests}`,
@@ -70,26 +83,25 @@ export function printReport(results: BenchmarkResult[], config: any) {
         route.p95ResponseTime.toFixed(2),
         route.p99ResponseTime.toFixed(2),
         route.errors,
-        route.throughput.toFixed(2)
+        route.throughput.toFixed(2),
       ]);
-      
+
       console.log(table.toString());
       console.log(`\n${overheadColor(`  Overhead: ${overhead.toFixed(2)}%`)}`);
     } else {
       console.log(table.toString());
     }
   }
-  
+
   console.log('\n' + '='.repeat(80));
   console.log(chalk.bold.green('  Benchmark completed!'));
   console.log('='.repeat(80) + '\n');
 }
 
 export function exportToJSON(results: BenchmarkResult[], outputPath: string) {
-  const fs = require('fs');
   const data = {
     timestamp: new Date().toISOString(),
-    results
+    results,
   };
   fs.writeFileSync(outputPath, JSON.stringify(data, null, 2));
   console.log(chalk.green(`Results exported to ${outputPath}`));

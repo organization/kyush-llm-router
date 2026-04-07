@@ -2,7 +2,7 @@ const DEFAULT_TIME_ZONE = 'UTC';
 
 function getFormatter(
   timeZone: string,
-  options: Intl.DateTimeFormatOptions
+  options: Intl.DateTimeFormatOptions,
 ): Intl.DateTimeFormat {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -21,12 +21,14 @@ function getParts(date: Date, timeZone: string): Record<string, string> {
     hourCycle: 'h23',
   });
 
-  return formatter.formatToParts(date).reduce<Record<string, string>>((acc, part) => {
-    if (part.type !== 'literal') {
-      acc[part.type] = part.value;
-    }
-    return acc;
-  }, {});
+  return formatter
+    .formatToParts(date)
+    .reduce<Record<string, string>>((acc, part) => {
+      if (part.type !== 'literal') {
+        acc[part.type] = part.value;
+      }
+      return acc;
+    }, {});
 }
 
 export function getConfiguredTimeZone(): string {
@@ -37,12 +39,18 @@ export function getUtcTimestamp(date: Date = new Date()): string {
   return date.toISOString();
 }
 
-export function getLocalDateKey(date: Date = new Date(), timeZone: string = getConfiguredTimeZone()): string {
+export function getLocalDateKey(
+  date: Date = new Date(),
+  timeZone: string = getConfiguredTimeZone(),
+): string {
   const parts = getParts(date, timeZone);
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-export function getLocalMonthKey(date: Date = new Date(), timeZone: string = getConfiguredTimeZone()): string {
+export function getLocalMonthKey(
+  date: Date = new Date(),
+  timeZone: string = getConfiguredTimeZone(),
+): string {
   const parts = getParts(date, timeZone);
   return `${parts.year}-${parts.month}`;
 }
@@ -50,4 +58,3 @@ export function getLocalMonthKey(date: Date = new Date(), timeZone: string = get
 export function getMonthKeyFromDateString(dateString: string): string {
   return dateString.slice(0, 7);
 }
-

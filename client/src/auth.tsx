@@ -1,6 +1,16 @@
-import { createContext, createSignal, onMount, useContext, type Accessor, type JSX, type ParentComponent } from 'solid-js';
-import type { AdminSessionResponse } from './types';
+import {
+  createContext,
+  createSignal,
+  onMount,
+  useContext,
+  type Accessor,
+  type JSX,
+  type ParentComponent,
+} from 'solid-js';
+
 import { api, setAdminCsrfToken, setUnauthorizedHandler } from './api/client';
+
+import type { AdminSessionResponse } from './types';
 
 interface AuthContextValue {
   session: Accessor<AdminSessionResponse | null>;
@@ -12,7 +22,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue>();
 
-function unauthenticatedState(previous: AdminSessionResponse | null): AdminSessionResponse {
+function unauthenticatedState(
+  previous: AdminSessionResponse | null,
+): AdminSessionResponse {
   return {
     authenticated: false,
     authMode: previous?.authMode ?? 'both',
@@ -21,7 +33,9 @@ function unauthenticatedState(previous: AdminSessionResponse | null): AdminSessi
   };
 }
 
-export const AuthProvider: ParentComponent<{ children: JSX.Element }> = (props) => {
+export const AuthProvider: ParentComponent<{ children: JSX.Element }> = (
+  props,
+) => {
   const [session, setSession] = createSignal<AdminSessionResponse | null>(null);
   const [loading, setLoading] = createSignal(true);
 
@@ -53,13 +67,20 @@ export const AuthProvider: ParentComponent<{ children: JSX.Element }> = (props) 
     });
 
     void refreshSession().catch(() => {
-      setSession({ authenticated: false, authMode: 'both', csrfToken: null, principal: null });
+      setSession({
+        authenticated: false,
+        authMode: 'both',
+        csrfToken: null,
+        principal: null,
+      });
       setLoading(false);
     });
   });
 
   return (
-    <AuthContext.Provider value={{ session, loading, refreshSession, login, logout }}>
+    <AuthContext.Provider
+      value={{ session, loading, refreshSession, login, logout }}
+    >
       {props.children}
     </AuthContext.Provider>
   );

@@ -1,11 +1,18 @@
-import { For, createResource, createSignal, Show, type Component } from 'solid-js';
+import {
+  For,
+  createResource,
+  createSignal,
+  Show,
+  type Component,
+} from 'solid-js';
 import Pencil from 'lucide-solid/icons/pencil';
 import Plus from 'lucide-solid/icons/plus';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import Trash2 from 'lucide-solid/icons/trash-2';
+
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
-import type { Backend, BackendModelsResponse } from '../types';
+
 import {
   Alert,
   Button,
@@ -20,6 +27,8 @@ import {
   StatusBadge,
   TextField,
 } from '../ui';
+
+import type { Backend, BackendModelsResponse } from '../types';
 
 interface BackendFormState {
   name: string;
@@ -41,15 +50,27 @@ export const Backends: Component = () => {
   const [backends, { refetch }] = createResource(() => api.backends.getAll());
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
-  const [editingBackend, setEditingBackend] = createSignal<Backend | null>(null);
-  const [pendingDeleteBackend, setPendingDeleteBackend] = createSignal<Backend | null>(null);
+  const [editingBackend, setEditingBackend] = createSignal<Backend | null>(
+    null,
+  );
+  const [pendingDeleteBackend, setPendingDeleteBackend] =
+    createSignal<Backend | null>(null);
   const [form, setForm] = createSignal<BackendFormState>(emptyForm());
   const [submitting, setSubmitting] = createSignal(false);
-  const [notice, setNotice] = createSignal<{ tone: 'success' | 'danger'; message: string } | null>(null);
-  const [expandedBackendId, setExpandedBackendId] = createSignal<number | null>(null);
-  const [backendModels, setBackendModels] = createSignal<Record<number, BackendModelsResponse>>({});
+  const [notice, setNotice] = createSignal<{
+    tone: 'success' | 'danger';
+    message: string;
+  } | null>(null);
+  const [expandedBackendId, setExpandedBackendId] = createSignal<number | null>(
+    null,
+  );
+  const [backendModels, setBackendModels] = createSignal<
+    Record<number, BackendModelsResponse>
+  >({});
 
-  const modelStateTone = (backend: Backend): 'success' | 'warning' | 'danger' | 'neutral' => {
+  const modelStateTone = (
+    backend: Backend,
+  ): 'success' | 'warning' | 'danger' | 'neutral' => {
     switch (backend.model_cache_state) {
       case 'ready':
         return 'success';
@@ -127,7 +148,11 @@ export const Backends: Component = () => {
       setForm(emptyForm());
       await refetch();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Backend save failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Backend save failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +175,11 @@ export const Backends: Component = () => {
       setPendingDeleteBackend(null);
       await refetch();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Backend deletion failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Backend deletion failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -167,7 +196,13 @@ export const Backends: Component = () => {
       const detail = await api.backends.getModels(backend.id);
       setBackendModels((current) => ({ ...current, [backend.id]: detail }));
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Failed to load backend models.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to load backend models.',
+      });
     }
   };
 
@@ -178,10 +213,17 @@ export const Backends: Component = () => {
     try {
       const detail = await api.backends.refreshModels(backend.id);
       setBackendModels((current) => ({ ...current, [backend.id]: detail }));
-      setNotice({ tone: 'success', message: `${backend.name} model cache refreshed.` });
+      setNotice({
+        tone: 'success',
+        message: `${backend.name} model cache refreshed.`,
+      });
       await refetch();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Model refresh failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Model refresh failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -191,60 +233,112 @@ export const Backends: Component = () => {
     <Layout>
       <div class="ui-app-page">
         <PageHeader
-          title="Backends"
+          actions={
+            <IconButton
+              icon={<Plus />}
+              label="Add Backend"
+              onClick={openCreateDialog}
+              variant="primary"
+            />
+          }
           description="Register upstream LLM targets, connection URLs, and activation state for routing."
-          actions={<IconButton variant="primary" icon={<Plus />} label="Add Backend" onClick={openCreateDialog} />}
+          title="Backends"
         />
 
         <Show when={notice()}>
-          {(currentNotice) => <Alert tone={currentNotice().tone}>{currentNotice().message}</Alert>}
+          {(currentNotice) => (
+            <Alert tone={currentNotice().tone}>{currentNotice().message}</Alert>
+          )}
         </Show>
 
-        <Panel title="Backend catalog" description="Operational list with overflow-safe URL presentation and compact actions.">
+        <Panel
+          description="Operational list with overflow-safe URL presentation and compact actions."
+          title="Backend catalog"
+        >
           <Show
+            fallback={
+              <EmptyState
+                description="Reading upstream routing targets from the admin API."
+                title="Loading backends"
+              />
+            }
             when={!backends.loading || (backends()?.length ?? 0) > 0}
-            fallback={<EmptyState title="Loading backends" description="Reading upstream routing targets from the admin API." />}
           >
             <Show
-              when={(backends()?.length ?? 0) > 0}
               fallback={
                 <EmptyState
-                  title="No backends yet"
+                  action={
+                    <IconButton
+                      icon={<Plus />}
+                      label="Add Backend"
+                      onClick={openCreateDialog}
+                      variant="primary"
+                    />
+                  }
                   description="Add a backend before granting permissions or routing requests."
-                  action={<IconButton variant="primary" icon={<Plus />} label="Add Backend" onClick={openCreateDialog} />}
+                  title="No backends yet"
                 />
               }
+              when={(backends()?.length ?? 0) > 0}
             >
               <DataGrid
-                rows={backends() ?? []}
                 columns={[
-                  { id: 'id', header: 'ID', mono: true, cell: (backend) => <span>{backend.id}</span> },
-                  { id: 'name', header: 'Name', cell: (backend) => <span>{backend.name}</span> },
+                  {
+                    id: 'id',
+                    header: 'ID',
+                    mono: true,
+                    cell: (backend) => <span>{backend.id}</span>,
+                  },
+                  {
+                    id: 'name',
+                    header: 'Name',
+                    cell: (backend) => <span>{backend.name}</span>,
+                  },
                   {
                     id: 'base_url',
                     header: 'Base URL',
                     class: 'ui-text-mono',
-                    cell: (backend) => <span title={backend.base_url}>{backend.base_url}</span>,
+                    cell: (backend) => (
+                      <span title={backend.base_url}>{backend.base_url}</span>
+                    ),
                   },
                   {
                     id: 'detail_logging',
                     header: 'Detail Log',
-                    cell: (backend) => <StatusBadge tone={backend.detail_logging ? 'warning' : 'neutral'}>{backend.detail_logging ? 'On' : 'Off'}</StatusBadge>,
+                    cell: (backend) => (
+                      <StatusBadge
+                        tone={backend.detail_logging ? 'warning' : 'neutral'}
+                      >
+                        {backend.detail_logging ? 'On' : 'Off'}
+                      </StatusBadge>
+                    ),
                   },
                   {
                     id: 'model_cache',
                     header: 'Model Cache',
-                    cell: (backend) => <StatusBadge tone={modelStateTone(backend)}>{modelStateLabel(backend)}</StatusBadge>,
+                    cell: (backend) => (
+                      <StatusBadge tone={modelStateTone(backend)}>
+                        {modelStateLabel(backend)}
+                      </StatusBadge>
+                    ),
                   },
                   {
                     id: 'model_count',
                     header: 'Models',
-                    cell: (backend) => <span>{backend.cached_model_count ?? 0}</span>,
+                    cell: (backend) => (
+                      <span>{backend.cached_model_count ?? 0}</span>
+                    ),
                   },
                   {
                     id: 'status',
                     header: 'Status',
-                    cell: (backend) => <StatusBadge tone={backend.is_active ? 'success' : 'warning'}>{backend.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
+                    cell: (backend) => (
+                      <StatusBadge
+                        tone={backend.is_active ? 'success' : 'warning'}
+                      >
+                        {backend.is_active ? 'Active' : 'Inactive'}
+                      </StatusBadge>
+                    ),
                   },
                 ]}
                 getRowKey={(backend) => backend.id}
@@ -252,38 +346,79 @@ export const Backends: Component = () => {
                 rowActions={(backend) => (
                   <div class="ui-row-actions">
                     <IconButton
+                      disabled={!backend.is_active || submitting()}
                       icon={<RefreshCw />}
                       label="Refresh Models"
-                      disabled={!backend.is_active || submitting()}
                       onClick={() => void refreshModels(backend)}
                     />
-                    <IconButton icon={<Pencil />} label="Edit" onClick={() => openEditDialog(backend)} />
-                    <Button onClick={() => void toggleDetails(backend)}>{expandedBackendId() === backend.id ? 'Hide Models' : 'View Models'}</Button>
-                    <IconButton variant="danger" icon={<Trash2 />} label="Delete" onClick={() => requestDelete(backend)} />
+                    <IconButton
+                      icon={<Pencil />}
+                      label="Edit"
+                      onClick={() => openEditDialog(backend)}
+                    />
+                    <Button onClick={() => void toggleDetails(backend)}>
+                      {expandedBackendId() === backend.id
+                        ? 'Hide Models'
+                        : 'View Models'}
+                    </Button>
+                    <IconButton
+                      icon={<Trash2 />}
+                      label="Delete"
+                      onClick={() => requestDelete(backend)}
+                      variant="danger"
+                    />
                   </div>
                 )}
+                rows={backends() ?? []}
               />
               <Show when={expandedBackendId()}>
                 {(backendId) => {
                   const detail = () => backendModels()[backendId()];
                   return (
                     <Panel
+                      description={
+                        detail()?.cache.state === 'inactive'
+                          ? 'Inactive backends skip model fetches and only keep the last DB snapshot.'
+                          : 'Live cache state and last persisted model snapshot.'
+                      }
                       title={`Backend ${backendId()} Models`}
-                      description={detail()?.cache.state === 'inactive' ? 'Inactive backends skip model fetches and only keep the last DB snapshot.' : 'Live cache state and last persisted model snapshot.'}
                     >
                       <div class="ui-stack ui-stack--tight">
-                        <Show when={detail()} fallback={<EmptyState title="Loading models" description="Reading cached model information for this backend." />}>
-                          <Alert tone={detail()!.cache.last_error ? 'danger' : 'success'}>
-                            {detail()!.cache.last_error
-                              ? `Last error: ${detail()!.cache.last_error}`
-                              : `State: ${detail()!.cache.state}, models: ${detail()!.cache.model_count}, last sync: ${detail()!.cache.last_synced_at ?? 'never'}`}
+                        <Show
+                          fallback={
+                            <EmptyState
+                              description="Reading cached model information for this backend."
+                              title="Loading models"
+                            />
+                          }
+                          when={detail()}
+                        >
+                          <Alert
+                            tone={
+                              detail().cache.last_error ? 'danger' : 'success'
+                            }
+                          >
+                            {detail().cache.last_error
+                              ? `Last error: ${detail().cache.last_error}`
+                              : `State: ${detail().cache.state}, models: ${detail().cache.model_count}, last sync: ${detail().cache.last_synced_at ?? 'never'}`}
                           </Alert>
                           <Show
-                            when={detail()!.models.length > 0}
-                            fallback={<EmptyState title="No cached models" description="This backend has not published any models yet or the last refresh failed." />}
+                            fallback={
+                              <EmptyState
+                                description="This backend has not published any models yet or the last refresh failed."
+                                title="No cached models"
+                              />
+                            }
+                            when={detail().models.length > 0}
                           >
                             <div class="ui-chip-row">
-                              <For each={detail()!.models}>{(modelId) => <StatusBadge tone="neutral">{modelId}</StatusBadge>}</For>
+                              <For each={detail().models}>
+                                {(modelId) => (
+                                  <StatusBadge tone="neutral">
+                                    {modelId}
+                                  </StatusBadge>
+                                )}
+                              </For>
                             </div>
                           </Show>
                         </Show>
@@ -297,59 +432,96 @@ export const Backends: Component = () => {
         </Panel>
 
         <FormDialog
-          open={dialogOpen()}
-          onOpenChange={setDialogOpen}
-          title={editingBackend() ? 'Edit Backend' : 'Add Backend'}
           description="Compact backend form with URL and optional credential fields."
           footer={
             <>
-              <Button onClick={() => setDialogOpen(false)} disabled={submitting()}>Cancel</Button>
-              <Button type="submit" form="backend-form" variant="primary" disabled={submitting()}>
+              <Button
+                disabled={submitting()}
+                onClick={() => setDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={submitting()}
+                form="backend-form"
+                type="submit"
+                variant="primary"
+              >
                 {editingBackend() ? 'Save Changes' : 'Create Backend'}
               </Button>
             </>
           }
+          onOpenChange={setDialogOpen}
+          open={dialogOpen()}
+          title={editingBackend() ? 'Edit Backend' : 'Add Backend'}
         >
-          <form id="backend-form" class="ui-form" onSubmit={(event) => void saveBackend(event)}>
-            <TextField label="Name" value={form().name} onInput={(event) => setForm((current) => ({ ...current, name: event.currentTarget.value }))} />
+          <form
+            class="ui-form"
+            id="backend-form"
+            onSubmit={(event) => void saveBackend(event)}
+          >
+            <TextField
+              label="Name"
+              onInput={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  name: event.currentTarget.value,
+                }))
+              }
+              value={form().name}
+            />
             <TextField
               label="Base URL"
-              value={form().base_url}
+              onInput={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  base_url: event.currentTarget.value,
+                }))
+              }
               placeholder="https://api.openai.com/v1"
-              onInput={(event) => setForm((current) => ({ ...current, base_url: event.currentTarget.value }))}
+              value={form().base_url}
             />
             <TextField
               label="API Key"
-              value={form().api_key}
+              onInput={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  api_key: event.currentTarget.value,
+                }))
+              }
               placeholder="Optional upstream API key"
-              onInput={(event) => setForm((current) => ({ ...current, api_key: event.currentTarget.value }))}
+              value={form().api_key}
             />
             <Show when={editingBackend()}>
               <Checkbox
-                label="Backend is active"
-                description="Inactive backends stay configured but are not selected for routing."
                 checked={form().is_active}
-                onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
+                description="Inactive backends stay configured but are not selected for routing."
+                label="Backend is active"
+                onChange={(checked) =>
+                  setForm((current) => ({ ...current, is_active: checked }))
+                }
               />
             </Show>
             <Checkbox
-              label="Enable detailed logging"
-              description="When enabled, proxied request and response headers/bodies are stored for this backend."
               checked={form().detail_logging}
-              onChange={(checked) => setForm((current) => ({ ...current, detail_logging: checked }))}
+              description="When enabled, proxied request and response headers/bodies are stored for this backend."
+              label="Enable detailed logging"
+              onChange={(checked) =>
+                setForm((current) => ({ ...current, detail_logging: checked }))
+              }
             />
           </form>
         </FormDialog>
 
         <ConfirmDialog
-          open={confirmOpen()}
-          onOpenChange={setConfirmOpen}
-          title="Delete backend"
-          description="Deleting a backend removes it from routing and any dependent permission mapping."
-          confirmLabel="Delete Backend"
-          tone="danger"
           busy={submitting()}
+          confirmLabel="Delete Backend"
+          description="Deleting a backend removes it from routing and any dependent permission mapping."
           onConfirm={() => void deleteBackend()}
+          onOpenChange={setConfirmOpen}
+          open={confirmOpen()}
+          title="Delete backend"
+          tone="danger"
         />
       </div>
     </Layout>

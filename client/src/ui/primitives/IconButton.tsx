@@ -1,7 +1,13 @@
-import type { JSX, ParentProps } from 'solid-js';
 import { Button } from './Button';
 
-interface IconButtonProps extends ParentProps, Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'class' | 'type' | 'onClick'> {
+import type { JSX, ParentProps } from 'solid-js';
+
+interface IconButtonProps
+  extends ParentProps,
+    Omit<
+      JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+      'children' | 'class' | 'type' | 'onClick'
+    > {
   icon: JSX.Element;
   label: JSX.Element;
   class?: string;
@@ -15,10 +21,12 @@ export function IconButton(props: IconButtonProps) {
   return (
     <Button
       {...props}
+      aria-label={
+        typeof props.label === 'string' ? props.label : props['aria-label']
+      }
       class={['ui-button--icon', props.class].filter(Boolean).join(' ')}
-      aria-label={typeof props.label === 'string' ? props.label : props['aria-label']}
     >
-      <span class="ui-button__icon" aria-hidden="true">
+      <span aria-hidden="true" class="ui-button__icon">
         {props.icon}
       </span>
       <span class="ui-button__label">{props.label}</span>

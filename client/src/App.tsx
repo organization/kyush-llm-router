@@ -1,21 +1,46 @@
 import { Router, Route } from '@solidjs/router';
 import { lazy, Show, Suspense } from 'solid-js';
+
 import { AuthProvider, useAuth } from './auth';
 import { LoginGate } from './components/LoginGate';
 import { Panel } from './ui';
 
-const Dashboard = lazy(() => import('./routes/Dashboard').then((module) => ({ default: module.Dashboard })));
-const Users = lazy(() => import('./routes/Users').then((module) => ({ default: module.Users })));
-const Backends = lazy(() => import('./routes/Backends').then((module) => ({ default: module.Backends })));
-const Analytics = lazy(() => import('./routes/Analytics').then((module) => ({ default: module.Analytics })));
-const DetailLogs = lazy(() => import('./routes/DetailLogs').then((module) => ({ default: module.DetailLogs })));
-const Models = lazy(() => import('./routes/Models').then((module) => ({ default: module.Models })));
-const Scripts = lazy(() => import('./routes/Scripts').then((module) => ({ default: module.Scripts })));
+const Dashboard = lazy(() =>
+  import('./routes/Dashboard').then((module) => ({
+    default: module.Dashboard,
+  })),
+);
+const Users = lazy(() =>
+  import('./routes/Users').then((module) => ({ default: module.Users })),
+);
+const Backends = lazy(() =>
+  import('./routes/Backends').then((module) => ({ default: module.Backends })),
+);
+const Analytics = lazy(() =>
+  import('./routes/Analytics').then((module) => ({
+    default: module.Analytics,
+  })),
+);
+const DetailLogs = lazy(() =>
+  import('./routes/DetailLogs').then((module) => ({
+    default: module.DetailLogs,
+  })),
+);
+const Models = lazy(() =>
+  import('./routes/Models').then((module) => ({ default: module.Models })),
+);
+const Scripts = lazy(() =>
+  import('./routes/Scripts').then((module) => ({ default: module.Scripts })),
+);
 
 function RouteLoadingFallback() {
   return (
     <div class="auth-screen">
-      <Panel class="auth-screen__panel" title="Loading Admin Page" description="Preparing the selected dashboard view." />
+      <Panel
+        class="auth-screen__panel"
+        description="Preparing the selected dashboard view."
+        title="Loading Admin Page"
+      />
     </div>
   );
 }
@@ -25,23 +50,27 @@ function AuthenticatedApp() {
 
   return (
     <Show
-      when={!auth.loading()}
       fallback={
         <div class="auth-screen">
-          <Panel class="auth-screen__panel" title="Loading Admin Session" description="Restoring the current administrator session." />
+          <Panel
+            class="auth-screen__panel"
+            description="Restoring the current administrator session."
+            title="Loading Admin Session"
+          />
         </div>
       }
+      when={!auth.loading()}
     >
-      <Show when={auth.session()?.authenticated} fallback={<LoginGate />}>
+      <Show fallback={<LoginGate />} when={auth.session()?.authenticated}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <Router base="/dashboard">
-            <Route path="/" component={Dashboard} />
-            <Route path="/users" component={Users} />
-            <Route path="/backends" component={Backends} />
-            <Route path="/analytics" component={Analytics} />
-            <Route path="/models" component={Models} />
-            <Route path="/detail-logs" component={DetailLogs} />
-            <Route path="/scripts" component={Scripts} />
+            <Route component={Dashboard} path="/" />
+            <Route component={Users} path="/users" />
+            <Route component={Backends} path="/backends" />
+            <Route component={Analytics} path="/analytics" />
+            <Route component={Models} path="/models" />
+            <Route component={DetailLogs} path="/detail-logs" />
+            <Route component={Scripts} path="/scripts" />
           </Router>
         </Suspense>
       </Show>

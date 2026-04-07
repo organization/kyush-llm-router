@@ -1,64 +1,82 @@
-import { Router, Request, Response } from 'express';
-import { ScriptModel } from '../models/Script';
-import { UserModel } from '../models/User';
-import { BackendModel } from '../models/Backend';
-import { CompiledScript } from '../services/ScriptExecutor';
-import { CreateScriptData, UpdateScriptData, ScriptContextData } from '../../../shared/types';
+import { Hono } from 'hono';
 
-const router: Router = Router();
+import { ScriptModel } from '../models/Script.js';
+import { CompiledScript } from '../services/ScriptExecutor.js';
+
+import type {
+  CreateScriptData,
+  UpdateScriptData,
+  ScriptContextData,
+} from '../../../shared/types.js';
+import type { AppEnv } from '../types/hono.js';
+
+const router = new Hono<AppEnv>();
 
 // ============ Script Management ============
 
-router.get('/', (req: Request, res: Response) => {
-  const scripts = ScriptModel.findAll();
-  res.json(scripts);
+router.get('/', (c) => {
+  return c.json(ScriptModel.findAll());
 });
 
-router.get('/active', (req: Request, res: Response) => {
-  const scripts = ScriptModel.findActive();
-  res.json(scripts);
+router.get('/active', (c) => {
+  return c.json(ScriptModel.findActive());
 });
 
-router.get('/type/:type', (req: Request, res: Response) => {
-  const scriptType = String(req.params.type);
-  const scripts = ScriptModel.findByScriptType(scriptType);
-  res.json(scripts);
+router.get('/type/:type', (c) => {
+  const scriptType = String(c.req.param('type'));
+  return c.json(ScriptModel.findByScriptType(scriptType));
 });
 
-router.get('/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.get('/:id', (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
-
   if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+    return c.json({ error: 'Script not found' }, 404);
   }
-
-  res.json(script);
+  return c.json(script);
 });
 
-router.post('/', (req: Request, res: Response) => {
-  const { name, script_type, target_user_id, target_backend_id, script_code, is_active } = req.body as CreateScriptData;
+router.post('/', async (c) => {
+  const body = await c.req.json();
+  const {
+    name,
+    script_type,
+    target_user_id,
+    target_backend_id,
+    script_code,
+    is_active,
+  } = body;
 
   if (!name || !script_type || !script_code) {
-    res.status(400).json({ error: 'name, script_type, and script_code are required' });
-    return;
+    return c.json(
+      { error: 'name, script_type, and script_code are required' },
+      400,
+    );
   }
 
   if (script_type === 'per-user-backend') {
     if (!target_user_id || !target_backend_id) {
-      res.status(400).json({ error: 'target_user_id and target_backend_id are required for per-user-backend scripts' });
-      return;
+      return c.json(
+        {
+          error:
+            'target_user_id and target_backend_id are required for per-user-backend scripts',
+        },
+        400,
+      );
     }
   } else if (script_type === 'per-backend') {
     if (!target_backend_id) {
-      res.status(400).json({ error: 'target_backend_id is required for per-backend scripts' });
-      return;
+      return c.json(
+        { error: 'target_backend_id is required for per-backend scripts' },
+        400,
+      );
     }
   } else if (script_type === 'per-user') {
     if (!target_user_id) {
-      res.status(400).json({ error: 'target_user_id is required for per-user scripts' });
-      return;
+      return c.json(
+        { error: 'target_user_id is required for per-user scripts' },
+        400,
+      );
     }
   }
 
@@ -71,44 +89,58 @@ router.post('/', (req: Request, res: Response) => {
       script_code,
       is_active: is_active ?? true,
     });
-    res.status(201).json(script);
+    return c.json(script, 201);
   } catch (error) {
     if (error instanceof Error && error.message.includes('already exists')) {
-      res.status(409).json({ error: error.message });
-      return;
-    } else {
-      console.error('Unexpected error creating script:', error);
-      res.status(500).json({ error: 'Failed to create script' });
+      return c.json({ error: error.message }, 409);
     }
+    console.error('Unexpected error creating script:', error);
+    return c.json({ error: 'Failed to create script' }, 500);
   }
 });
 
-router.put('/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.put('/:id', async (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
 
   if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+    return c.json({ error: 'Script not found' }, 404);
   }
 
-  const { name, script_type, target_user_id, target_backend_id, script_code, is_active } = req.body as UpdateScriptData;
+  const body = await c.req.json();
+  const {
+    name,
+    script_type,
+    target_user_id,
+    target_backend_id,
+    script_code,
+    is_active,
+  } = body;
 
   if (script_type) {
     if (script_type === 'per-user-backend') {
       if (!target_user_id || !target_backend_id) {
-        res.status(400).json({ error: 'target_user_id and target_backend_id are required for per-user-backend scripts' });
-        return;
+        return c.json(
+          {
+            error:
+              'target_user_id and target_backend_id are required for per-user-backend scripts',
+          },
+          400,
+        );
       }
     } else if (script_type === 'per-backend') {
       if (!target_backend_id) {
-        res.status(400).json({ error: 'target_backend_id is required for per-backend scripts' });
-        return;
+        return c.json(
+          { error: 'target_backend_id is required for per-backend scripts' },
+          400,
+        );
       }
     } else if (script_type === 'per-user') {
       if (!target_user_id) {
-        res.status(400).json({ error: 'target_user_id is required for per-user scripts' });
-        return;
+        return c.json(
+          { error: 'target_user_id is required for per-user scripts' },
+          400,
+        );
       }
     }
   }
@@ -122,83 +154,67 @@ router.put('/:id', (req: Request, res: Response) => {
     is_active,
   });
 
-  res.json(updatedScript);
+  return c.json(updatedScript);
 });
 
-router.delete('/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.delete('/:id', (c) => {
+  const id = Number(c.req.param('id'));
   const success = ScriptModel.delete(id);
-
   if (!success) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+    return c.json({ error: 'Script not found' }, 404);
   }
-
-  res.status(204).send();
+  return c.body(null, 204);
 });
 
-router.post('/:id/activate', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.post('/:id/activate', (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
-
   if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+    return c.json({ error: 'Script not found' }, 404);
   }
 
   const success = ScriptModel.activate(id);
   if (!success) {
-    res.status(500).json({ error: 'Failed to activate script' });
-    return;
+    return c.json({ error: 'Failed to activate script' }, 500);
   }
 
-  res.json({ ...script, is_active: true });
+  return c.json({ ...script, is_active: true });
 });
 
-router.post('/:id/deactivate', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.post('/:id/deactivate', (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
-
   if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+    return c.json({ error: 'Script not found' }, 404);
   }
 
   const success = ScriptModel.deactivate(id);
   if (!success) {
-    res.status(500).json({ error: 'Failed to deactivate script' });
-    return;
+    return c.json({ error: 'Failed to deactivate script' }, 500);
   }
 
-  res.json({ ...script, is_active: false });
+  return c.json({ ...script, is_active: false });
 });
 
 // ============ Script Testing ============
 
-router.post('/:id/test', async (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.post('/:id/test', async (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
-
   if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+    return c.json({ error: 'Script not found' }, 404);
   }
 
-  const { user, backend, request } = req.body as {
-    user?: { id: number; name: string; email?: string };
-    backend?: { id: number; name: string; base_url: string };
-    request: { method: string; path: string; headers: Record<string, string>; body: unknown; isStream: boolean };
-  };
+  const body = await c.req.json();
 
-  if (!request) {
-    res.status(400).json({ error: 'request is required' });
-    return;
+  if (!body.request) {
+    return c.json({ error: 'request is required' }, 400);
   }
 
   const testContext: ScriptContextData = {
-    user: user ?? null,
-    backend: backend ?? null,
-    request,
+    user: body.user ?? null,
+    backend: body.backend ?? null,
+    request: body.request,
   };
 
   let compiled: CompiledScript | null = null;
@@ -213,17 +229,20 @@ router.post('/:id/test', async (req: Request, res: Response) => {
       await compiled.callOnResponse(testContext);
     }
 
-    res.json({
+    return c.json({
       success: true,
       executionTime: Date.now() - startTime,
       hasOnRequest: compiled.hasOnRequest,
       hasOnResponse: compiled.hasOnResponse,
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    return c.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      400,
+    );
   } finally {
     compiled?.dispose();
   }

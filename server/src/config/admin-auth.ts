@@ -1,5 +1,6 @@
-import { createHash } from 'crypto';
-import { AdminAuthMode } from '../../../shared/types';
+import { createHash } from 'node:crypto';
+
+import type { AdminAuthMode } from '../../../shared/types.js';
 
 function normalizeAuthMode(value?: string): AdminAuthMode {
   if (value === 'env' || value === 'oidc' || value === 'both') {
@@ -38,7 +39,10 @@ export function getAdminPasswordHash(): string | null {
 }
 
 export function getAdminSessionSecret(): string {
-  return process.env.ADMIN_SESSION_SECRET?.trim() || 'development-admin-session-secret';
+  return (
+    process.env.ADMIN_SESSION_SECRET?.trim() ||
+    'development-admin-session-secret'
+  );
 }
 
 export function getAdminSessionTtlHours(): number {
@@ -52,11 +56,16 @@ export function getAdminApiTokenTtlDays(): number {
 }
 
 export function getCookieSecure(): boolean {
-  return process.env.NODE_ENV === 'production' && process.env.ADMIN_COOKIE_SECURE !== 'false';
+  return (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ADMIN_COOKIE_SECURE !== 'false'
+  );
 }
 
 export function getAllowedOidcEmails(): string[] {
-  return parseList(process.env.OIDC_ALLOWED_EMAILS).map((entry) => entry.toLowerCase());
+  return parseList(process.env.OIDC_ALLOWED_EMAILS).map((entry) =>
+    entry.toLowerCase(),
+  );
 }
 
 export function getTrustedProxyIps(): string[] {

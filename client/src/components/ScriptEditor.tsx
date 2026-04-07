@@ -2,7 +2,9 @@ import { Dynamic } from 'solid-js/web';
 import { createSignal, lazy, onCleanup, onMount, Suspense } from 'solid-js';
 
 const THEME_STORAGE_KEY = 'kyush-theme';
-const MonacoEditor = lazy(() => import('solid-monaco').then((module) => ({ default: module.MonacoEditor })));
+const MonacoEditor = lazy(() =>
+  import('solid-monaco').then((module) => ({ default: module.MonacoEditor })),
+);
 
 interface ScriptEditorProps {
   value: string;
@@ -58,7 +60,9 @@ export async function onResponse(ctx) {
 }
 `;
 
-  const [editorTheme, setEditorTheme] = createSignal<'vs' | 'vs-dark'>('vs-dark');
+  const [editorTheme, setEditorTheme] = createSignal<'vs' | 'vs-dark'>(
+    'vs-dark',
+  );
 
   onMount(() => {
     const root = document.documentElement;
@@ -67,13 +71,21 @@ export async function onResponse(ctx) {
     const syncTheme = () => {
       const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
       const explicitTheme = root.dataset.theme;
-      const preferredTheme = storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : explicitTheme;
-      const isDark = preferredTheme ? preferredTheme === 'dark' : mediaQuery.matches;
+      const preferredTheme =
+        storedTheme === 'light' || storedTheme === 'dark'
+          ? storedTheme
+          : explicitTheme;
+      const isDark = preferredTheme
+        ? preferredTheme === 'dark'
+        : mediaQuery.matches;
       setEditorTheme(isDark ? 'vs-dark' : 'vs');
     };
 
     const observer = new MutationObserver(syncTheme);
-    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
 
     mediaQuery.addEventListener('change', syncTheme);
     syncTheme();
@@ -88,7 +100,7 @@ export async function onResponse(ctx) {
     <div class="script-editor">
       <Suspense
         fallback={
-          <div class="script-editor__loading" role="status" aria-live="polite">
+          <div aria-live="polite" class="script-editor__loading" role="status">
             <div class="script-editor__skeleton script-editor__skeleton--toolbar" />
             <div class="script-editor__skeleton script-editor__skeleton--line" />
             <div class="script-editor__skeleton script-editor__skeleton--line script-editor__skeleton--short" />
@@ -101,10 +113,7 @@ export async function onResponse(ctx) {
         <Dynamic
           component={MonacoEditor}
           language="typescript"
-          value={props.value || defaultCode}
-          path={props.path}
           onChange={(value: string) => props.onChange(value)}
-          theme={editorTheme()}
           options={{
             minimap: { enabled: false },
             fontSize: 14,
@@ -114,6 +123,9 @@ export async function onResponse(ctx) {
             scrollBeyondLastLine: false,
             padding: { top: 16, bottom: 16 },
           }}
+          path={props.path}
+          theme={editorTheme()}
+          value={props.value || defaultCode}
         />
       </Suspense>
     </div>

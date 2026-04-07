@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+
 import { Button, LogConsole, type LogEntry } from '../index';
 
 const entries: LogEntry[] = [
@@ -54,8 +55,12 @@ export const Default = {
     return (
       <div class="ui-workbench ui-stack">
         <div class="ui-cluster">
-          <Button onClick={() => setFollow((value) => !value)}>{follow() ? 'Follow: on' : 'Follow: off'}</Button>
-          <Button onClick={() => setWrapLines((value) => !value)}>{wrapLines() ? 'Wrap: on' : 'Wrap: off'}</Button>
+          <Button onClick={() => setFollow((value) => !value)}>
+            {follow() ? 'Follow: on' : 'Follow: off'}
+          </Button>
+          <Button onClick={() => setWrapLines((value) => !value)}>
+            {wrapLines() ? 'Wrap: on' : 'Wrap: off'}
+          </Button>
           <Button
             onClick={() =>
               setLocalEntries((current) => [
@@ -75,11 +80,11 @@ export const Default = {
         </div>
 
         <LogConsole
+          emptyMessage="No logs yet."
           entries={localEntries()}
           follow={follow()}
-          wrapLines={wrapLines()}
-          emptyMessage="No logs yet."
           onClear={() => setLocalEntries([])}
+          wrapLines={wrapLines()}
         />
       </div>
     );
@@ -91,7 +96,7 @@ export const States = {
     <div class="ui-workbench ui-stack">
       <LogConsole entries={[]} loading />
       <LogConsole entries={[]} error="Failed to fetch script test logs." />
-      <LogConsole entries={[]} emptyMessage="No console output yet." />
+      <LogConsole emptyMessage="No console output yet." entries={[]} />
     </div>
   ),
 };

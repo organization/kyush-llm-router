@@ -1,5 +1,6 @@
-import express from 'express';
-import cors from 'cors';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { cors } from 'hono/cors';
+
 import { initDb } from '../../src/config/database';
 import { initAnalyticsDb } from '../../src/config/analytics-db';
 import adminAuthRoutes from '../../src/routes/admin-auth';
@@ -8,40 +9,42 @@ import apiRoutes from '../../src/routes/api';
 import analyticsRoutes from '../../src/routes/analytics';
 import { initRequestLogsDb } from '../../src/config/request-logs-db';
 import { getUtcTimestamp } from '../../src/utils/time';
-import { requireAdminAccess, requireSessionCsrf } from '../../src/utils/adminAuth';
+import {
+  requireAdminAccess,
+  requireSessionCsrf,
+} from '../../src/utils/adminAuth';
 import { ModelCatalogService } from '../../src/services/ModelCatalogService';
 
-export function createTestApp() {
-  // Initialize both databases
+import type { AppEnv } from '../../src/types/hono';
+
+export function createTestApp(): OpenAPIHono<AppEnv> {
   initDb();
   initAnalyticsDb();
   initRequestLogsDb();
   ModelCatalogService.reset();
   void ModelCatalogService.initialize();
-  
-  const app = express();
-  
-  app.use(cors());
-  app.use(express.json());
-  
-  app.use('/admin/auth', adminAuthRoutes);
-  app.use('/admin/analytics', requireAdminAccess, requireSessionCsrf, analyticsRoutes);
-  app.use('/admin', requireAdminAccess, requireSessionCsrf, adminRoutes);
-  app.use('/v1', apiRoutes);
-  
-  app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: getUtcTimestamp() });
-  });
-  
-  // Error handling middleware
-  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+
+  const app = new OpenAPIHono<AppEnv>();
+
+  app.use('*', cors());
+
+  app.route('/admin/auth', adminAuthRoutes);
+  app.use('/admin/analytics/*', requireAdminAccess, requireSessionCsrf);
+  app.route('/admin/analytics', analyticsRoutes);
+  app.use('/admin/*', requireAdminAccess, requireSessionCsrf);
+  app.route('/admin', adminRoutes);
+  app.route('/v1', apiRoutes);
+
+  app.get('/health', (c) =>
+    c.json({ status: 'ok', timestamp: getUtcTimestamp() }),
+  );
+
+  app.notFound((c) => c.json({ error: 'Not found' }, 404));
+
+  app.onError((err, c) => {
     console.error('Error:', err.message);
-    res.status(500).json({ error: err.message || 'Internal server error' });
+    return c.json({ error: err.message || 'Internal server error' }, 500);
   });
-  
-  app.use((req, res) => {
-    res.status(404).json({ error: 'Not found' });
-  });
-  
+
   return app;
 }

@@ -1,6 +1,17 @@
-import request from 'supertest';
+import { request, type TestAgent, type TestRequest } from './httpClient';
 
-export async function createAdminClient(app: Parameters<typeof request.agent>[0]) {
+import type { Hono } from 'hono';
+
+export interface AdminTestClient {
+  agent: TestAgent;
+  csrfToken: string;
+  get: (url: string) => TestRequest;
+  post: (url: string) => TestRequest;
+  put: (url: string) => TestRequest;
+  delete: (url: string) => TestRequest;
+}
+
+export async function createAdminClient(app: Hono): Promise<AdminTestClient> {
   const agent = request.agent(app);
 
   await agent

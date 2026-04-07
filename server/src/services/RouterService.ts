@@ -1,8 +1,11 @@
-import { Backend } from '../../../shared/types';
-import { BackendModel } from '../models/Backend';
+import { BackendModel } from '../models/Backend.js';
+
+import type { Backend } from '../../../shared/types.js';
 
 export class RouterService {
-  private static prepareRequestBody(body?: unknown): string | Uint8Array | ArrayBuffer | undefined {
+  private static prepareRequestBody(
+    body?: unknown,
+  ): string | Uint8Array | ArrayBuffer | undefined {
     if (body === undefined || body === null) {
       return undefined;
     }
@@ -24,8 +27,9 @@ export class RouterService {
     }
 
     const allBackends = BackendModel.findAll();
-    const backends = allBackends
-      .filter(b => (b.is_active === true) && allowedBackendIds.includes(b.id));
+    const backends = allBackends.filter(
+      (b) => b.is_active === true && allowedBackendIds.includes(b.id),
+    );
 
     if (backends.length === 0) {
       return null;
@@ -40,7 +44,7 @@ export class RouterService {
     path: string,
     method: string,
     headers: Record<string, string>,
-    body?: unknown
+    body?: unknown,
   ): Promise<Response> {
     let backendPath = path;
     if (backend.base_url.includes('/v1')) {
@@ -83,10 +87,20 @@ export class RouterService {
     path: string,
     method: string,
     headers: Record<string, string>,
-    body?: unknown
-  ): Promise<{ status: number; data: unknown; headers: Record<string, string> }> {
+    body?: unknown,
+  ): Promise<{
+    status: number;
+    data: unknown;
+    headers: Record<string, string>;
+  }> {
     try {
-      const response = await this.rawFetch(backend, path, method, headers, body);
+      const response = await this.rawFetch(
+        backend,
+        path,
+        method,
+        headers,
+        body,
+      );
 
       const data = await response.json().catch(() => ({}));
       const responseHeaders = Object.fromEntries(response.headers.entries());
@@ -98,37 +112,45 @@ export class RouterService {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      
+
       // Extract detailed error information from error cause
       let cause: string | undefined;
       let errorType: string;
-      
+
       if (error instanceof Error && error.cause) {
         const causeError = error.cause as any;
         const causeCode = causeError.code || causeError.errno;
         const causeSyscall = causeError.syscall;
         const causeAddress = causeError.address || causeError.hostname;
         const causePort = causeError.port;
-        
+
         if (causeCode === 'ECONNREFUSED') {
           errorType = 'Backend connection refused';
-          cause = causeAddress && causePort 
-            ? `Backend server at ${causeAddress}:${causePort} is not accepting connections`
-            : 'Backend server is not accepting connections';
+          cause =
+            causeAddress && causePort
+              ? `Backend server at ${causeAddress}:${causePort} is not accepting connections`
+              : 'Backend server is not accepting connections';
         } else if (causeCode === 'ETIMEDOUT' || causeCode === 'ECONNABORTED') {
           errorType = 'Backend request timeout';
           cause = 'Connection to backend timed out';
         } else if (causeCode === 'ENOTFOUND') {
           errorType = 'Backend unreachable';
-          cause = causeAddress ? `Could not resolve hostname: ${causeAddress}` : 'Could not resolve backend hostname';
+          cause = causeAddress
+            ? `Could not resolve hostname: ${causeAddress}`
+            : 'Could not resolve backend hostname';
         } else if (causeCode === 'EPIPE' || causeSyscall === 'write') {
           errorType = 'Backend connection lost';
-          cause = causeSyscall ? `Connection broken during ${causeSyscall} operation` : 'Connection broken during operation';
+          cause = causeSyscall
+            ? `Connection broken during ${causeSyscall} operation`
+            : 'Connection broken during operation';
         } else {
           errorType = 'Backend connection error';
           cause = `${causeCode || 'Unknown error'} during ${causeSyscall || 'connection'}`;
         }
-      } else if (errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNABORTED')) {
+      } else if (
+        errorMsg.includes('ETIMEDOUT') ||
+        errorMsg.includes('ECONNABORTED')
+      ) {
         errorType = 'Backend request timeout';
         cause = 'Connection timed out after 30s';
       } else if (errorMsg.includes('aborted')) {
@@ -159,13 +181,19 @@ export class RouterService {
     path: string,
     method: string,
     headers: Record<string, string>,
-    body?: unknown
+    body?: unknown,
   ): Promise<
     | { response: Response }
     | { status: number; data: unknown; headers: Record<string, string> }
   > {
     try {
-      const response = await this.rawFetch(backend, path, method, headers, body);
+      const response = await this.rawFetch(
+        backend,
+        path,
+        method,
+        headers,
+        body,
+      );
       return { response };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -182,23 +210,31 @@ export class RouterService {
 
         if (causeCode === 'ECONNREFUSED') {
           errorType = 'Backend connection refused';
-          cause = causeAddress && causePort
-            ? `Backend server at ${causeAddress}:${causePort} is not accepting connections`
-            : 'Backend server is not accepting connections';
+          cause =
+            causeAddress && causePort
+              ? `Backend server at ${causeAddress}:${causePort} is not accepting connections`
+              : 'Backend server is not accepting connections';
         } else if (causeCode === 'ETIMEDOUT' || causeCode === 'ECONNABORTED') {
           errorType = 'Backend request timeout';
           cause = 'Connection to backend timed out';
         } else if (causeCode === 'ENOTFOUND') {
           errorType = 'Backend unreachable';
-          cause = causeAddress ? `Could not resolve hostname: ${causeAddress}` : 'Could not resolve backend hostname';
+          cause = causeAddress
+            ? `Could not resolve hostname: ${causeAddress}`
+            : 'Could not resolve backend hostname';
         } else if (causeCode === 'EPIPE' || causeSyscall === 'write') {
           errorType = 'Backend connection lost';
-          cause = causeSyscall ? `Connection broken during ${causeSyscall} operation` : 'Connection broken during operation';
+          cause = causeSyscall
+            ? `Connection broken during ${causeSyscall} operation`
+            : 'Connection broken during operation';
         } else {
           errorType = 'Backend connection error';
           cause = `${causeCode || 'Unknown error'} during ${causeSyscall || 'connection'}`;
         }
-      } else if (errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNABORTED')) {
+      } else if (
+        errorMsg.includes('ETIMEDOUT') ||
+        errorMsg.includes('ECONNABORTED')
+      ) {
         errorType = 'Backend request timeout';
         cause = 'Connection timed out after 30s';
       } else if (errorMsg.includes('aborted')) {

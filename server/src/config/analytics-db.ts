@@ -1,9 +1,27 @@
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
-import { ensureDir, getAnalyticsDbPath } from './db-paths';
+
+import { ensureDir, getAnalyticsDbPath } from './db-paths.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let db: Database.Database;
+
+function loadSchema(database: Database.Database): void {
+  const schemaPath = path.join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'database',
+    'analytics-schema.sql',
+  );
+  const schema = fs.readFileSync(schemaPath, 'utf-8');
+  database.exec(schema);
+}
 
 export function getAnalyticsDb(): Database.Database {
   if (!db) {
@@ -12,29 +30,22 @@ export function getAnalyticsDb(): Database.Database {
 
     db = new Database(analyticsDbPath);
     db.pragma('foreign_keys = ON');
-
-    const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'analytics-schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf-8');
-    db.exec(schema);
+    loadSchema(db);
   }
   return db;
 }
 
 export function initAnalyticsDb(): Database.Database {
-  // Close existing connection if any
   if (db) {
     db.close();
   }
-  
+
   const analyticsDbPath = getAnalyticsDbPath();
   ensureDir(path.dirname(analyticsDbPath));
 
   db = new Database(analyticsDbPath);
   db.pragma('foreign_keys = ON');
-
-  const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'analytics-schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf-8');
-  db.exec(schema);
+  loadSchema(db);
 
   return db;
 }

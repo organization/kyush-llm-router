@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import request from 'supertest';
-import http from 'http';
+
+import { request } from '../utils/httpClient';
 import { createTestApp } from '../utils/testApp';
 import { createMockBackend } from '../utils/mockBackend';
 import { initDb } from '../../src/config/database';
@@ -23,13 +23,21 @@ describe('Streaming Response Proxying', () => {
       id: 'chatcmpl-stream-1',
       object: 'chat.completion.chunk',
       model: 'mock-model',
-      choices: [{ index: 0, delta: { role: 'assistant', content: 'Hello' }, finish_reason: null }],
+      choices: [
+        {
+          index: 0,
+          delta: { role: 'assistant', content: 'Hello' },
+          finish_reason: null,
+        },
+      ],
     }),
     JSON.stringify({
       id: 'chatcmpl-stream-1',
       object: 'chat.completion.chunk',
       model: 'mock-model',
-      choices: [{ index: 0, delta: { content: ' world' }, finish_reason: null }],
+      choices: [
+        { index: 0, delta: { content: ' world' }, finish_reason: null },
+      ],
     }),
     JSON.stringify({
       id: 'chatcmpl-stream-1',
@@ -51,14 +59,16 @@ describe('Streaming Response Proxying', () => {
     const allBackendsResponse = await admin.get('/admin/backends');
     for (const backend of allBackendsResponse.body) {
       if (backend.is_active) {
-        await admin.put(`/admin/backends/${backend.id}`).send({ is_active: false });
+        await admin
+          .put(`/admin/backends/${backend.id}`)
+          .send({ is_active: false });
       }
     }
   });
 
   afterEach(async () => {
     if (mockServer) {
-      await new Promise<void>(resolve => mockServer.close(resolve));
+      await new Promise<void>((resolve) => mockServer.close(resolve));
       mockServer = undefined;
     }
   });
@@ -68,7 +78,9 @@ describe('Streaming Response Proxying', () => {
     const allBackendsResponse = await admin.get('/admin/backends');
     for (const backend of allBackendsResponse.body) {
       if (!backend.is_active) {
-        await admin.put(`/admin/backends/${backend.id}`).send({ is_active: true });
+        await admin
+          .put(`/admin/backends/${backend.id}`)
+          .send({ is_active: true });
       }
     }
   });
@@ -78,11 +90,15 @@ describe('Streaming Response Proxying', () => {
     const allBackendsResponse = await admin.get('/admin/backends');
     for (const backend of allBackendsResponse.body) {
       if (backend.is_active) {
-        await admin.put(`/admin/backends/${backend.id}`).send({ is_active: false });
+        await admin
+          .put(`/admin/backends/${backend.id}`)
+          .send({ is_active: false });
       }
     }
 
-    const userResponse = await admin.post('/admin/users').send({ name: `Stream Test User ${Date.now()}` });
+    const userResponse = await admin
+      .post('/admin/users')
+      .send({ name: `Stream Test User ${Date.now()}` });
     const userApiKey = userResponse.body.api_key;
     const userId = userResponse.body.id;
 
@@ -92,7 +108,9 @@ describe('Streaming Response Proxying', () => {
     });
     const backendId = backendResponse.body.id;
 
-    await admin.post('/admin/permissions').send({ user_id: userId, backend_id: backendId });
+    await admin
+      .post('/admin/permissions')
+      .send({ user_id: userId, backend_id: backendId });
 
     return { userApiKey, userId, backendId };
   }
@@ -140,7 +158,9 @@ describe('Streaming Response Proxying', () => {
     const body = response.text;
 
     // Should contain all three data chunks plus [DONE]
-    const dataLines = body.split('\n').filter((line: string) => line.startsWith('data: '));
+    const dataLines = body
+      .split('\n')
+      .filter((line: string) => line.startsWith('data: '));
     expect(dataLines.length).toBe(4); // 3 chunks + [DONE]
 
     // Verify first chunk
@@ -187,7 +207,13 @@ describe('Streaming Response Proxying', () => {
       chatResponse: {
         id: 'non-stream-1',
         model: 'mock-model',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'Hello' }, finish_reason: 'stop' }],
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'Hello' },
+            finish_reason: 'stop',
+          },
+        ],
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
       },
       modelsResponse: [{ id: 'mock-model', object: 'model' }],

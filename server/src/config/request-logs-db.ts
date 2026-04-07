@@ -1,18 +1,41 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { ensureDir, getRequestLogsDbPath, getRequestLogsDir } from './db-paths';
-import { getLocalMonthKey } from '../utils/time';
+
+import {
+  ensureDir,
+  getRequestLogsDbPath,
+  getRequestLogsDir,
+} from './db-paths.js';
+
+import { getLocalMonthKey } from '../utils/time.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const connections = new Map<string, Database.Database>();
 
-function hasColumn(database: Database.Database, tableName: string, columnName: string): boolean {
-  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+function hasColumn(
+  database: Database.Database,
+  tableName: string,
+  columnName: string,
+): boolean {
+  const columns = database
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all() as Array<{ name: string }>;
   return columns.some((column) => column.name === columnName);
 }
 
 function initRequestLogsSchema(db: Database.Database): void {
-  const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'request-logs-schema.sql');
+  const schemaPath = path.join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'database',
+    'request-logs-schema.sql',
+  );
   const schema = fs.readFileSync(schemaPath, 'utf-8');
   db.exec(schema);
   if (hasColumn(db, 'request_logs', 'routed_model') === false) {
@@ -20,7 +43,9 @@ function initRequestLogsSchema(db: Database.Database): void {
   }
 }
 
-export function getRequestLogsDb(monthKey: string = getLocalMonthKey()): Database.Database {
+export function getRequestLogsDb(
+  monthKey: string = getLocalMonthKey(),
+): Database.Database {
   const existing = connections.get(monthKey);
   if (existing) {
     return existing;
@@ -35,7 +60,9 @@ export function getRequestLogsDb(monthKey: string = getLocalMonthKey()): Databas
   return db;
 }
 
-export function initRequestLogsDb(monthKey: string = getLocalMonthKey()): Database.Database {
+export function initRequestLogsDb(
+  monthKey: string = getLocalMonthKey(),
+): Database.Database {
   const existing = connections.get(monthKey);
   if (existing) {
     existing.close();

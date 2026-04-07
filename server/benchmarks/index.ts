@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { BenchmarkConfig, BenchmarkEnv, setupBenchmark, runBenchmark } from './runner';
+
+import {
+  type BenchmarkConfig,
+  type BenchmarkEnv,
+  setupBenchmark,
+  runBenchmark,
+} from './runner';
 import { Scenarios, createRealBackendPayload } from './scenarios';
-import { calculateStats, BenchmarkResult } from './stats';
+import { calculateStats, type BenchmarkResult } from './stats';
 import { printReport, exportToJSON } from './report';
 
 // Utility: Normalize backend URL (remove trailing slash and /v1 prefix)
@@ -21,7 +27,7 @@ function normalizeBackendUrl(url: string): string {
 // Utility: Build request headers with optional authentication
 function buildHeaders(authToken?: string): Record<string, string> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   };
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
@@ -35,18 +41,18 @@ function buildUrls(
   backendBaseUrl: string | undefined,
   routerPort: number | undefined,
   mockBackendPort: number | undefined,
-  endpoint: string
+  endpoint: string,
 ): { directUrl: string; routeUrl: string } {
   if (backendType === 'real') {
     const normalizedUrl = normalizeBackendUrl(backendBaseUrl || '');
     return {
       directUrl: `${normalizedUrl}${endpoint}`,
-      routeUrl: `http://localhost:${routerPort || 3099}${endpoint}`
+      routeUrl: `http://localhost:${routerPort || 3099}${endpoint}`,
     };
   } else {
     return {
       directUrl: `http://localhost:${mockBackendPort}${endpoint}`,
-      routeUrl: `http://localhost:${routerPort || 3099}${endpoint}`
+      routeUrl: `http://localhost:${routerPort || 3099}${endpoint}`,
     };
   }
 }
@@ -57,14 +63,14 @@ async function runScenarioBenchmark(
   scenario: any,
   config: BenchmarkConfig,
   env: BenchmarkEnv | null,
-  backendApiKey?: string
+  backendApiKey?: string,
 ): Promise<{ directResults: any[]; routeResults: any[] }> {
   const urls = buildUrls(
     backendType,
     config.backendUrl,
     env?.routerPort,
     env?.mockBackendPort,
-    scenario.endpoint
+    scenario.endpoint,
   );
 
   const directHeaders = buildHeaders(backendApiKey);
@@ -73,7 +79,7 @@ async function runScenarioBenchmark(
   const benchmarkConfig = {
     concurrent: config.concurrentRequests,
     total: config.totalRequests,
-    warmup: config.warmupRequests
+    warmup: config.warmupRequests,
   };
 
   if (backendType === 'real') {
@@ -86,7 +92,7 @@ async function runScenarioBenchmark(
     scenario.method,
     scenario.payload,
     directHeaders,
-    benchmarkConfig
+    benchmarkConfig,
   );
 
   console.log(chalk.yellow('  Running routed requests...'));
@@ -95,7 +101,7 @@ async function runScenarioBenchmark(
     scenario.method,
     scenario.payload,
     routeHeaders,
-    benchmarkConfig
+    benchmarkConfig,
   );
 
   return { directResults: directRaw, routeResults: routeRaw };
@@ -111,7 +117,10 @@ program
   .option('-r, --requests <number>', 'Total number of requests', '100')
   .option('-w, --warmup <number>', 'Number of warmup requests', '5')
   .option('-b, --backend <type>', 'Backend type (mock|real)', 'mock')
-  .option('-u, --backend-url <url>', 'Real backend URL (required for real backend)')
+  .option(
+    '-u, --backend-url <url>',
+    'Real backend URL (required for real backend)',
+  )
   .option('-k, --backend-key <key>', 'Real backend API key (optional)')
   .option('-o, --output <file>', 'Export results to JSON file')
   .parse(process.argv);
@@ -120,19 +129,21 @@ const options = program.opts();
 
 async function main() {
   console.log(chalk.bold.cyan('\n🚀 LLM Router Benchmark Tool\n'));
-  
+
   const config: BenchmarkConfig = {
     concurrentRequests: parseInt(options.concurrent),
     totalRequests: parseInt(options.requests),
     warmupRequests: parseInt(options.warmup),
     backendType: options.backend as 'mock' | 'real',
     backendUrl: options.backendUrl,
-    backendApiKey: options.backendKey
+    backendApiKey: options.backendKey,
   };
 
   // Validate real backend options
   if (config.backendType === 'real' && !config.backendUrl) {
-    console.error(chalk.red('Error: --backend-url is required for real backend'));
+    console.error(
+      chalk.red('Error: --backend-url is required for real backend'),
+    );
     process.exit(1);
   }
 
@@ -148,7 +159,7 @@ async function main() {
     const scenarios = [
       Scenarios.smallPayload(),
       Scenarios.largePayload(),
-      Scenarios.modelsEndpoint()
+      Scenarios.modelsEndpoint(),
     ];
 
     if (config.backendType === 'real') {
@@ -165,13 +176,17 @@ async function main() {
         scenario,
         config,
         env,
-        config.backendApiKey
+        config.backendApiKey,
       );
 
       // Calculate statistics
-      const directStats = calculateStats(directResults, scenario.name, 'direct');
+      const directStats = calculateStats(
+        directResults,
+        scenario.name,
+        'direct',
+      );
       const routeStats = calculateStats(routeResults, scenario.name, 'route');
-      
+
       allResults.push(directStats, routeStats);
     }
 
@@ -180,16 +195,19 @@ async function main() {
       concurrent: config.concurrentRequests,
       total: config.totalRequests,
       warmup: config.warmupRequests,
-      backend: config.backendType
+      backend: config.backendType,
     });
 
     // Export to JSON if requested
     if (options.output) {
       exportToJSON(allResults, options.output);
     }
-
   } catch (error) {
-    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    console.error(
+      chalk.red(
+        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      ),
+    );
     process.exit(1);
   } finally {
     // Cleanup

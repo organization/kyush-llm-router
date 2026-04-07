@@ -1,5 +1,6 @@
-import type { JSX, ParentProps } from 'solid-js';
 import { cn } from '../lib/cn';
+
+import type { JSX, ParentProps } from 'solid-js';
 
 interface PanelProps extends ParentProps {
   title?: string;
@@ -16,7 +17,9 @@ export function Panel(props: PanelProps) {
         <div class="ui-panel__header">
           <div class="ui-panel__header-copy">
             {props.title && <h3 class="ui-panel__title">{props.title}</h3>}
-            {props.description && <p class="ui-subtitle">{props.description}</p>}
+            {props.description && (
+              <p class="ui-subtitle">{props.description}</p>
+            )}
           </div>
           {props.actions}
         </div>

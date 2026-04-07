@@ -1,21 +1,23 @@
-import { NextFunction, Request, Response } from 'express';
-import { AdminPrincipal } from '../../../shared/types';
-import { getTrustedProxyIps } from '../config/admin-auth';
-import { AdminApiTokenModel } from '../models/AdminApiToken';
-import { AdminSessionModel } from '../models/AdminSession';
-import { getSessionTokenFromCookies, hashAdminToken } from './adminSecurity';
+import { getSessionTokenFromCookies, hashAdminToken } from './adminSecurity.js';
 
-export interface AdminRequest extends Request {
-  adminAuth?: {
-    principal: AdminPrincipal;
-    method: 'session' | 'token';
-    csrfToken?: string;
-    sessionId?: number;
-    tokenId?: number;
-  };
-}
+import { getTrustedProxyIps } from '../config/admin-auth.js';
 
-function toPrincipal(data: { provider: 'env' | 'oidc'; subject: string; username?: string; email?: string; display_name: string }): AdminPrincipal {
+import { AdminApiTokenModel } from '../models/AdminApiToken.js';
+
+import { AdminSessionModel } from '../models/AdminSession.js';
+
+import type { Context, MiddlewareHandler } from 'hono';
+import type { AdminPrincipal } from '../../../shared/types.js';
+
+import type { AdminAuthContext, AppEnv } from '../types/hono.js';
+
+function toPrincipal(data: {
+  provider: 'env' | 'oidc';
+  subject: string;
+  username?: string;
+  email?: string;
+  display_name: string;
+}): AdminPrincipal {
   return {
     provider: data.provider,
     subject: data.subject,
@@ -25,83 +27,115 @@ function toPrincipal(data: { provider: 'env' | 'oidc'; subject: string; username
   };
 }
 
-function passesTrustedProxyGuard(req: Request): boolean {
+function getRemoteIp(c: Context): string {
+  const forwarded = c.req.header('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0]?.trim() ?? '';
+  }
+  // @hono/node-server exposes the underlying IncomingMessage as c.env.incoming
+  const incoming = (
+    c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined
+  )?.incoming;
+  return incoming?.socket?.remoteAddress ?? '';
+}
+
+function passesTrustedProxyGuard(c: Context): boolean {
   const allowedIps = getTrustedProxyIps();
   if (allowedIps.length === 0) {
     return true;
   }
 
-  const remoteIp = req.ip || req.socket.remoteAddress || '';
+  const remoteIp = getRemoteIp(c);
   return allowedIps.includes(remoteIp);
 }
 
-export function resolveAdminAuth(req: AdminRequest): void {
-  const authHeader = req.headers.authorization;
+export function resolveAdminAuth(
+  c: Context<AppEnv>,
+): AdminAuthContext | undefined {
+  const authHeader = c.req.header('authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const bearerToken = authHeader.slice('Bearer '.length).trim();
-    const adminToken = AdminApiTokenModel.findByTokenHash(hashAdminToken(bearerToken));
+    const adminToken = AdminApiTokenModel.findByTokenHash(
+      hashAdminToken(bearerToken),
+    );
     if (adminToken) {
       AdminApiTokenModel.touch(adminToken.id);
-      req.adminAuth = {
+      const ctx: AdminAuthContext = {
         principal: toPrincipal(adminToken),
         method: 'token',
         tokenId: adminToken.id,
       };
-      return;
+      c.set('adminAuth', ctx);
+      return ctx;
     }
   }
 
-  const sessionToken = getSessionTokenFromCookies(req.headers.cookie);
+  const sessionToken = getSessionTokenFromCookies(c.req.header('cookie'));
   if (!sessionToken) {
-    return;
+    return undefined;
   }
 
-  const session = AdminSessionModel.findByTokenHash(hashAdminToken(sessionToken));
+  const session = AdminSessionModel.findByTokenHash(
+    hashAdminToken(sessionToken),
+  );
   if (!session) {
-    return;
+    return undefined;
   }
 
   AdminSessionModel.touch(session.id);
-  req.adminAuth = {
+  const ctx: AdminAuthContext = {
     principal: toPrincipal(session),
     method: 'session',
     csrfToken: session.csrf_token,
     sessionId: session.id,
   };
+  c.set('adminAuth', ctx);
+  return ctx;
 }
 
-export function requireAdminAccess(req: AdminRequest, res: Response, next: NextFunction): void {
-  if (!passesTrustedProxyGuard(req)) {
-    res.status(403).json({ error: 'Admin access is restricted to trusted proxy IPs' });
-    return;
+export const requireAdminAccess: MiddlewareHandler<AppEnv> = async (
+  c,
+  next,
+) => {
+  if (!passesTrustedProxyGuard(c)) {
+    return c.json(
+      { error: 'Admin access is restricted to trusted proxy IPs' },
+      403,
+    );
   }
 
-  resolveAdminAuth(req);
-  if (!req.adminAuth) {
-    res.status(401).json({ error: 'Admin authentication required' });
-    return;
+  const auth = resolveAdminAuth(c);
+  if (!auth) {
+    return c.json({ error: 'Admin authentication required' }, 401);
   }
 
-  next();
-}
+  await next();
+  return;
+};
 
-export function requireSessionCsrf(req: AdminRequest, res: Response, next: NextFunction): void {
-  const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase());
+export const requireSessionCsrf: MiddlewareHandler<AppEnv> = async (
+  c,
+  next,
+) => {
+  const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(
+    c.req.method.toUpperCase(),
+  );
   if (!unsafeMethod) {
-    next();
+    await next();
     return;
   }
 
-  if (req.adminAuth?.method !== 'session') {
-    next();
+  const adminAuth = c.get('adminAuth');
+  if (adminAuth?.method !== 'session') {
+    await next();
     return;
   }
 
-  const csrfHeader = req.get('X-CSRF-Token');
-  if (!csrfHeader || csrfHeader !== req.adminAuth.csrfToken) {
-    res.status(403).json({ error: 'Invalid CSRF token' });
-    return;
+  const csrfHeader = c.req.header('X-CSRF-Token');
+  if (!csrfHeader || csrfHeader !== adminAuth.csrfToken) {
+    return c.json({ error: 'Invalid CSRF token' }, 403);
   }
 
-  next();
-}
+  await next();
+  return;
+};

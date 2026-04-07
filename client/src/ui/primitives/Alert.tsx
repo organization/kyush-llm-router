@@ -1,5 +1,6 @@
-import type { JSX, ParentProps } from 'solid-js';
 import { cn } from '../lib/cn';
+
+import type { JSX, ParentProps } from 'solid-js';
 
 type AlertTone = 'info' | 'success' | 'warning' | 'danger';
 
@@ -12,7 +13,10 @@ interface AlertProps extends ParentProps {
 
 export function Alert(props: AlertProps) {
   return (
-    <div class={cn('ui-alert', `ui-alert--${props.tone ?? 'info'}`, props.class)} role="alert">
+    <div
+      class={cn('ui-alert', `ui-alert--${props.tone ?? 'info'}`, props.class)}
+      role="alert"
+    >
       {props.title && <strong>{props.title}</strong>}
       <div>{props.children}</div>
       {props.actions}

@@ -1,5 +1,13 @@
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import {
+  For,
+  Show,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} from 'solid-js';
 import * as d3 from 'd3';
+
 import { Button } from '../primitives/Button';
 import { cn } from '../lib/cn';
 
@@ -59,7 +67,10 @@ function createChartEnvironment() {
       observer.observe(rootRef);
     }
 
-    mutationObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    mutationObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
 
     onCleanup(() => {
       observer.disconnect();
@@ -76,7 +87,11 @@ function createChartEnvironment() {
   };
 }
 
-function buildChartDimensions(width: number, height: number, marginRight: number = 56): ChartDimensions {
+function buildChartDimensions(
+  width: number,
+  height: number,
+  marginRight: number = 56,
+): ChartDimensions {
   return {
     width,
     height,
@@ -88,15 +103,24 @@ function buildChartDimensions(width: number, height: number, marginRight: number
 }
 
 function getInnerWidth(dimensions: ChartDimensions): number {
-  return Math.max(0, dimensions.width - dimensions.marginLeft - dimensions.marginRight);
+  return Math.max(
+    0,
+    dimensions.width - dimensions.marginLeft - dimensions.marginRight,
+  );
 }
 
 function getInnerHeight(dimensions: ChartDimensions): number {
-  return Math.max(0, dimensions.height - dimensions.marginTop - dimensions.marginBottom);
+  return Math.max(
+    0,
+    dimensions.height - dimensions.marginTop - dimensions.marginBottom,
+  );
 }
 
 function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function formatPercent(value: number): string {
@@ -108,7 +132,8 @@ function getDateTicks(values: Date[], width: number): Date[] {
     return values;
   }
 
-  const scale = d3.scaleUtc()
+  const scale = d3
+    .scaleUtc()
     .domain(d3.extent(values) as [Date, Date])
     .range([0, width]);
 
@@ -158,35 +183,60 @@ export function ChartLegend(props: ChartLegendProps) {
   return (
     <div class="ui-chart__legend">
       <For each={props.items}>
-        {(item) => (
+        {(item) =>
           props.onToggle ? (
             <button
-              type="button"
-              class={cn('ui-chart__legend-button', props.mutedKeys?.has(item.key) && 'ui-chart__legend-button--muted')}
+              class={cn(
+                'ui-chart__legend-button',
+                props.mutedKeys?.has(item.key) &&
+                  'ui-chart__legend-button--muted',
+              )}
               onClick={() => props.onToggle?.(item.key)}
+              type="button"
             >
-              <span class="ui-chart__legend-swatch" style={{ background: item.color }} />
+              <span
+                class="ui-chart__legend-swatch"
+                style={{ background: item.color }}
+              />
               <span>{item.label}</span>
             </button>
           ) : (
             <div class="ui-chart__legend-static">
-              <span class="ui-chart__legend-swatch" style={{ background: item.color }} />
+              <span
+                class="ui-chart__legend-swatch"
+                style={{ background: item.color }}
+              />
               <span>{item.label}</span>
             </div>
           )
-        )}
+        }
       </For>
     </div>
   );
 }
 
 type ParsedTimeSeriesDatum = TimeSeriesDatum & { parsedDate: Date };
-type ParsedComboDatum = { date: string; lineValue: number; barValue: number; parsedDate: Date };
-type ParsedBoxPlotDatum = { date: string; min: number; q1: number; median: number; q3: number; max: number; parsedDate: Date };
+type ParsedComboDatum = {
+  date: string;
+  lineValue: number;
+  barValue: number;
+  parsedDate: Date;
+};
+type ParsedBoxPlotDatum = {
+  date: string;
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  parsedDate: Date;
+};
 
 export function TimeSeriesChart(props: TimeSeriesChartProps) {
   const env = createChartEnvironment();
-  const [internalHiddenSeries, setInternalHiddenSeries] = createSignal<Set<string>>(new Set());
+  const [internalHiddenSeries, setInternalHiddenSeries] = createSignal<
+    Set<string>
+  >(new Set());
   const [hoverIndex, setHoverIndex] = createSignal<number | null>(null);
 
   const theme = createMemo(() => {
@@ -194,10 +244,20 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
     return readChartTheme();
   });
 
-  const hiddenSeries = createMemo(() => props.hiddenKeys ?? internalHiddenSeries());
-  const visibleSeries = createMemo(() => props.series.filter((series) => !hiddenSeries().has(series.key)));
+  const hiddenSeries = createMemo(
+    () => props.hiddenKeys ?? internalHiddenSeries(),
+  );
+  const visibleSeries = createMemo(() =>
+    props.series.filter((series) => !hiddenSeries().has(series.key)),
+  );
   const chartHeight = () => props.height ?? 240;
-  const dimensions = createMemo(() => buildChartDimensions(env.width(), chartHeight(), props.series.some((series) => series.axis === 'right') ? 56 : 20));
+  const dimensions = createMemo(() =>
+    buildChartDimensions(
+      env.width(),
+      chartHeight(),
+      props.series.some((series) => series.axis === 'right') ? 56 : 20,
+    ),
+  );
 
   const points = createMemo(() =>
     props.data
@@ -205,49 +265,97 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
         ...row,
         parsedDate: parseDate(row.date),
       }))
-      .filter((row): row is ParsedTimeSeriesDatum => row.parsedDate instanceof Date)
-      .sort((left, right) => left.parsedDate.getTime() - right.parsedDate.getTime())
+      .filter(
+        (row): row is ParsedTimeSeriesDatum => row.parsedDate instanceof Date,
+      )
+      .sort(
+        (left, right) => left.parsedDate.getTime() - right.parsedDate.getTime(),
+      ),
   );
 
   const xScale = createMemo(() => {
     const values = points().map((point) => point.parsedDate);
     const domain = d3.extent(values) as [Date, Date];
-    return d3.scaleUtc().domain(domain).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
+    return d3
+      .scaleUtc()
+      .domain(domain)
+      .range([
+        dimensions().marginLeft,
+        dimensions().marginLeft + getInnerWidth(dimensions()),
+      ]);
   });
 
-  const leftSeries = createMemo(() => visibleSeries().filter((series) => series.axis !== 'right'));
-  const rightSeries = createMemo(() => visibleSeries().filter((series) => series.axis === 'right'));
+  const leftSeries = createMemo(() =>
+    visibleSeries().filter((series) => series.axis !== 'right'),
+  );
+  const rightSeries = createMemo(() =>
+    visibleSeries().filter((series) => series.axis === 'right'),
+  );
 
   const leftScale = createMemo(() => {
     const maxValue =
       d3.max(points(), (point: ParsedTimeSeriesDatum) =>
-        d3.max(leftSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
+        d3.max(leftSeries(), (series: TimeSeriesChartSeries) =>
+          Number(point[series.key] ?? 0),
+        ),
       ) ?? 0;
-    return d3.scaleLinear().domain([0, maxValue === 0 ? 1 : maxValue * 1.1]).nice().range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    return d3
+      .scaleLinear()
+      .domain([0, maxValue === 0 ? 1 : maxValue * 1.1])
+      .nice()
+      .range([
+        dimensions().marginTop + getInnerHeight(dimensions()),
+        dimensions().marginTop,
+      ]);
   });
 
   const rightScale = createMemo(() => {
     const maxValue =
       d3.max(points(), (point: ParsedTimeSeriesDatum) =>
-        d3.max(rightSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
+        d3.max(rightSeries(), (series: TimeSeriesChartSeries) =>
+          Number(point[series.key] ?? 0),
+        ),
       ) ?? 0;
-    return d3.scaleLinear().domain([0, maxValue === 0 ? 1 : maxValue * 1.1]).nice().range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    return d3
+      .scaleLinear()
+      .domain([0, maxValue === 0 ? 1 : maxValue * 1.1])
+      .nice()
+      .range([
+        dimensions().marginTop + getInnerHeight(dimensions()),
+        dimensions().marginTop,
+      ]);
   });
 
   const leftTicks = createMemo(() => leftScale().ticks(4));
-  const rightTicks = createMemo(() => rightSeries().length > 0 ? rightScale().ticks(4) : []);
-  const xTicks = createMemo(() => xScale().ticks(Math.max(2, Math.floor(getInnerWidth(dimensions()) / 120))));
-  const dateTicks = createMemo(() => getDateTicks(points().map((point) => point.parsedDate), getInnerWidth(dimensions())));
+  const rightTicks = createMemo(() =>
+    rightSeries().length > 0 ? rightScale().ticks(4) : [],
+  );
+  const xTicks = createMemo(() =>
+    xScale().ticks(Math.max(2, Math.floor(getInnerWidth(dimensions()) / 120))),
+  );
+  const dateTicks = createMemo(() =>
+    getDateTicks(
+      points().map((point) => point.parsedDate),
+      getInnerWidth(dimensions()),
+    ),
+  );
 
   const linePath = (series: TimeSeriesChartSeries) =>
-    d3.line()
-      .defined((point: ParsedTimeSeriesDatum) => typeof point[series.key] === 'number')
+    d3
+      .line()
+      .defined(
+        (point: ParsedTimeSeriesDatum) => typeof point[series.key] === 'number',
+      )
       .x((point: ParsedTimeSeriesDatum) => xScale()(point.parsedDate))
-      .y((point: ParsedTimeSeriesDatum) => (series.axis === 'right' ? rightScale() : leftScale())(Number(point[series.key] ?? 0)))(points()) ?? '';
+      .y((point: ParsedTimeSeriesDatum) =>
+        (series.axis === 'right' ? rightScale() : leftScale())(
+          Number(point[series.key] ?? 0),
+        ),
+      )(points()) ?? '';
 
   const hoveredPoint = createMemo(() => {
     const index = hoverIndex();
-    return index === null ? null : points()[index] ?? null;
+    return index === null ? null : (points()[index] ?? null);
   });
 
   const tooltipRows = createMemo(() =>
@@ -258,7 +366,7 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
             value: Number(hoveredPoint()?.[series.key] ?? 0),
           }))
           .filter((series) => Number.isFinite(series.value))
-      : []
+      : [],
   );
 
   const toggleSeries = (key: string) => {
@@ -279,35 +387,60 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
   };
 
   const handlePointerMove = (event: PointerEvent) => {
-    const rect = (event.currentTarget as SVGRectElement).getBoundingClientRect();
+    const rect = (
+      event.currentTarget as SVGRectElement
+    ).getBoundingClientRect();
     const offsetX = event.clientX - rect.left;
     const hoveredDate = xScale().invert(offsetX);
-    const nearestIndex = d3.leastIndex(points(), (point: ParsedTimeSeriesDatum) => Math.abs(point.parsedDate.getTime() - hoveredDate.getTime()));
+    const nearestIndex = d3.leastIndex(
+      points(),
+      (point: ParsedTimeSeriesDatum) =>
+        Math.abs(point.parsedDate.getTime() - hoveredDate.getTime()),
+    );
     setHoverIndex(nearestIndex ?? null);
   };
 
   return (
     <div class={cn('ui-chart', props.class)}>
       <Show when={props.showLegend !== false && props.series.length > 1}>
-        <ChartLegend items={props.series} mutedKeys={hiddenSeries()} onToggle={toggleSeries} />
+        <ChartLegend
+          items={props.series}
+          mutedKeys={hiddenSeries()}
+          onToggle={toggleSeries}
+        />
       </Show>
 
       <div class="ui-chart__frame" ref={env.rootRef}>
-        <Show when={env.width() > 0 && points().length > 0} fallback={<div class="ui-chart__empty">No chart data available.</div>}>
-          <svg viewBox={`0 0 ${dimensions().width} ${dimensions().height}`} class="ui-chart__svg" role="img" aria-label={props.tooltipTitle ?? 'Time series chart'}>
+        <Show
+          fallback={<div class="ui-chart__empty">No chart data available.</div>}
+          when={env.width() > 0 && points().length > 0}
+        >
+          <svg
+            aria-label={props.tooltipTitle ?? 'Time series chart'}
+            class="ui-chart__svg"
+            role="img"
+            viewBox={`0 0 ${dimensions().width} ${dimensions().height}`}
+          >
             <g>
               <For each={leftTicks()}>
                 {(tick) => (
                   <g>
                     <line
+                      stroke={theme().border}
+                      stroke-dasharray="3 4"
                       x1={dimensions().marginLeft}
                       x2={dimensions().marginLeft + getInnerWidth(dimensions())}
                       y1={leftScale()(tick)}
                       y2={leftScale()(tick)}
-                      stroke={theme().border}
-                      stroke-dasharray="3 4"
                     />
-                    <text x={dimensions().marginLeft - 8} y={leftScale()(tick)} fill={theme().textMuted} text-anchor="end" dominant-baseline="middle" class="ui-chart__tick">
+                    <text
+                      class="ui-chart__tick"
+                      dominant-baseline="middle"
+                      fill={theme().textMuted}
+                      text-anchor="end"
+                      x={dimensions().marginLeft - 8}
+                      y={leftScale()(tick)}
+                    >
                       {(props.formatLeftValue ?? formatCompactNumber)(tick)}
                     </text>
                   </g>
@@ -317,11 +450,13 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
               <For each={dateTicks()}>
                 {(tick) => (
                   <text
-                    x={xScale()(tick)}
-                    y={dimensions().marginTop + getInnerHeight(dimensions()) + 20}
+                    class="ui-chart__tick"
                     fill={theme().textMuted}
                     text-anchor="middle"
-                    class="ui-chart__tick"
+                    x={xScale()(tick)}
+                    y={
+                      dimensions().marginTop + getInnerHeight(dimensions()) + 20
+                    }
                   >
                     {formatDate(tick)}
                   </text>
@@ -334,9 +469,9 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
                     d={linePath(series)}
                     fill="none"
                     stroke={series.color}
-                    stroke-width="2.25"
-                    stroke-linejoin="round"
                     stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.25"
                   />
                 )}
               </For>
@@ -345,12 +480,12 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
                 <For each={rightTicks()}>
                   {(tick) => (
                     <text
-                      x={dimensions().width - dimensions().marginRight + 8}
-                      y={rightScale()(tick)}
+                      class="ui-chart__tick"
+                      dominant-baseline="middle"
                       fill={theme().textMuted}
                       text-anchor="start"
-                      dominant-baseline="middle"
-                      class="ui-chart__tick"
+                      x={dimensions().width - dimensions().marginRight + 8}
+                      y={rightScale()(tick)}
                     >
                       {(props.formatRightValue ?? formatCompactNumber)(tick)}
                     </text>
@@ -362,20 +497,22 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
                 {(point) => (
                   <>
                     <line
+                      stroke={theme().textMuted}
+                      stroke-dasharray="4 4"
                       x1={xScale()(point().parsedDate)}
                       x2={xScale()(point().parsedDate)}
                       y1={dimensions().marginTop}
                       y2={dimensions().marginTop + getInnerHeight(dimensions())}
-                      stroke={theme().textMuted}
-                      stroke-dasharray="4 4"
                     />
                     <For each={tooltipRows()}>
                       {(series) => (
                         <circle
                           cx={xScale()(point().parsedDate)}
-                          cy={(series.axis === 'right' ? rightScale() : leftScale())(series.value)}
-                          r="4"
+                          cy={(series.axis === 'right'
+                            ? rightScale()
+                            : leftScale())(series.value)}
                           fill={series.color}
+                          r="4"
                           stroke={theme().bg}
                           stroke-width="2"
                         />
@@ -386,13 +523,13 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
               </Show>
 
               <rect
+                fill="transparent"
+                height={getInnerHeight(dimensions())}
+                onPointerLeave={() => setHoverIndex(null)}
+                onPointerMove={handlePointerMove}
+                width={getInnerWidth(dimensions())}
                 x={dimensions().marginLeft}
                 y={dimensions().marginTop}
-                width={getInnerWidth(dimensions())}
-                height={getInnerHeight(dimensions())}
-                fill="transparent"
-                onPointerMove={handlePointerMove}
-                onPointerLeave={() => setHoverIndex(null)}
               />
             </g>
           </svg>
@@ -400,16 +537,23 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
           <Show when={hoveredPoint()}>
             {(point) => (
               <div class="ui-chart__tooltip">
-                <div class="ui-chart__tooltip-title">{formatDate(point().parsedDate)}</div>
+                <div class="ui-chart__tooltip-title">
+                  {formatDate(point().parsedDate)}
+                </div>
                 <For each={tooltipRows()}>
                   {(series) => (
                     <div class="ui-chart__tooltip-row">
-                      <span class="ui-chart__legend-swatch" style={{ background: series.color }} />
+                      <span
+                        class="ui-chart__legend-swatch"
+                        style={{ background: series.color }}
+                      />
                       <span>{series.label}</span>
                       <strong>
                         {(series.axis === 'right'
-                          ? props.formatRightValue ?? formatCompactNumber
-                          : props.formatLeftValue ?? formatCompactNumber)(series.value)}
+                          ? (props.formatRightValue ?? formatCompactNumber)
+                          : (props.formatLeftValue ?? formatCompactNumber))(
+                          series.value,
+                        )}
                       </strong>
                     </div>
                   )}
@@ -451,45 +595,84 @@ export function ComboChart(props: ComboChartProps) {
     env.themeVersion();
     return readChartTheme();
   });
-  const dimensions = createMemo(() => buildChartDimensions(env.width(), props.height ?? 240, 60));
+  const dimensions = createMemo(() =>
+    buildChartDimensions(env.width(), props.height ?? 240, 60),
+  );
   const points = createMemo(() =>
     props.data
       .map((row) => ({ ...row, parsedDate: parseDate(row.date) }))
       .filter((row): row is ParsedComboDatum => row.parsedDate instanceof Date)
-      .sort((left, right) => left.parsedDate.getTime() - right.parsedDate.getTime())
+      .sort(
+        (left, right) => left.parsedDate.getTime() - right.parsedDate.getTime(),
+      ),
   );
   const xScale = createMemo(() => {
     const values = points().map((point) => point.parsedDate);
     const domain = d3.extent(values) as [Date, Date];
-    return d3.scaleUtc().domain(domain).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
+    return d3
+      .scaleUtc()
+      .domain(domain)
+      .range([
+        dimensions().marginLeft,
+        dimensions().marginLeft + getInnerWidth(dimensions()),
+      ]);
   });
   const barScale = createMemo(() => {
-    const maxValue = d3.max(points(), (point: ParsedComboDatum) => point.barValue) ?? 0;
-    return d3.scaleLinear().domain([0, maxValue === 0 ? 1 : maxValue * 1.1]).nice().range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    const maxValue =
+      d3.max(points(), (point: ParsedComboDatum) => point.barValue) ?? 0;
+    return d3
+      .scaleLinear()
+      .domain([0, maxValue === 0 ? 1 : maxValue * 1.1])
+      .nice()
+      .range([
+        dimensions().marginTop + getInnerHeight(dimensions()),
+        dimensions().marginTop,
+      ]);
   });
-  const lineScale = createMemo(() => d3.scaleLinear().domain([0, 100]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]));
-  const dateTicks = createMemo(() => getDateTicks(points().map((point) => point.parsedDate), getInnerWidth(dimensions())));
+  const lineScale = createMemo(() =>
+    d3
+      .scaleLinear()
+      .domain([0, 100])
+      .range([
+        dimensions().marginTop + getInnerHeight(dimensions()),
+        dimensions().marginTop,
+      ]),
+  );
+  const dateTicks = createMemo(() =>
+    getDateTicks(
+      points().map((point) => point.parsedDate),
+      getInnerWidth(dimensions()),
+    ),
+  );
   const barTicks = createMemo(() => barScale().ticks(4));
   const linePath = createMemo(
     () =>
-      d3.line()
+      d3
+        .line()
         .x((point: ParsedComboDatum) => xScale()(point.parsedDate))
-        .y((point: ParsedComboDatum) => lineScale()(point.lineValue))(points()) ?? ''
+        .y((point: ParsedComboDatum) => lineScale()(point.lineValue))(
+        points(),
+      ) ?? '',
   );
   const barWidth = createMemo(() => {
-    const maxSlotWidth = getInnerWidth(dimensions()) / Math.max(1, points().length);
+    const maxSlotWidth =
+      getInnerWidth(dimensions()) / Math.max(1, points().length);
     return Math.max(8, Math.min(48, maxSlotWidth * 0.6));
   });
   const hoveredPoint = createMemo(() => {
     const index = hoverIndex();
-    return index === null ? null : points()[index] ?? null;
+    return index === null ? null : (points()[index] ?? null);
   });
 
   const handlePointerMove = (event: PointerEvent) => {
-    const rect = (event.currentTarget as SVGRectElement).getBoundingClientRect();
+    const rect = (
+      event.currentTarget as SVGRectElement
+    ).getBoundingClientRect();
     const offsetX = event.clientX - rect.left;
     const hoveredDate = xScale().invert(offsetX);
-    const nearestIndex = d3.leastIndex(points(), (point: ParsedComboDatum) => Math.abs(point.parsedDate.getTime() - hoveredDate.getTime()));
+    const nearestIndex = d3.leastIndex(points(), (point: ParsedComboDatum) =>
+      Math.abs(point.parsedDate.getTime() - hoveredDate.getTime()),
+    );
     setHoverIndex(nearestIndex ?? null);
   };
 
@@ -498,27 +681,50 @@ export function ComboChart(props: ComboChartProps) {
       <Show when={props.showLegend !== false}>
         <ChartLegend
           items={[
-            { key: 'line', label: props.lineLabel, color: props.lineColor ?? theme().accent },
-            { key: 'bar', label: props.barLabel, color: props.barColor ?? theme().danger },
+            {
+              key: 'line',
+              label: props.lineLabel,
+              color: props.lineColor ?? theme().accent,
+            },
+            {
+              key: 'bar',
+              label: props.barLabel,
+              color: props.barColor ?? theme().danger,
+            },
           ]}
         />
       </Show>
 
       <div class="ui-chart__frame" ref={env.rootRef}>
-        <Show when={env.width() > 0 && points().length > 0} fallback={<div class="ui-chart__empty">No chart data available.</div>}>
-          <svg viewBox={`0 0 ${dimensions().width} ${dimensions().height}`} class="ui-chart__svg" role="img" aria-label="Combo chart">
+        <Show
+          fallback={<div class="ui-chart__empty">No chart data available.</div>}
+          when={env.width() > 0 && points().length > 0}
+        >
+          <svg
+            aria-label="Combo chart"
+            class="ui-chart__svg"
+            role="img"
+            viewBox={`0 0 ${dimensions().width} ${dimensions().height}`}
+          >
             <For each={barTicks()}>
               {(tick) => (
                 <>
                   <line
+                    stroke={theme().border}
+                    stroke-dasharray="3 4"
                     x1={dimensions().marginLeft}
                     x2={dimensions().marginLeft + getInnerWidth(dimensions())}
                     y1={barScale()(tick)}
                     y2={barScale()(tick)}
-                    stroke={theme().border}
-                    stroke-dasharray="3 4"
                   />
-                  <text x={dimensions().marginLeft - 8} y={barScale()(tick)} fill={theme().textMuted} text-anchor="end" dominant-baseline="middle" class="ui-chart__tick">
+                  <text
+                    class="ui-chart__tick"
+                    dominant-baseline="middle"
+                    fill={theme().textMuted}
+                    text-anchor="end"
+                    x={dimensions().marginLeft - 8}
+                    y={barScale()(tick)}
+                  >
                     {formatCompactNumber(tick)}
                   </text>
                 </>
@@ -528,27 +734,44 @@ export function ComboChart(props: ComboChartProps) {
             <For each={points()}>
               {(point) => (
                 <rect
-                  x={Math.max(dimensions().marginLeft, Math.min(xScale()(point.parsedDate) - barWidth() / 2, dimensions().marginLeft + getInnerWidth(dimensions()) - barWidth()))}
-                  y={barScale()(point.barValue)}
-                  width={barWidth()}
-                  height={dimensions().marginTop + getInnerHeight(dimensions()) - barScale()(point.barValue)}
                   fill={props.barColor ?? theme().danger}
+                  height={
+                    dimensions().marginTop +
+                    getInnerHeight(dimensions()) -
+                    barScale()(point.barValue)
+                  }
                   opacity="0.7"
                   rx="2"
+                  width={barWidth()}
+                  x={Math.max(
+                    dimensions().marginLeft,
+                    Math.min(
+                      xScale()(point.parsedDate) - barWidth() / 2,
+                      dimensions().marginLeft +
+                        getInnerWidth(dimensions()) -
+                        barWidth(),
+                    ),
+                  )}
+                  y={barScale()(point.barValue)}
                 />
               )}
             </For>
 
-            <path d={linePath()} fill="none" stroke={props.lineColor ?? theme().accent} stroke-width="2.25" />
+            <path
+              d={linePath()}
+              fill="none"
+              stroke={props.lineColor ?? theme().accent}
+              stroke-width="2.25"
+            />
 
             <For each={dateTicks()}>
               {(tick) => (
                 <text
-                  x={xScale()(tick)}
-                  y={dimensions().marginTop + getInnerHeight(dimensions()) + 20}
+                  class="ui-chart__tick"
                   fill={theme().textMuted}
                   text-anchor="middle"
-                  class="ui-chart__tick"
+                  x={xScale()(tick)}
+                  y={dimensions().marginTop + getInnerHeight(dimensions()) + 20}
                 >
                   {formatDate(tick)}
                 </text>
@@ -558,12 +781,12 @@ export function ComboChart(props: ComboChartProps) {
             <For each={[0, 25, 50, 75, 100]}>
               {(tick) => (
                 <text
-                  x={dimensions().width - dimensions().marginRight + 8}
-                  y={lineScale()(tick)}
+                  class="ui-chart__tick"
+                  dominant-baseline="middle"
                   fill={theme().textMuted}
                   text-anchor="start"
-                  dominant-baseline="middle"
-                  class="ui-chart__tick"
+                  x={dimensions().width - dimensions().marginRight + 8}
+                  y={lineScale()(tick)}
                 >
                   {formatPercent(tick)}
                 </text>
@@ -574,18 +797,18 @@ export function ComboChart(props: ComboChartProps) {
               {(point) => (
                 <>
                   <line
+                    stroke={theme().textMuted}
+                    stroke-dasharray="4 4"
                     x1={xScale()(point().parsedDate)}
                     x2={xScale()(point().parsedDate)}
                     y1={dimensions().marginTop}
                     y2={dimensions().marginTop + getInnerHeight(dimensions())}
-                    stroke={theme().textMuted}
-                    stroke-dasharray="4 4"
                   />
                   <circle
                     cx={xScale()(point().parsedDate)}
                     cy={lineScale()(point().lineValue)}
-                    r="4"
                     fill={props.lineColor ?? theme().accent}
+                    r="4"
                     stroke={theme().bg}
                     stroke-width="2"
                   />
@@ -594,27 +817,35 @@ export function ComboChart(props: ComboChartProps) {
             </Show>
 
             <rect
+              fill="transparent"
+              height={getInnerHeight(dimensions())}
+              onPointerLeave={() => setHoverIndex(null)}
+              onPointerMove={handlePointerMove}
+              width={getInnerWidth(dimensions())}
               x={dimensions().marginLeft}
               y={dimensions().marginTop}
-              width={getInnerWidth(dimensions())}
-              height={getInnerHeight(dimensions())}
-              fill="transparent"
-              onPointerMove={handlePointerMove}
-              onPointerLeave={() => setHoverIndex(null)}
             />
           </svg>
 
           <Show when={hoveredPoint()}>
             {(point) => (
               <div class="ui-chart__tooltip">
-                <div class="ui-chart__tooltip-title">{formatDate(point().parsedDate)}</div>
+                <div class="ui-chart__tooltip-title">
+                  {formatDate(point().parsedDate)}
+                </div>
                 <div class="ui-chart__tooltip-row">
-                  <span class="ui-chart__legend-swatch" style={{ background: props.lineColor ?? theme().accent }} />
+                  <span
+                    class="ui-chart__legend-swatch"
+                    style={{ background: props.lineColor ?? theme().accent }}
+                  />
                   <span>{props.lineLabel}</span>
                   <strong>{formatPercent(point().lineValue)}</strong>
                 </div>
                 <div class="ui-chart__tooltip-row">
-                  <span class="ui-chart__legend-swatch" style={{ background: props.barColor ?? theme().danger }} />
+                  <span
+                    class="ui-chart__legend-swatch"
+                    style={{ background: props.barColor ?? theme().danger }}
+                  />
                   <span>{props.barLabel}</span>
                   <strong>{formatCompactNumber(point().barValue)}</strong>
                 </div>
@@ -638,35 +869,83 @@ export function HistogramChart(props: HistogramChartProps) {
     env.themeVersion();
     return readChartTheme();
   });
-  const dimensions = createMemo(() => buildChartDimensions(env.width(), props.height ?? 200, 20));
+  const dimensions = createMemo(() =>
+    buildChartDimensions(env.width(), props.height ?? 200, 20),
+  );
   const xScale = createMemo(() => {
-    const min = d3.min(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_start) ?? 0;
-    const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_end) ?? 1;
-    return d3.scaleLinear().domain([min, max]).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
+    const min =
+      d3.min(
+        props.data,
+        (bin: { bin_start: number; bin_end: number; count: number }) =>
+          bin.bin_start,
+      ) ?? 0;
+    const max =
+      d3.max(
+        props.data,
+        (bin: { bin_start: number; bin_end: number; count: number }) =>
+          bin.bin_end,
+      ) ?? 1;
+    return d3
+      .scaleLinear()
+      .domain([min, max])
+      .range([
+        dimensions().marginLeft,
+        dimensions().marginLeft + getInnerWidth(dimensions()),
+      ]);
   });
   const yScale = createMemo(() => {
-    const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.count) ?? 0;
-    return d3.scaleLinear().domain([0, max === 0 ? 1 : max * 1.1]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    const max =
+      d3.max(
+        props.data,
+        (bin: { bin_start: number; bin_end: number; count: number }) =>
+          bin.count,
+      ) ?? 0;
+    return d3
+      .scaleLinear()
+      .domain([0, max === 0 ? 1 : max * 1.1])
+      .range([
+        dimensions().marginTop + getInnerHeight(dimensions()),
+        dimensions().marginTop,
+      ]);
   });
-  const xTicks = createMemo(() => xScale().ticks(Math.max(2, Math.floor(getInnerWidth(dimensions()) / 100))));
+  const xTicks = createMemo(() =>
+    xScale().ticks(Math.max(2, Math.floor(getInnerWidth(dimensions()) / 100))),
+  );
 
   return (
     <div class="ui-chart">
       <div class="ui-chart__frame" ref={env.rootRef}>
-        <Show when={env.width() > 0 && props.data.length > 0} fallback={<div class="ui-chart__empty">No histogram data available.</div>}>
-          <svg viewBox={`0 0 ${dimensions().width} ${dimensions().height}`} class="ui-chart__svg" role="img" aria-label="Histogram">
+        <Show
+          fallback={
+            <div class="ui-chart__empty">No histogram data available.</div>
+          }
+          when={env.width() > 0 && props.data.length > 0}
+        >
+          <svg
+            aria-label="Histogram"
+            class="ui-chart__svg"
+            role="img"
+            viewBox={`0 0 ${dimensions().width} ${dimensions().height}`}
+          >
             <For each={yScale().ticks(4)}>
               {(tick) => (
                 <>
                   <line
+                    stroke={theme().border}
+                    stroke-dasharray="3 4"
                     x1={dimensions().marginLeft}
                     x2={dimensions().marginLeft + getInnerWidth(dimensions())}
                     y1={yScale()(tick)}
                     y2={yScale()(tick)}
-                    stroke={theme().border}
-                    stroke-dasharray="3 4"
                   />
-                  <text x={dimensions().marginLeft - 8} y={yScale()(tick)} fill={theme().textMuted} text-anchor="end" dominant-baseline="middle" class="ui-chart__tick">
+                  <text
+                    class="ui-chart__tick"
+                    dominant-baseline="middle"
+                    fill={theme().textMuted}
+                    text-anchor="end"
+                    x={dimensions().marginLeft - 8}
+                    y={yScale()(tick)}
+                  >
                     {formatCompactNumber(tick)}
                   </text>
                 </>
@@ -676,13 +955,20 @@ export function HistogramChart(props: HistogramChartProps) {
             <For each={props.data}>
               {(bin) => (
                 <rect
-                  x={xScale()(bin.bin_start) + 1}
-                  y={yScale()(bin.count)}
-                  width={Math.max(2, xScale()(bin.bin_end) - xScale()(bin.bin_start) - 2)}
-                  height={dimensions().marginTop + getInnerHeight(dimensions()) - yScale()(bin.count)}
                   fill={theme().warning}
+                  height={
+                    dimensions().marginTop +
+                    getInnerHeight(dimensions()) -
+                    yScale()(bin.count)
+                  }
                   opacity="0.8"
                   rx="2"
+                  width={Math.max(
+                    2,
+                    xScale()(bin.bin_end) - xScale()(bin.bin_start) - 2,
+                  )}
+                  x={xScale()(bin.bin_start) + 1}
+                  y={yScale()(bin.count)}
                 />
               )}
             </For>
@@ -690,11 +976,11 @@ export function HistogramChart(props: HistogramChartProps) {
             <For each={xTicks()}>
               {(tick) => (
                 <text
-                  x={xScale()(tick)}
-                  y={dimensions().marginTop + getInnerHeight(dimensions()) + 20}
+                  class="ui-chart__tick"
                   fill={theme().textMuted}
                   text-anchor="middle"
-                  class="ui-chart__tick"
+                  x={xScale()(tick)}
+                  y={dimensions().marginTop + getInnerHeight(dimensions()) + 20}
                 >
                   {formatCompactNumber(tick)}
                 </text>
@@ -708,7 +994,14 @@ export function HistogramChart(props: HistogramChartProps) {
 }
 
 interface BoxPlotChartProps {
-  data: Array<{ date: string; min: number; q1: number; median: number; q3: number; max: number }>;
+  data: Array<{
+    date: string;
+    min: number;
+    q1: number;
+    median: number;
+    q3: number;
+    max: number;
+  }>;
   height?: number;
 }
 
@@ -718,39 +1011,75 @@ export function BoxPlotChart(props: BoxPlotChartProps) {
     env.themeVersion();
     return readChartTheme();
   });
-  const dimensions = createMemo(() => buildChartDimensions(env.width(), props.height ?? 200, 20));
+  const dimensions = createMemo(() =>
+    buildChartDimensions(env.width(), props.height ?? 200, 20),
+  );
   const points = createMemo(() =>
     props.data
       .map((row) => ({ ...row, parsedDate: parseDate(row.date) }))
-      .filter((row): row is ParsedBoxPlotDatum => row.parsedDate instanceof Date)
-      .sort((left, right) => left.parsedDate.getTime() - right.parsedDate.getTime())
+      .filter(
+        (row): row is ParsedBoxPlotDatum => row.parsedDate instanceof Date,
+      )
+      .sort(
+        (left, right) => left.parsedDate.getTime() - right.parsedDate.getTime(),
+      ),
   );
   const xScale = createMemo(() => {
     const domain = points().map((point) => point.date);
-    return d3.scaleBand().domain(domain).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]).padding(0.35);
+    return d3
+      .scaleBand()
+      .domain(domain)
+      .range([
+        dimensions().marginLeft,
+        dimensions().marginLeft + getInnerWidth(dimensions()),
+      ])
+      .padding(0.35);
   });
   const yScale = createMemo(() => {
     const max = d3.max(points(), (point: ParsedBoxPlotDatum) => point.max) ?? 0;
-    return d3.scaleLinear().domain([0, max === 0 ? 1 : max * 1.1]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    return d3
+      .scaleLinear()
+      .domain([0, max === 0 ? 1 : max * 1.1])
+      .range([
+        dimensions().marginTop + getInnerHeight(dimensions()),
+        dimensions().marginTop,
+      ]);
   });
 
   return (
     <div class="ui-chart">
       <div class="ui-chart__frame" ref={env.rootRef}>
-        <Show when={env.width() > 0 && points().length > 0} fallback={<div class="ui-chart__empty">No box plot data available.</div>}>
-          <svg viewBox={`0 0 ${dimensions().width} ${dimensions().height}`} class="ui-chart__svg" role="img" aria-label="Box plot chart">
+        <Show
+          fallback={
+            <div class="ui-chart__empty">No box plot data available.</div>
+          }
+          when={env.width() > 0 && points().length > 0}
+        >
+          <svg
+            aria-label="Box plot chart"
+            class="ui-chart__svg"
+            role="img"
+            viewBox={`0 0 ${dimensions().width} ${dimensions().height}`}
+          >
             <For each={yScale().ticks(4)}>
               {(tick) => (
                 <>
                   <line
+                    stroke={theme().border}
+                    stroke-dasharray="3 4"
                     x1={dimensions().marginLeft}
                     x2={dimensions().marginLeft + getInnerWidth(dimensions())}
                     y1={yScale()(tick)}
                     y2={yScale()(tick)}
-                    stroke={theme().border}
-                    stroke-dasharray="3 4"
                   />
-                  <text x={dimensions().marginLeft - 8} y={yScale()(tick)} fill={theme().textMuted} text-anchor="end" dominant-baseline="middle" class="ui-chart__tick">
+                  <text
+                    class="ui-chart__tick"
+                    dominant-baseline="middle"
+                    fill={theme().textMuted}
+                    text-anchor="end"
+                    x={dimensions().marginLeft - 8}
+                    y={yScale()(tick)}
+                  >
                     {formatCompactNumber(tick)}
                   </text>
                 </>
@@ -759,26 +1088,47 @@ export function BoxPlotChart(props: BoxPlotChartProps) {
 
             <For each={points()}>
               {(point) => {
-                const center = () => (xScale()(point.date) ?? 0) + xScale().bandwidth() / 2;
+                const center = () =>
+                  (xScale()(point.date) ?? 0) + xScale().bandwidth() / 2;
                 return (
                   <>
-                    <line x1={center()} x2={center()} y1={yScale()(point.min)} y2={yScale()(point.max)} stroke={theme().textMuted} />
+                    <line
+                      stroke={theme().textMuted}
+                      x1={center()}
+                      x2={center()}
+                      y1={yScale()(point.min)}
+                      y2={yScale()(point.max)}
+                    />
                     <rect
-                      x={xScale()(point.date)}
-                      y={yScale()(point.q3)}
-                      width={xScale().bandwidth()}
-                      height={Math.max(2, yScale()(point.q1) - yScale()(point.q3))}
                       fill={theme().accent}
+                      height={Math.max(
+                        2,
+                        yScale()(point.q1) - yScale()(point.q3),
+                      )}
                       opacity="0.25"
                       stroke={theme().accent}
+                      width={xScale().bandwidth()}
+                      x={xScale()(point.date)}
+                      y={yScale()(point.q3)}
                     />
-                    <line x1={xScale()(point.date)} x2={(xScale()(point.date) ?? 0) + xScale().bandwidth()} y1={yScale()(point.median)} y2={yScale()(point.median)} stroke={theme().accent} stroke-width="2" />
+                    <line
+                      stroke={theme().accent}
+                      stroke-width="2"
+                      x1={xScale()(point.date)}
+                      x2={(xScale()(point.date) ?? 0) + xScale().bandwidth()}
+                      y1={yScale()(point.median)}
+                      y2={yScale()(point.median)}
+                    />
                     <text
-                      x={center()}
-                      y={dimensions().marginTop + getInnerHeight(dimensions()) + 20}
+                      class="ui-chart__tick"
                       fill={theme().textMuted}
                       text-anchor="middle"
-                      class="ui-chart__tick"
+                      x={center()}
+                      y={
+                        dimensions().marginTop +
+                        getInnerHeight(dimensions()) +
+                        20
+                      }
                     >
                       {formatDate(point.parsedDate)}
                     </text>

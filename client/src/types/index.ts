@@ -183,7 +183,10 @@ export type DashboardOverviewSummary = {
 };
 
 export type DashboardHealthSummary = {
-  cache_state_counts: Record<Backend['model_cache_state'] extends infer T ? Extract<T, string> : never, number>;
+  cache_state_counts: Record<
+    Backend['model_cache_state'] extends infer T ? Extract<T, string> : never,
+    number
+  >;
   stale_backends: Array<{
     id: number;
     name: string;
