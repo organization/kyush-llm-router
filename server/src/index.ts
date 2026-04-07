@@ -43,7 +43,9 @@ export function createServer(): Application {
     origin: corsOrigins,
     credentials: true,
   }));
-  app.use(express.json());
+  app.use(express.json({
+    limit: '30mb',
+  }));
 
   app.use('/admin/auth', adminAuthRoutes);
   app.use('/admin/analytics', requireAdminAccess, requireSessionCsrf, analyticsRoutes);
