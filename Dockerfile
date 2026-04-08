@@ -50,4 +50,4 @@ RUN mkdir -p /data
 
 EXPOSE 3000
 
-CMD ["npx", "tsx", "server/src/main.ts"]
+CMD ["pnpm", "--filter", "server", "start"]
