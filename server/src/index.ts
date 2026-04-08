@@ -43,6 +43,7 @@ export function createApp(): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
   const adminDistCandidates = [
+    path.resolve(moduleDir, '..', '..', 'client', 'dist'),
     path.resolve(moduleDir, '..', '..', '..', 'client', 'dist'),
     path.resolve(moduleDir, '..', '..', '..', '..', 'client', 'dist'),
   ];
