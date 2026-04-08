@@ -40,9 +40,9 @@ ENV DB_DIR=/data
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/server/package.json ./server/package.json
-COPY --from=build /app/server/node_modules ./server/node_modules
-COPY --from=build /app/server/dist ./server/dist
+COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build /app/server ./server
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/client/dist ./client/dist
 COPY --from=build /app/database ./database
 
@@ -50,4 +50,4 @@ RUN mkdir -p /data
 
 EXPOSE 3000
 
-CMD ["node", "server/dist/server/src/index.js"]
+CMD ["npx", "tsx", "server/src/main.ts"]
