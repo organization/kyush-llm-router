@@ -1,20 +1,42 @@
-import * as KTabs from '@kobalte/core/tabs';
-import type { ParentProps } from 'solid-js';
+import * as TabsPrimitive from '@kobalte/core/tabs';
+
 import { cn } from '../lib/cn';
+
+import type { ParentProps } from 'solid-js';
 
 type WrapperProps = ParentProps<{ class?: string; [key: string]: unknown }>;
 
 export const Tabs = {
-  Root: (props: WrapperProps) => <KTabs.Root {...(props as unknown as KTabs.TabsRootProps)} class={cn('ui-tabs', props.class)}>{props.children}</KTabs.Root>,
-  List: (props: WrapperProps) => <KTabs.List {...(props as unknown as KTabs.TabsListProps)} class={cn('ui-tabs__list', props.class)}>{props.children}</KTabs.List>,
-  Trigger: (props: WrapperProps) => (
-    <KTabs.Trigger {...(props as unknown as KTabs.TabsTriggerProps)} class={cn('ui-tabs__trigger', props.class)}>
+  Root: (props: WrapperProps) => (
+    <TabsPrimitive.Root
+      {...(props as unknown as TabsPrimitive.TabsRootProps)}
+      class={cn('ui-tabs', props.class)}
+    >
       {props.children}
-    </KTabs.Trigger>
+    </TabsPrimitive.Root>
+  ),
+  List: (props: WrapperProps) => (
+    <TabsPrimitive.List
+      {...(props as unknown as TabsPrimitive.TabsListProps)}
+      class={cn('ui-tabs__list', props.class)}
+    >
+      {props.children}
+    </TabsPrimitive.List>
+  ),
+  Trigger: (props: WrapperProps) => (
+    <TabsPrimitive.Trigger
+      {...(props as unknown as TabsPrimitive.TabsTriggerProps)}
+      class={cn('ui-tabs__trigger', props.class)}
+    >
+      {props.children}
+    </TabsPrimitive.Trigger>
   ),
   Content: (props: WrapperProps) => (
-    <KTabs.Content {...(props as unknown as KTabs.TabsContentProps)} class={cn('ui-tabs__content', props.class)}>
+    <TabsPrimitive.Content
+      {...(props as unknown as TabsPrimitive.TabsContentProps)}
+      class={cn('ui-tabs__content', props.class)}
+    >
       {props.children}
-    </KTabs.Content>
+    </TabsPrimitive.Content>
   ),
 };

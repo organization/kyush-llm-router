@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import request from 'supertest';
+
+import { request } from '../utils/httpClient';
 import { createTestApp } from '../utils/testApp';
 import { createAdminClient } from '../utils/adminClient';
 
@@ -27,9 +28,14 @@ describe('Admin Authentication', () => {
 
   it('should require CSRF for session-based writes', async () => {
     const agent = request.agent(app);
-    await agent.post('/admin/auth/login').send({ username: 'admin', password: 'password' }).expect(200);
+    await agent
+      .post('/admin/auth/login')
+      .send({ username: 'admin', password: 'password' })
+      .expect(200);
 
-    const response = await agent.post('/admin/users').send({ name: 'Blocked By Csrf' });
+    const response = await agent
+      .post('/admin/users')
+      .send({ name: 'Blocked By Csrf' });
     expect(response.status).toBe(403);
     expect(response.body.error).toBe('Invalid CSRF token');
   });

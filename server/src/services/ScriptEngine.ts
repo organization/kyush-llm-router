@@ -1,7 +1,9 @@
-import { ScriptContextData } from '../../../shared/types';
 import { CompiledScript } from './ScriptExecutor';
+
 import { ScriptModel } from '../models/Script';
 import { logger } from '../utils/logger';
+
+import type { ScriptContextData } from '../../../shared/types';
 
 export interface ScriptChainResult {
   success: boolean;
@@ -14,8 +16,12 @@ export class ScriptEngine {
   static async applyOnRequestScripts(
     context: ScriptContextData,
     userId: number,
-    backendId: number
-  ): Promise<{ context: ScriptContextData; errors: string[]; executionTimes: number[] }> {
+    backendId: number,
+  ): Promise<{
+    context: ScriptContextData;
+    errors: string[];
+    executionTimes: number[];
+  }> {
     const scripts = ScriptModel.getMatchingScripts(userId, backendId);
     const errors: string[] = [];
     const executionTimes: number[] = [];
@@ -28,7 +34,9 @@ export class ScriptEngine {
         compiled = await CompiledScript.compile(script.script_code);
         if (compiled.hasOnRequest) {
           current = await compiled.callOnRequest(current);
-          logger.info(`Script "${script.name}" onRequest executed in ${Date.now() - startTime}ms`);
+          logger.info(
+            `Script "${script.name}" onRequest executed in ${Date.now() - startTime}ms`,
+          );
         }
       } catch (error) {
         const msg = `Script "${script.name}" onRequest failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -45,10 +53,19 @@ export class ScriptEngine {
 
   static async applyOnResponseScripts(
     context: ScriptContextData,
-    response: { status: number; headers: Record<string, string>; body: unknown; isStream: boolean },
+    response: {
+      status: number;
+      headers: Record<string, string>;
+      body: unknown;
+      isStream: boolean;
+    },
     userId: number,
-    backendId: number
-  ): Promise<{ context: ScriptContextData; errors: string[]; executionTimes: number[] }> {
+    backendId: number,
+  ): Promise<{
+    context: ScriptContextData;
+    errors: string[];
+    executionTimes: number[];
+  }> {
     const scripts = ScriptModel.getMatchingScripts(userId, backendId);
     const errors: string[] = [];
     const executionTimes: number[] = [];
@@ -61,7 +78,9 @@ export class ScriptEngine {
         compiled = await CompiledScript.compile(script.script_code);
         if (compiled.hasOnResponse) {
           current = await compiled.callOnResponse(current);
-          logger.info(`Script "${script.name}" onResponse executed in ${Date.now() - startTime}ms`);
+          logger.info(
+            `Script "${script.name}" onResponse executed in ${Date.now() - startTime}ms`,
+          );
         }
       } catch (error) {
         const msg = `Script "${script.name}" onResponse failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -81,14 +100,28 @@ export class ScriptEngine {
     backendId: number,
     phase: 'onRequest' | 'onResponse',
     context: ScriptContextData,
-    response?: { status: number; headers: Record<string, string>; body: unknown; isStream: boolean }
+    response?: {
+      status: number;
+      headers: Record<string, string>;
+      body: unknown;
+      isStream: boolean;
+    },
   ): Promise<ScriptChainResult> {
     if (phase === 'onRequest') {
-      const result = await this.applyOnRequestScripts(context, userId, backendId);
+      const result = await this.applyOnRequestScripts(
+        context,
+        userId,
+        backendId,
+      );
       return { success: result.errors.length === 0, ...result };
     }
     if (phase === 'onResponse' && response) {
-      const result = await this.applyOnResponseScripts(context, response, userId, backendId);
+      const result = await this.applyOnResponseScripts(
+        context,
+        response,
+        userId,
+        backendId,
+      );
       return { success: result.errors.length === 0, ...result };
     }
     return { success: true, context, errors: [], executionTimes: [] };

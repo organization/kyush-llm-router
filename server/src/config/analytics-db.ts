@@ -1,47 +1,41 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
-import { ensureDir, getAnalyticsDbPath } from './db-paths';
+import fs from 'node:fs';
+import path from 'node:path';
 
-let db: Database.Database;
+import Database from 'better-sqlite3';
+
+import { ensureDir, getAnalyticsDbPath, getSchemaPath } from './db-paths';
+
+let db: Database.Database | undefined;
+
+function loadSchema(database: Database.Database): void {
+  const schema = fs.readFileSync(
+    getSchemaPath('analytics-schema.sql'),
+    'utf-8',
+  );
+  database.exec(schema);
+}
+
+function openDb(): Database.Database {
+  const analyticsDbPath = getAnalyticsDbPath();
+  ensureDir(path.dirname(analyticsDbPath));
+  const handle = new Database(analyticsDbPath);
+  handle.pragma('foreign_keys = ON');
+  loadSchema(handle);
+  return handle;
+}
 
 export function getAnalyticsDb(): Database.Database {
-  if (!db) {
-    const analyticsDbPath = getAnalyticsDbPath();
-    ensureDir(path.dirname(analyticsDbPath));
-
-    db = new Database(analyticsDbPath);
-    db.pragma('foreign_keys = ON');
-
-    const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'analytics-schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf-8');
-    db.exec(schema);
-  }
+  db ??= openDb();
   return db;
 }
 
 export function initAnalyticsDb(): Database.Database {
-  // Close existing connection if any
-  if (db) {
-    db.close();
-  }
-  
-  const analyticsDbPath = getAnalyticsDbPath();
-  ensureDir(path.dirname(analyticsDbPath));
-
-  db = new Database(analyticsDbPath);
-  db.pragma('foreign_keys = ON');
-
-  const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'analytics-schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf-8');
-  db.exec(schema);
-
+  db?.close();
+  db = openDb();
   return db;
 }
 
 export function closeAnalyticsDb(): void {
-  if (db) {
-    db.close();
-    db = undefined as unknown as Database.Database;
-  }
+  db?.close();
+  db = undefined;
 }

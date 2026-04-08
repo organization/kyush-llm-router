@@ -1,28 +1,52 @@
-import * as KDropdownMenu from '@kobalte/core/dropdown-menu';
-import type { ParentProps } from 'solid-js';
+import * as DropdownMenuPrimitive from '@kobalte/core/dropdown-menu';
+
 import { cn } from '../lib/cn';
+
+import type { ParentProps } from 'solid-js';
 
 type WrapperProps = ParentProps<{ class?: string; [key: string]: unknown }>;
 
 export const DropdownMenu = {
-  Root: (props: WrapperProps) => <KDropdownMenu.Root {...(props as KDropdownMenu.DropdownMenuRootProps)}>{props.children}</KDropdownMenu.Root>,
-  Trigger: (props: WrapperProps) => (
-    <KDropdownMenu.Trigger {...(props as KDropdownMenu.DropdownMenuTriggerProps)} class={cn('ui-button', props.class)}>
+  Root: (props: WrapperProps) => (
+    <DropdownMenuPrimitive.Root
+      {...(props as DropdownMenuPrimitive.DropdownMenuRootProps)}
+    >
       {props.children}
-    </KDropdownMenu.Trigger>
+    </DropdownMenuPrimitive.Root>
   ),
-  Portal: (props: WrapperProps) => <KDropdownMenu.Portal>{props.children}</KDropdownMenu.Portal>,
-  Content: (props: WrapperProps) => (
-    <KDropdownMenu.Content {...(props as KDropdownMenu.DropdownMenuContentProps)} class={cn('ui-dropdown__content', props.class)}>
+  Trigger: (props: WrapperProps) => (
+    <DropdownMenuPrimitive.Trigger
+      {...(props as DropdownMenuPrimitive.DropdownMenuTriggerProps)}
+      class={cn('ui-button', props.class)}
+    >
       {props.children}
-    </KDropdownMenu.Content>
+    </DropdownMenuPrimitive.Trigger>
+  ),
+  Portal: (props: WrapperProps) => (
+    <DropdownMenuPrimitive.Portal>
+      {props.children}
+    </DropdownMenuPrimitive.Portal>
+  ),
+  Content: (props: WrapperProps) => (
+    <DropdownMenuPrimitive.Content
+      {...(props as DropdownMenuPrimitive.DropdownMenuContentProps)}
+      class={cn('ui-dropdown__content', props.class)}
+    >
+      {props.children}
+    </DropdownMenuPrimitive.Content>
   ),
   Item: (props: WrapperProps) => (
-    <KDropdownMenu.Item {...(props as KDropdownMenu.DropdownMenuItemProps)} class={cn('ui-dropdown__item', props.class)}>
+    <DropdownMenuPrimitive.Item
+      {...(props as DropdownMenuPrimitive.DropdownMenuItemProps)}
+      class={cn('ui-dropdown__item', props.class)}
+    >
       {props.children}
-    </KDropdownMenu.Item>
+    </DropdownMenuPrimitive.Item>
   ),
   Separator: (props: WrapperProps) => (
-    <KDropdownMenu.Separator {...(props as KDropdownMenu.DropdownMenuSeparatorProps)} class={cn('ui-dropdown__separator', props.class)} />
+    <DropdownMenuPrimitive.Separator
+      {...(props as DropdownMenuPrimitive.DropdownMenuSeparatorProps)}
+      class={cn('ui-dropdown__separator', props.class)}
+    />
   ),
 };

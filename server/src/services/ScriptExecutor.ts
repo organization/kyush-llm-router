@@ -1,15 +1,23 @@
 import ivmImport from 'isolated-vm';
-import type { Context, Isolate, Reference } from 'isolated-vm';
-import { ScriptContextData } from '../../../shared/types';
+
 import { logger } from '../utils/logger';
+
+import type { Context, Isolate, Reference } from 'isolated-vm';
+import type { ScriptContextData } from '../../../shared/types';
 
 const SCRIPT_TIMEOUT_MS = 5000;
 const MEMORY_LIMIT_MB = 50;
 
 type IsolatedVmModule = typeof import('isolated-vm');
 
-export function resolveIsolatedVmModule(moduleValue: unknown): IsolatedVmModule {
-  if (moduleValue && typeof moduleValue === 'object' && 'Isolate' in moduleValue) {
+export function resolveIsolatedVmModule(
+  moduleValue: unknown,
+): IsolatedVmModule {
+  if (
+    moduleValue &&
+    typeof moduleValue === 'object' &&
+    'Isolate' in moduleValue
+  ) {
     return moduleValue as IsolatedVmModule;
   }
 
@@ -68,16 +76,27 @@ export class CompiledScript {
 
     // Provide console via Reference callbacks (only primitives can cross applySync boundary)
     const logFns = {
-      _logLog: new ivm.Reference((...args: string[]) => logger.log(`[script] ${args.join(' ')}`)),
-      _logDebug: new ivm.Reference((...args: string[]) => logger.debug(`[script] ${args.join(' ')}`)),
-      _logInfo: new ivm.Reference((...args: string[]) => logger.info(`[script] ${args.join(' ')}`)),
-      _logWarn: new ivm.Reference((...args: string[]) => logger.warn(`[script] ${args.join(' ')}`)),
-      _logError: new ivm.Reference((...args: string[]) => logger.error(`[script] ${args.join(' ')}`)),
+      _logLog: new ivm.Reference((...args: string[]) =>
+        logger.log(`[script] ${args.join(' ')}`),
+      ),
+      _logDebug: new ivm.Reference((...args: string[]) =>
+        logger.debug(`[script] ${args.join(' ')}`),
+      ),
+      _logInfo: new ivm.Reference((...args: string[]) =>
+        logger.info(`[script] ${args.join(' ')}`),
+      ),
+      _logWarn: new ivm.Reference((...args: string[]) =>
+        logger.warn(`[script] ${args.join(' ')}`),
+      ),
+      _logError: new ivm.Reference((...args: string[]) =>
+        logger.error(`[script] ${args.join(' ')}`),
+      ),
     };
     for (const [name, ref] of Object.entries(logFns)) {
       await jail.set(name, ref);
     }
-    await ctx.eval(`
+    await ctx.eval(
+      `
       globalThis.console = {
         log:   (...a) => _logLog.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
         debug: (...a) => _logDebug.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
@@ -85,27 +104,33 @@ export class CompiledScript {
         warn:  (...a) => _logWarn.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
         error: (...a) => _logError.applySync(undefined, a.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v))),
       };
-    `, { timeout: SCRIPT_TIMEOUT_MS });
+    `,
+      { timeout: SCRIPT_TIMEOUT_MS },
+    );
 
     // Evaluate user script (with export keywords stripped)
     const processedCode = preprocessScript(code);
     await ctx.eval(processedCode, { timeout: SCRIPT_TIMEOUT_MS });
 
     // Check which hooks exist, then grab References only for defined ones
-    const hasOnRequest = await ctx.eval(
-      'typeof onRequest === "function"',
-      { timeout: SCRIPT_TIMEOUT_MS },
-    ) as boolean;
-    const hasOnResponse = await ctx.eval(
-      'typeof onResponse === "function"',
-      { timeout: SCRIPT_TIMEOUT_MS },
-    ) as boolean;
+    const hasOnRequest = (await ctx.eval('typeof onRequest === "function"', {
+      timeout: SCRIPT_TIMEOUT_MS,
+    })) as boolean;
+    const hasOnResponse = (await ctx.eval('typeof onResponse === "function"', {
+      timeout: SCRIPT_TIMEOUT_MS,
+    })) as boolean;
 
     const onRequestRef = hasOnRequest
-      ? await ctx.eval('onRequest', { timeout: SCRIPT_TIMEOUT_MS, reference: true }) as Reference<Function>
+      ? ((await ctx.eval('onRequest', {
+          timeout: SCRIPT_TIMEOUT_MS,
+          reference: true,
+        })) as Reference<Function>)
       : null;
     const onResponseRef = hasOnResponse
-      ? await ctx.eval('onResponse', { timeout: SCRIPT_TIMEOUT_MS, reference: true }) as Reference<Function>
+      ? ((await ctx.eval('onResponse', {
+          timeout: SCRIPT_TIMEOUT_MS,
+          reference: true,
+        })) as Reference<Function>)
       : null;
 
     return new CompiledScript(isolate, ctx, onRequestRef, onResponseRef);
@@ -143,7 +168,11 @@ export class CompiledScript {
   }
 
   dispose(): void {
-    try { this.ctx.release(); } catch {}
-    try { this.isolate.dispose(); } catch {}
+    try {
+      this.ctx.release();
+    } catch {}
+    try {
+      this.isolate.dispose();
+    } catch {}
   }
 }

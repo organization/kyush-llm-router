@@ -1,10 +1,31 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DEFAULT_DB_DIR = path.join(process.cwd(), 'data');
+import { env } from './env';
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Schema files (the .sql sources baked into the repo)
+ *
+ * Resolved relative to *this module's URL* — counted in one place so the
+ * other DB modules don't each carry their own `'..'/'..'/'..'/'database'`
+ * path math. Anchoring on `import.meta.url` also means it doesn't care
+ * whether we're running from src (tsx) or some future bundler output, as
+ * long as this file's relative position to `<repo>/database/` is preserved.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const SCHEMA_DIR_URL = new URL('../../../database/', import.meta.url);
+
+export function getSchemaPath(filename: string): string {
+  return fileURLToPath(new URL(filename, SCHEMA_DIR_URL));
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Runtime data directories (configurable via env.DB_DIR)
+ * ────────────────────────────────────────────────────────────────────────── */
 
 export function getDbRootDir(): string {
-  return process.env.DB_DIR || process.env.DB_PATH || DEFAULT_DB_DIR;
+  return env.DB_DIR;
 }
 
 export function ensureDir(dirPath: string): void {
@@ -28,4 +49,3 @@ export function getRequestLogsDir(): string {
 export function getRequestLogsDbPath(monthKey: string): string {
   return path.join(getRequestLogsDir(), `request_logs_${monthKey}.db`);
 }
-

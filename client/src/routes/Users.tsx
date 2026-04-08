@@ -1,4 +1,11 @@
-import { createEffect, createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+  Show,
+  type Component,
+} from 'solid-js';
 import Copy from 'lucide-solid/icons/copy';
 import Ellipsis from 'lucide-solid/icons/ellipsis';
 import KeyRound from 'lucide-solid/icons/key-round';
@@ -6,9 +13,10 @@ import Pencil from 'lucide-solid/icons/pencil';
 import Plus from 'lucide-solid/icons/plus';
 import ShieldMinus from 'lucide-solid/icons/shield-minus';
 import Trash2 from 'lucide-solid/icons/trash-2';
+
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
-import type { User } from '../types';
+
 import {
   Alert,
   Button,
@@ -30,6 +38,8 @@ import {
   TextField,
 } from '../ui';
 
+import type { User } from '../types';
+
 type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
 
 interface UserFormState {
@@ -50,22 +60,34 @@ const emptyForm = (): UserFormState => ({
 
 const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 5)}...`;
 
-export const Users: Component = () => {
-  const [users, { refetch: refetchUsers }] = createResource(() => api.users.getAll());
+const Users: Component = () => {
+  const [users, { refetch: refetchUsers }] = createResource(() =>
+    api.users.getAll(),
+  );
   const [backends] = createResource(() => api.backends.getAll());
-  const [permissions, { refetch: refetchPermissions }] = createResource(() => api.permissions.getAll());
+  const [permissions, { refetch: refetchPermissions }] = createResource(() =>
+    api.permissions.getAll(),
+  );
   const [query, setQuery] = createSignal('');
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [userDeleteConfirmOpen, setUserDeleteConfirmOpen] = createSignal(false);
   const [permissionDialogOpen, setPermissionDialogOpen] = createSignal(false);
   const [permissionConfirmOpen, setPermissionConfirmOpen] = createSignal(false);
   const [editingUser, setEditingUser] = createSignal<User | null>(null);
-  const [pendingDeleteUser, setPendingDeleteUser] = createSignal<User | null>(null);
+  const [pendingDeleteUser, setPendingDeleteUser] = createSignal<User | null>(
+    null,
+  );
   const [selectedUserId, setSelectedUserId] = createSignal<number | null>(null);
-  const [pendingDeletePermission, setPendingDeletePermission] = createSignal<{ user_id: number; backend_id: number } | null>(null);
+  const [pendingDeletePermission, setPendingDeletePermission] = createSignal<{
+    user_id: number;
+    backend_id: number;
+  } | null>(null);
   const [permissionBackendId, setPermissionBackendId] = createSignal('');
   const [submitting, setSubmitting] = createSignal(false);
-  const [notice, setNotice] = createSignal<{ tone: NoticeTone; message: string } | null>(null);
+  const [notice, setNotice] = createSignal<{
+    tone: NoticeTone;
+    message: string;
+  } | null>(null);
   const [form, setForm] = createSignal<UserFormState>(emptyForm());
 
   const filteredUsers = createMemo(() => {
@@ -73,23 +95,36 @@ export const Users: Component = () => {
     const list = users() ?? [];
     if (!value) return list;
     return list.filter((user) => {
-      const haystack = [user.name, user.email ?? '', user.api_key].join(' ').toLowerCase();
+      const haystack = [user.name, user.email ?? '', user.api_key]
+        .join(' ')
+        .toLowerCase();
       return haystack.includes(value);
     });
   });
 
-  const activeCount = createMemo(() => (users() ?? []).filter((user) => user.is_active).length);
-  const selectedUser = createMemo(() => (users() ?? []).find((user) => user.id === selectedUserId()) ?? null);
+  const activeCount = createMemo(
+    () => (users() ?? []).filter((user) => user.is_active).length,
+  );
+  const selectedUser = createMemo(
+    () => (users() ?? []).find((user) => user.id === selectedUserId()) ?? null,
+  );
   const permissionsForSelectedUser = createMemo(() => {
     const currentUserId = selectedUserId();
     if (!currentUserId) return [];
-    return (permissions() ?? []).filter((permission) => permission.user_id === currentUserId);
+    return (permissions() ?? []).filter(
+      (permission) => permission.user_id === currentUserId,
+    );
   });
-  const assignedBackendIds = createMemo(() => new Set(permissionsForSelectedUser().map((permission) => permission.backend_id)));
+  const assignedBackendIds = createMemo(
+    () =>
+      new Set(
+        permissionsForSelectedUser().map((permission) => permission.backend_id),
+      ),
+  );
   const availableBackendOptions = createMemo(() =>
     (backends() ?? [])
       .filter((backend) => !assignedBackendIds().has(backend.id))
-      .map((backend) => ({ value: String(backend.id), label: backend.name }))
+      .map((backend) => ({ value: String(backend.id), label: backend.name })),
   );
   const backendNameById = createMemo(() => {
     const names = new Map<number, string>();
@@ -110,7 +145,10 @@ export const Users: Component = () => {
       return;
     }
 
-    if (currentSelectedUserId === null || !list.some((user) => user.id === currentSelectedUserId)) {
+    if (
+      currentSelectedUserId === null ||
+      !list.some((user) => user.id === currentSelectedUserId)
+    ) {
       setSelectedUserId(list[0].id);
     }
   });
@@ -168,7 +206,10 @@ export const Users: Component = () => {
       setEditingUser(null);
       await refetchUsers();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'User save failed.' });
+      setNotice({
+        tone: 'danger',
+        message: error instanceof Error ? error.message : 'User save failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -177,10 +218,19 @@ export const Users: Component = () => {
   const handleRegenerateApiKey = async (user: User) => {
     try {
       await api.users.regenerateApiKey(user.id);
-      setNotice({ tone: 'success', message: `API key regenerated for ${user.name}.` });
+      setNotice({
+        tone: 'success',
+        message: `API key regenerated for ${user.name}.`,
+      });
       await refetchUsers();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'API key regeneration failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'API key regeneration failed.',
+      });
     }
   };
 
@@ -189,7 +239,11 @@ export const Users: Component = () => {
       await navigator.clipboard.writeText(apiKey);
       setNotice({ tone: 'success', message: 'API key copied to clipboard.' });
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Clipboard copy failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Clipboard copy failed.',
+      });
     }
   };
 
@@ -210,7 +264,11 @@ export const Users: Component = () => {
       setPendingDeleteUser(null);
       await Promise.all([refetchUsers(), refetchPermissions()]);
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'User deletion failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'User deletion failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -226,24 +284,40 @@ export const Users: Component = () => {
     const user = selectedUser();
 
     if (!user) {
-      setNotice({ tone: 'warning', message: 'Select a user before granting backend access.' });
+      setNotice({
+        tone: 'warning',
+        message: 'Select a user before granting backend access.',
+      });
       return;
     }
 
     if (!permissionBackendId()) {
-      setNotice({ tone: 'danger', message: 'Select a backend to grant access.' });
+      setNotice({
+        tone: 'danger',
+        message: 'Select a backend to grant access.',
+      });
       return;
     }
 
     setSubmitting(true);
     try {
-      await api.permissions.create({ user_id: user.id, backend_id: Number(permissionBackendId()) });
-      setNotice({ tone: 'success', message: `Backend access granted to ${user.name}.` });
+      await api.permissions.create({
+        user_id: user.id,
+        backend_id: Number(permissionBackendId()),
+      });
+      setNotice({
+        tone: 'success',
+        message: `Backend access granted to ${user.name}.`,
+      });
       setPermissionBackendId('');
       setPermissionDialogOpen(false);
       await refetchPermissions();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Permission grant failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Permission grant failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -269,7 +343,11 @@ export const Users: Component = () => {
       setPendingDeletePermission(null);
       await refetchPermissions();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Permission revoke failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Permission revoke failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -279,14 +357,31 @@ export const Users: Component = () => {
     <Layout>
       <div class="ui-app-page">
         <PageHeader
-          title="Users"
+          actions={
+            <IconButton
+              icon={<Plus />}
+              label="Add User"
+              onClick={openCreateDialog}
+              variant="primary"
+            />
+          }
           description="Manage API identities, lifecycle state, and operational access for the router."
-          actions={<IconButton variant="primary" icon={<Plus />} label="Add User" onClick={openCreateDialog} />}
+          title="Users"
         />
 
         <Show when={notice()}>
           {(currentNotice) => (
-            <Alert tone={currentNotice().tone === 'danger' ? 'danger' : currentNotice().tone === 'warning' ? 'warning' : currentNotice().tone === 'success' ? 'success' : 'info'}>
+            <Alert
+              tone={
+                currentNotice().tone === 'danger'
+                  ? 'danger'
+                  : currentNotice().tone === 'warning'
+                    ? 'warning'
+                    : currentNotice().tone === 'success'
+                      ? 'success'
+                      : 'info'
+              }
+            >
               {currentNotice().message}
             </Alert>
           )}
@@ -294,7 +389,11 @@ export const Users: Component = () => {
 
         <CommandBar>
           <CommandBarGroup>
-            <TextField label="Search users" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
+            <TextField
+              label="Search users"
+              onInput={(event) => setQuery(event.currentTarget.value)}
+              value={query()}
+            />
           </CommandBarGroup>
           <CommandBarGroup>
             <StatusBadge tone="success">{`${activeCount()} active`}</StatusBadge>
@@ -306,26 +405,37 @@ export const Users: Component = () => {
 
         <div class="ui-section-grid">
           <Panel
-            title="User registry"
-            description="Dense operational view with API key overflow handling and row-level actions."
             bodyClass="ui-stack ui-stack--tight"
+            description="Dense operational view with API key overflow handling and row-level actions."
+            title="User registry"
           >
             <Show
+              fallback={
+                <EmptyState
+                  description="Fetching identities and access state from the admin API."
+                  title="Loading users"
+                />
+              }
               when={!users.loading || filteredUsers().length > 0}
-              fallback={<EmptyState title="Loading users" description="Fetching identities and access state from the admin API." />}
             >
               <Show
-                when={filteredUsers().length > 0 || users.loading}
                 fallback={
                   <EmptyState
-                    title="No users yet"
+                    action={
+                      <IconButton
+                        icon={<Plus />}
+                        label="Add User"
+                        onClick={openCreateDialog}
+                        variant="primary"
+                      />
+                    }
                     description="Create the first user to issue an API key and start routing traffic."
-                    action={<IconButton variant="primary" icon={<Plus />} label="Add User" onClick={openCreateDialog} />}
+                    title="No users yet"
                   />
                 }
+                when={filteredUsers().length > 0 || users.loading}
               >
                 <DataGrid
-                  rows={filteredUsers()}
                   columns={[
                     {
                       id: 'id',
@@ -342,7 +452,11 @@ export const Users: Component = () => {
                       id: 'email',
                       header: 'Email',
                       truncate: true,
-                      cell: (user) => <span title={user.email ?? '-'}>{user.email || '-'}</span>,
+                      cell: (user) => (
+                        <span title={user.email ?? '-'}>
+                          {user.email || '-'}
+                        </span>
+                      ),
                     },
                     {
                       id: 'api_key',
@@ -350,45 +464,76 @@ export const Users: Component = () => {
                       class: 'ui-text-mono',
                       cell: (user) => (
                         <div class="api-key-cell">
-                          <span class="api-key-cell__value" title="Hidden by default">
+                          <span
+                            class="api-key-cell__value"
+                            title="Hidden by default"
+                          >
                             {maskApiKey(user.api_key)}
                           </span>
-                          <IconButton icon={<Copy />} label="Copy" onClick={() => void handleCopyApiKey(user.api_key)} />
+                          <IconButton
+                            icon={<Copy />}
+                            label="Copy"
+                            onClick={() => void handleCopyApiKey(user.api_key)}
+                          />
                         </div>
                       ),
                     },
                     {
                       id: 'detail_logging',
                       header: 'Detail Log',
-                      cell: (user) => <StatusBadge tone={user.detail_logging ? 'warning' : 'neutral'}>{user.detail_logging ? 'On' : 'Off'}</StatusBadge>,
+                      cell: (user) => (
+                        <StatusBadge
+                          tone={user.detail_logging ? 'warning' : 'neutral'}
+                        >
+                          {user.detail_logging ? 'On' : 'Off'}
+                        </StatusBadge>
+                      ),
                     },
                     {
                       id: 'status',
                       header: 'Status',
-                      cell: (user) => <StatusBadge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
+                      cell: (user) => (
+                        <StatusBadge
+                          tone={user.is_active ? 'success' : 'danger'}
+                        >
+                          {user.is_active ? 'Active' : 'Inactive'}
+                        </StatusBadge>
+                      ),
                     },
                   ]}
+                  emptyMessage="No users match the current search."
                   getRowKey={(user) => user.id}
                   loading={users.loading}
-                  emptyMessage="No users match the current search."
                   onRowClick={(user) => setSelectedUserId(user.id)}
                   rowActions={(user) => (
                     <div class="ui-row-actions">
-                      <IconButton icon={<KeyRound />} label="Regenerate" onClick={() => void handleRegenerateApiKey(user)} />
+                      <IconButton
+                        icon={<KeyRound />}
+                        label="Regenerate"
+                        onClick={() => void handleRegenerateApiKey(user)}
+                      />
                       <DropdownMenu.Root>
-                        <DropdownMenu.Trigger as={Button} class="ui-button--icon" aria-label="More actions">
-                          <span class="ui-button__icon" aria-hidden="true">
+                        <DropdownMenu.Trigger
+                          aria-label="More actions"
+                          as={Button}
+                          class="ui-button--icon"
+                        >
+                          <span aria-hidden="true" class="ui-button__icon">
                             <Ellipsis />
                           </span>
                           <span class="ui-button__label">More</span>
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Portal>
                           <DropdownMenu.Content>
-                            <DropdownMenu.Item onSelect={() => openEditDialog(user)}>
+                            <DropdownMenu.Item
+                              onSelect={() => openEditDialog(user)}
+                            >
                               <Pencil />
                               Edit
                             </DropdownMenu.Item>
-                            <DropdownMenu.Item onSelect={() => requestDelete(user)}>
+                            <DropdownMenu.Item
+                              onSelect={() => requestDelete(user)}
+                            >
                               <Trash2 />
                               Delete
                             </DropdownMenu.Item>
@@ -397,20 +542,38 @@ export const Users: Component = () => {
                       </DropdownMenu.Root>
                     </div>
                   )}
+                  rows={filteredUsers()}
                 />
               </Show>
             </Show>
           </Panel>
 
           <Panel
-            title={selectedUser() ? `${selectedUser()!.name} Access` : 'User Access'}
-            description="Grant or revoke backend access for the currently selected user."
-            actions={<IconButton variant="primary" icon={<Plus />} label="Grant Backend" onClick={openPermissionDialog} disabled={!selectedUser() || availableBackendOptions().length === 0} />}
+            actions={
+              <IconButton
+                disabled={
+                  !selectedUser() || availableBackendOptions().length === 0
+                }
+                icon={<Plus />}
+                label="Grant Backend"
+                onClick={openPermissionDialog}
+                variant="primary"
+              />
+            }
             bodyClass="ui-stack ui-stack--tight"
+            description="Grant or revoke backend access for the currently selected user."
+            title={
+              selectedUser() ? `${selectedUser()!.name} Access` : 'User Access'
+            }
           >
             <Show
+              fallback={
+                <EmptyState
+                  description="Select a user from the registry to manage backend access."
+                  title="No user selected"
+                />
+              }
               when={selectedUser()}
-              fallback={<EmptyState title="No user selected" description="Select a user from the registry to manage backend access." />}
             >
               {(user) => (
                 <>
@@ -418,57 +581,106 @@ export const Users: Component = () => {
                     items={[
                       { key: 'User', value: user().name },
                       { key: 'Email', value: user().email ?? '-' },
-                      { key: 'Assigned backends', value: String(permissionsForSelectedUser().length) },
+                      {
+                        key: 'Assigned backends',
+                        value: String(permissionsForSelectedUser().length),
+                      },
                     ]}
                   />
                   <Show
-                    when={!permissions.loading || permissionsForSelectedUser().length > 0}
-                    fallback={<EmptyState title="Loading access" description="Reading backend assignments for the selected user." />}
+                    fallback={
+                      <EmptyState
+                        description="Reading backend assignments for the selected user."
+                        title="Loading access"
+                      />
+                    }
+                    when={
+                      !permissions.loading ||
+                      permissionsForSelectedUser().length > 0
+                    }
                   >
                     <Show
-                      when={permissionsForSelectedUser().length > 0}
                       fallback={
                         <EmptyState
-                          title="No backend access yet"
+                          action={
+                            <IconButton
+                              disabled={availableBackendOptions().length === 0}
+                              icon={<Plus />}
+                              label="Grant Backend"
+                              onClick={openPermissionDialog}
+                              variant="primary"
+                            />
+                          }
                           description="Grant this user access to a backend to allow routing."
-                          action={<IconButton variant="primary" icon={<Plus />} label="Grant Backend" onClick={openPermissionDialog} disabled={availableBackendOptions().length === 0} />}
+                          title="No backend access yet"
                         />
                       }
+                      when={permissionsForSelectedUser().length > 0}
                     >
                       <DataGrid
-                        rows={permissionsForSelectedUser()}
                         columns={[
                           {
                             id: 'backend',
                             header: 'Backend',
-                            cell: (permission) => <span title={backendNameById().get(permission.backend_id) ?? `Backend #${permission.backend_id}`}>{backendNameById().get(permission.backend_id) ?? `Backend #${permission.backend_id}`}</span>,
+                            cell: (permission) => (
+                              <span
+                                title={
+                                  backendNameById().get(
+                                    permission.backend_id,
+                                  ) ?? `Backend #${permission.backend_id}`
+                                }
+                              >
+                                {backendNameById().get(permission.backend_id) ??
+                                  `Backend #${permission.backend_id}`}
+                              </span>
+                            ),
                           },
                           {
                             id: 'created_at',
                             header: 'Granted',
-                            cell: (permission) => <span>{new Date(permission.created_at).toLocaleString()}</span>,
+                            cell: (permission) => (
+                              <span>
+                                {new Date(
+                                  permission.created_at,
+                                ).toLocaleString()}
+                              </span>
+                            ),
                           },
                           {
                             id: 'status',
                             header: 'Status',
-                            cell: () => <StatusBadge tone="success">Assigned</StatusBadge>,
+                            cell: () => (
+                              <StatusBadge tone="success">Assigned</StatusBadge>
+                            ),
                           },
                         ]}
-                        getRowKey={(permission) => `${permission.user_id}-${permission.backend_id}`}
+                        getRowKey={(permission) =>
+                          `${permission.user_id}-${permission.backend_id}`
+                        }
                         loading={permissions.loading || backends.loading}
                         rowActions={(permission) => (
                           <IconButton
-                            variant="danger"
                             icon={<ShieldMinus />}
                             label="Revoke"
-                            onClick={() => requestPermissionDelete(permission.backend_id)}
+                            onClick={() =>
+                              requestPermissionDelete(permission.backend_id)
+                            }
+                            variant="danger"
                           />
                         )}
+                        rows={permissionsForSelectedUser()}
                       />
                     </Show>
                   </Show>
-                  <Show when={availableBackendOptions().length === 0 && permissionsForSelectedUser().length > 0}>
-                    <Alert tone="info">All available backends are already assigned to this user.</Alert>
+                  <Show
+                    when={
+                      availableBackendOptions().length === 0 &&
+                      permissionsForSelectedUser().length > 0
+                    }
+                  >
+                    <Alert tone="info">
+                      All available backends are already assigned to this user.
+                    </Alert>
                   </Show>
                 </>
               )}
@@ -477,66 +689,97 @@ export const Users: Component = () => {
         </div>
 
         <FormDialog
-          open={dialogOpen()}
-          onOpenChange={setDialogOpen}
-          title={editingUser() ? 'Edit User' : 'Add User'}
+          class="ui-dialog__content--compact"
           description="Compact form dialog for user identity and lifecycle status."
           footer={
             <>
-              <Button onClick={() => setDialogOpen(false)} disabled={submitting()}>
+              <Button
+                disabled={submitting()}
+                onClick={() => setDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" form="user-form" disabled={submitting()}>
+              <Button
+                disabled={submitting()}
+                form="user-form"
+                type="submit"
+                variant="primary"
+              >
                 {editingUser() ? 'Save Changes' : 'Create User'}
               </Button>
             </>
           }
-          class="ui-dialog__content--compact"
+          onOpenChange={setDialogOpen}
+          open={dialogOpen()}
+          title={editingUser() ? 'Edit User' : 'Add User'}
         >
-          <form id="user-form" class="ui-form" onSubmit={(event) => void handleSubmit(event)}>
-            <TextField label="Name" value={form().name} onInput={(event) => setForm((current) => ({ ...current, name: event.currentTarget.value }))} />
+          <form
+            class="ui-form"
+            id="user-form"
+            onSubmit={(event) => void handleSubmit(event)}
+          >
             <TextField
-              label="Email"
-              value={form().email}
-              placeholder="ops@example.com"
-              onInput={(event) => setForm((current) => ({ ...current, email: event.currentTarget.value }))}
+              label="Name"
+              onInput={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  name: event.currentTarget.value,
+                }))
+              }
+              value={form().name}
             />
             <TextField
-              label="API Key"
-              value={form().api_key}
-              placeholder="Leave blank to auto-generate"
+              label="Email"
+              onInput={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  email: event.currentTarget.value,
+                }))
+              }
+              placeholder="ops@example.com"
+              value={form().email}
+            />
+            <TextField
               description={
                 editingUser()
                   ? 'Set a replacement key for migrations or leave blank to keep the current key.'
                   : 'Optional. Paste a legacy key to preserve it during migration, or leave blank to auto-generate.'
               }
-              onInput={(event) => setForm((current) => ({ ...current, api_key: event.currentTarget.value }))}
+              label="API Key"
+              onInput={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  api_key: event.currentTarget.value,
+                }))
+              }
+              placeholder="Leave blank to auto-generate"
+              value={form().api_key}
             />
             <Show when={editingUser()}>
               <Checkbox
-                label="User is active"
-                description="Inactive users keep their record but cannot route traffic."
                 checked={form().is_active}
-                onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
+                description="Inactive users keep their record but cannot route traffic."
+                label="User is active"
+                onChange={(checked) =>
+                  setForm((current) => ({ ...current, is_active: checked }))
+                }
               />
             </Show>
             <Checkbox
-              label="Enable detailed logging"
-              description="When enabled, proxied request and response headers/bodies are stored for this user."
               checked={form().detail_logging}
-              onChange={(checked) => setForm((current) => ({ ...current, detail_logging: checked }))}
+              description="When enabled, proxied request and response headers/bodies are stored for this user."
+              label="Enable detailed logging"
+              onChange={(checked) =>
+                setForm((current) => ({ ...current, detail_logging: checked }))
+              }
             />
           </form>
         </FormDialog>
 
         <ConfirmDialog
-          open={userDeleteConfirmOpen()}
-          onOpenChange={setUserDeleteConfirmOpen}
-          title="Delete user"
-          description="This removes the user record and invalidates the current API key."
-          confirmLabel="Delete User"
-          tone="danger"
           busy={submitting()}
+          confirmLabel="Delete User"
+          description="This removes the user record and invalidates the current API key."
           details={
             <Show when={pendingDeleteUser()}>
               {(user) => (
@@ -550,65 +793,109 @@ export const Users: Component = () => {
             </Show>
           }
           onConfirm={() => void handleDelete()}
+          onOpenChange={setUserDeleteConfirmOpen}
+          open={userDeleteConfirmOpen()}
+          title="Delete user"
+          tone="danger"
         />
 
         <FormDialog
-          open={permissionDialogOpen()}
-          onOpenChange={setPermissionDialogOpen}
-          title={selectedUser() ? `Grant Backend to ${selectedUser()!.name}` : 'Grant Backend'}
+          class="ui-dialog__content--compact"
           description="Assign backend access for the selected user."
           footer={
             <>
-              <Button onClick={() => setPermissionDialogOpen(false)} disabled={submitting()}>
+              <Button
+                disabled={submitting()}
+                onClick={() => setPermissionDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" form="user-permission-form" variant="primary" disabled={submitting() || !selectedUser() || availableBackendOptions().length === 0}>
+              <Button
+                disabled={
+                  submitting() ||
+                  !selectedUser() ||
+                  availableBackendOptions().length === 0
+                }
+                form="user-permission-form"
+                type="submit"
+                variant="primary"
+              >
                 Grant
               </Button>
             </>
           }
-          class="ui-dialog__content--compact"
+          onOpenChange={setPermissionDialogOpen}
+          open={permissionDialogOpen()}
+          title={
+            selectedUser()
+              ? `Grant Backend to ${selectedUser()!.name}`
+              : 'Grant Backend'
+          }
         >
-          <form id="user-permission-form" class="ui-form" onSubmit={(event) => void createPermission(event)}>
+          <form
+            class="ui-form"
+            id="user-permission-form"
+            onSubmit={(event) => void createPermission(event)}
+          >
             <Show
+              fallback={
+                <Alert tone="warning">
+                  Select a user before granting backend access.
+                </Alert>
+              }
               when={selectedUser()}
-              fallback={<Alert tone="warning">Select a user before granting backend access.</Alert>}
             >
-              <MetaCluster items={[{ key: 'User', value: selectedUser()!.name }]} />
+              <MetaCluster
+                items={[{ key: 'User', value: selectedUser()!.name }]}
+              />
             </Show>
             <Select
               label="Backend"
-              value={permissionBackendId()}
               onChange={setPermissionBackendId}
               options={availableBackendOptions()}
-              placeholder={availableBackendOptions().length > 0 ? 'Select backend' : 'No unassigned backends'}
+              placeholder={
+                availableBackendOptions().length > 0
+                  ? 'Select backend'
+                  : 'No unassigned backends'
+              }
+              value={permissionBackendId()}
             />
           </form>
         </FormDialog>
 
         <ConfirmDialog
-          open={permissionConfirmOpen()}
-          onOpenChange={setPermissionConfirmOpen}
-          title="Revoke backend access"
-          description="This removes the routing relationship between the selected user and backend."
-          confirmLabel="Revoke"
-          tone="danger"
           busy={submitting()}
+          confirmLabel="Revoke"
+          description="This removes the routing relationship between the selected user and backend."
           details={
             <Show when={pendingDeletePermission()}>
               {(current) => (
                 <MetaCluster
                   items={[
-                    { key: 'User', value: selectedUser()?.name ?? String(current().user_id) },
-                    { key: 'Backend', value: backendNameById().get(current().backend_id) ?? String(current().backend_id) },
+                    {
+                      key: 'User',
+                      value: selectedUser()?.name ?? String(current().user_id),
+                    },
+                    {
+                      key: 'Backend',
+                      value:
+                        backendNameById().get(current().backend_id) ??
+                        String(current().backend_id),
+                    },
                   ]}
                 />
               )}
             </Show>
           }
           onConfirm={() => void revokePermission()}
+          onOpenChange={setPermissionConfirmOpen}
+          open={permissionConfirmOpen()}
+          title="Revoke backend access"
+          tone="danger"
         />
       </div>
     </Layout>
   );
 };
+
+export default Users;

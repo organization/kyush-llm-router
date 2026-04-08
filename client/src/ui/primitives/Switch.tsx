@@ -1,4 +1,5 @@
-import * as KSwitch from '@kobalte/core/switch';
+import * as SwitchPrimitive from '@kobalte/core/switch';
+
 import { cn } from '../lib/cn';
 
 interface SwitchProps {
@@ -13,21 +14,25 @@ interface SwitchProps {
 
 export function Switch(props: SwitchProps) {
   return (
-    <KSwitch.Root
-      class={cn('ui-switch', props.class)}
+    <SwitchPrimitive.Root
       checked={props.checked}
+      class={cn('ui-switch', props.class)}
       defaultChecked={props.defaultChecked}
       disabled={props.disabled}
       onChange={props.onChange}
     >
-      <KSwitch.Input />
-      <KSwitch.Control class="ui-switch__control">
-        <KSwitch.Thumb class="ui-switch__thumb" />
-      </KSwitch.Control>
+      <SwitchPrimitive.Input />
+      <SwitchPrimitive.Control class="ui-switch__control">
+        <SwitchPrimitive.Thumb class="ui-switch__thumb" />
+      </SwitchPrimitive.Control>
       <span>
-        <KSwitch.Label>{props.label}</KSwitch.Label>
-        {props.description && <KSwitch.Description class="ui-field__description">{props.description}</KSwitch.Description>}
+        <SwitchPrimitive.Label>{props.label}</SwitchPrimitive.Label>
+        {props.description && (
+          <SwitchPrimitive.Description class="ui-field__description">
+            {props.description}
+          </SwitchPrimitive.Description>
+        )}
       </span>
-    </KSwitch.Root>
+    </SwitchPrimitive.Root>
   );
 }

@@ -1,232 +1,162 @@
-import { Router, Request, Response } from 'express';
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+
+import {
+  CreateScriptInputSchema,
+  ScriptTestInputSchema,
+  UpdateScriptInputSchema,
+} from '@kyush/shared';
+
 import { ScriptModel } from '../models/Script';
-import { UserModel } from '../models/User';
-import { BackendModel } from '../models/Backend';
 import { CompiledScript } from '../services/ScriptExecutor';
-import { CreateScriptData, UpdateScriptData, ScriptContextData } from '../../../shared/types';
 
-const router: Router = Router();
+import type { ScriptContextData } from '../../../shared/types';
+import type { AppEnv } from '../types/hono';
 
-// ============ Script Management ============
+const router = new Hono<AppEnv>();
 
-router.get('/', (req: Request, res: Response) => {
-  const scripts = ScriptModel.findAll();
-  res.json(scripts);
+router.get('/', (c) => c.json(ScriptModel.findAll()));
+router.get('/active', (c) => c.json(ScriptModel.findActive()));
+
+router.get('/type/:type', (c) => {
+  const scriptType = c.req.param('type');
+  return c.json(ScriptModel.findByScriptType(scriptType));
 });
 
-router.get('/active', (req: Request, res: Response) => {
-  const scripts = ScriptModel.findActive();
-  res.json(scripts);
-});
-
-router.get('/type/:type', (req: Request, res: Response) => {
-  const scriptType = String(req.params.type);
-  const scripts = ScriptModel.findByScriptType(scriptType);
-  res.json(scripts);
-});
-
-router.get('/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.get('/:id', (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
-
-  if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
-  }
-
-  res.json(script);
+  if (!script) return c.json({ error: 'Script not found' }, 404);
+  return c.json(script);
 });
 
-router.post('/', (req: Request, res: Response) => {
-  const { name, script_type, target_user_id, target_backend_id, script_code, is_active } = req.body as CreateScriptData;
-
-  if (!name || !script_type || !script_code) {
-    res.status(400).json({ error: 'name, script_type, and script_code are required' });
-    return;
-  }
-
-  if (script_type === 'per-user-backend') {
-    if (!target_user_id || !target_backend_id) {
-      res.status(400).json({ error: 'target_user_id and target_backend_id are required for per-user-backend scripts' });
-      return;
-    }
-  } else if (script_type === 'per-backend') {
-    if (!target_backend_id) {
-      res.status(400).json({ error: 'target_backend_id is required for per-backend scripts' });
-      return;
-    }
-  } else if (script_type === 'per-user') {
-    if (!target_user_id) {
-      res.status(400).json({ error: 'target_user_id is required for per-user scripts' });
-      return;
-    }
-  }
-
+router.post('/', zValidator('json', CreateScriptInputSchema), (c) => {
+  const data = c.req.valid('json');
   try {
     const script = ScriptModel.create({
-      name,
-      script_type,
-      target_user_id: target_user_id ?? null,
-      target_backend_id: target_backend_id ?? null,
-      script_code,
-      is_active: is_active ?? true,
+      name: data.name,
+      script_type: data.script_type,
+      target_user_id: data.target_user_id ?? null,
+      target_backend_id: data.target_backend_id ?? null,
+      script_code: data.script_code,
+      is_active: data.is_active ?? true,
     });
-    res.status(201).json(script);
+    return c.json(script, 201);
   } catch (error) {
     if (error instanceof Error && error.message.includes('already exists')) {
-      res.status(409).json({ error: error.message });
-      return;
-    } else {
-      console.error('Unexpected error creating script:', error);
-      res.status(500).json({ error: 'Failed to create script' });
+      return c.json({ error: error.message }, 409);
     }
+    console.error('Unexpected error creating script:', error);
+    return c.json({ error: 'Failed to create script' }, 500);
   }
 });
 
-router.put('/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.put('/:id', zValidator('json', UpdateScriptInputSchema), (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
+  if (!script) return c.json({ error: 'Script not found' }, 404);
 
-  if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
-  }
+  const data = c.req.valid('json');
 
-  const { name, script_type, target_user_id, target_backend_id, script_code, is_active } = req.body as UpdateScriptData;
-
-  if (script_type) {
-    if (script_type === 'per-user-backend') {
-      if (!target_user_id || !target_backend_id) {
-        res.status(400).json({ error: 'target_user_id and target_backend_id are required for per-user-backend scripts' });
-        return;
-      }
-    } else if (script_type === 'per-backend') {
-      if (!target_backend_id) {
-        res.status(400).json({ error: 'target_backend_id is required for per-backend scripts' });
-        return;
-      }
-    } else if (script_type === 'per-user') {
-      if (!target_user_id) {
-        res.status(400).json({ error: 'target_user_id is required for per-user scripts' });
-        return;
-      }
+  // When script_type changes, the target fields must satisfy the discriminated
+  // shape. The shared CreateScriptInputSchema enforces this on creation; the
+  // update path mirrors the same checks because UpdateScriptInputSchema accepts
+  // any combination by design.
+  if (data.script_type === 'per-user-backend') {
+    if (!data.target_user_id || !data.target_backend_id) {
+      return c.json(
+        {
+          error:
+            'target_user_id and target_backend_id are required for per-user-backend scripts',
+        },
+        400,
+      );
     }
+  } else if (data.script_type === 'per-backend' && !data.target_backend_id) {
+    return c.json(
+      { error: 'target_backend_id is required for per-backend scripts' },
+      400,
+    );
+  } else if (data.script_type === 'per-user' && !data.target_user_id) {
+    return c.json(
+      { error: 'target_user_id is required for per-user scripts' },
+      400,
+    );
   }
 
-  const updatedScript = ScriptModel.update(id, {
-    name,
-    script_type,
-    target_user_id,
-    target_backend_id,
-    script_code,
-    is_active,
-  });
-
-  res.json(updatedScript);
+  const updatedScript = ScriptModel.update(id, data);
+  return c.json(updatedScript);
 });
 
-router.delete('/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
-  const success = ScriptModel.delete(id);
-
-  if (!success) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+router.delete('/:id', (c) => {
+  const id = Number(c.req.param('id'));
+  if (!ScriptModel.delete(id)) {
+    return c.json({ error: 'Script not found' }, 404);
   }
-
-  res.status(204).send();
+  return c.body(null, 204);
 });
 
-router.post('/:id/activate', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.post('/:id/activate', (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
-
-  if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+  if (!script) return c.json({ error: 'Script not found' }, 404);
+  if (!ScriptModel.activate(id)) {
+    return c.json({ error: 'Failed to activate script' }, 500);
   }
-
-  const success = ScriptModel.activate(id);
-  if (!success) {
-    res.status(500).json({ error: 'Failed to activate script' });
-    return;
-  }
-
-  res.json({ ...script, is_active: true });
+  return c.json({ ...script, is_active: true });
 });
 
-router.post('/:id/deactivate', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.post('/:id/deactivate', (c) => {
+  const id = Number(c.req.param('id'));
   const script = ScriptModel.findById(id);
-
-  if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
+  if (!script) return c.json({ error: 'Script not found' }, 404);
+  if (!ScriptModel.deactivate(id)) {
+    return c.json({ error: 'Failed to deactivate script' }, 500);
   }
-
-  const success = ScriptModel.deactivate(id);
-  if (!success) {
-    res.status(500).json({ error: 'Failed to deactivate script' });
-    return;
-  }
-
-  res.json({ ...script, is_active: false });
+  return c.json({ ...script, is_active: false });
 });
 
-// ============ Script Testing ============
+router.post(
+  '/:id/test',
+  zValidator('json', ScriptTestInputSchema),
+  async (c) => {
+    const id = Number(c.req.param('id'));
+    const script = ScriptModel.findById(id);
+    if (!script) return c.json({ error: 'Script not found' }, 404);
 
-router.post('/:id/test', async (req: Request, res: Response) => {
-  const id = Number(req.params.id);
-  const script = ScriptModel.findById(id);
+    const body = c.req.valid('json');
+    const testContext: ScriptContextData = {
+      user: body.user ?? null,
+      backend: body.backend ?? null,
+      request: body.request,
+    };
 
-  if (!script) {
-    res.status(404).json({ error: 'Script not found' });
-    return;
-  }
+    let compiled: CompiledScript | null = null;
+    try {
+      const startTime = Date.now();
+      compiled = await CompiledScript.compile(script.script_code);
 
-  const { user, backend, request } = req.body as {
-    user?: { id: number; name: string; email?: string };
-    backend?: { id: number; name: string; base_url: string };
-    request: { method: string; path: string; headers: Record<string, string>; body: unknown; isStream: boolean };
-  };
+      if (compiled.hasOnRequest) await compiled.callOnRequest(testContext);
+      if (compiled.hasOnResponse) await compiled.callOnResponse(testContext);
 
-  if (!request) {
-    res.status(400).json({ error: 'request is required' });
-    return;
-  }
-
-  const testContext: ScriptContextData = {
-    user: user ?? null,
-    backend: backend ?? null,
-    request,
-  };
-
-  let compiled: CompiledScript | null = null;
-  try {
-    const startTime = Date.now();
-    compiled = await CompiledScript.compile(script.script_code);
-
-    if (compiled.hasOnRequest) {
-      await compiled.callOnRequest(testContext);
+      return c.json({
+        success: true,
+        executionTime: Date.now() - startTime,
+        hasOnRequest: compiled.hasOnRequest,
+        hasOnResponse: compiled.hasOnResponse,
+      });
+    } catch (error) {
+      return c.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        400,
+      );
+    } finally {
+      compiled?.dispose();
     }
-    if (compiled.hasOnResponse) {
-      await compiled.callOnResponse(testContext);
-    }
-
-    res.json({
-      success: true,
-      executionTime: Date.now() - startTime,
-      hasOnRequest: compiled.hasOnRequest,
-      hasOnResponse: compiled.hasOnResponse,
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  } finally {
-    compiled?.dispose();
-  }
-});
+  },
+);
 
 export default router;

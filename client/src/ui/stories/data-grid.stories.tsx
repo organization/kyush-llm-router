@@ -1,5 +1,14 @@
 import { createSignal } from 'solid-js';
-import { Button, CommandBar, CommandBarGroup, CommandBarHint, DataGrid, StatusBadge, type DataGridColumn } from '../index';
+
+import {
+  Button,
+  CommandBar,
+  CommandBarGroup,
+  CommandBarHint,
+  DataGrid,
+  StatusBadge,
+  type DataGridColumn,
+} from '../index';
 
 type GridRow = {
   id: number;
@@ -47,7 +56,11 @@ const columns: DataGridColumn<GridRow>[] = [
   {
     id: 'status',
     header: 'Status',
-    cell: (row) => <StatusBadge tone={row.status === 'Active' ? 'success' : 'danger'}>{row.status}</StatusBadge>,
+    cell: (row) => (
+      <StatusBadge tone={row.status === 'Active' ? 'success' : 'danger'}>
+        {row.status}
+      </StatusBadge>
+    ),
   },
   {
     id: 'updatedAt',
@@ -66,7 +79,9 @@ export const Paged = {
   render: () => {
     const [page, setPage] = createSignal(1);
     const [pageSize, setPageSize] = createSignal(10);
-    const [selectedKeys, setSelectedKeys] = createSignal(new Set<string | number>([1, 3]));
+    const [selectedKeys, setSelectedKeys] = createSignal(
+      new Set<string | number>([1, 3]),
+    );
 
     const pagedRows = () => {
       const start = (page() - 1) * pageSize();
@@ -77,7 +92,10 @@ export const Paged = {
       <div class="ui-workbench ui-stack">
         <div>
           <h1 class="ui-title">DataGrid</h1>
-          <p class="ui-subtitle">Pagination-first dense table for users, backends, analytics, and scripts.</p>
+          <p class="ui-subtitle">
+            Pagination-first dense table for users, backends, analytics, and
+            scripts.
+          </p>
         </div>
 
         <CommandBar>
@@ -93,23 +111,14 @@ export const Paged = {
         </CommandBar>
 
         <DataGrid
-          rows={pagedRows()}
           columns={columns}
           getRowKey={(row) => row.id}
-          stickyHeader
-          selectedKeys={selectedKeys()}
           onToggleRowSelection={(row, nextSelected) => {
             const next = new Set(selectedKeys());
             if (nextSelected) next.add(row.id);
             else next.delete(row.id);
             setSelectedKeys(next);
           }}
-          rowActions={(row) => (
-            <div class="ui-cluster">
-              <Button>Edit</Button>
-              <Button variant="danger">Disable</Button>
-            </div>
-          )}
           pagination={{
             page: page(),
             pageSize: pageSize(),
@@ -121,6 +130,15 @@ export const Paged = {
             },
             pageSizeOptions: [10, 20, 50],
           }}
+          rowActions={(row) => (
+            <div class="ui-cluster">
+              <Button>Edit</Button>
+              <Button variant="danger">Disable</Button>
+            </div>
+          )}
+          rows={pagedRows()}
+          selectedKeys={selectedKeys()}
+          stickyHeader
         />
       </div>
     );
@@ -132,9 +150,25 @@ export const States = {
     <div class="ui-workbench ui-stack">
       <div class="ui-stack">
         <h1 class="ui-title">Grid States</h1>
-        <DataGrid rows={[]} columns={columns} getRowKey={(row) => row.id} loading emptyMessage="No data." />
-        <DataGrid rows={[]} columns={columns} getRowKey={(row) => row.id} error="Failed to fetch rows from analytics database." />
-        <DataGrid rows={[]} columns={columns} getRowKey={(row) => row.id} emptyMessage="No matching rows for this filter set." />
+        <DataGrid
+          columns={columns}
+          emptyMessage="No data."
+          getRowKey={(row) => row.id}
+          loading
+          rows={[]}
+        />
+        <DataGrid
+          columns={columns}
+          error="Failed to fetch rows from analytics database."
+          getRowKey={(row) => row.id}
+          rows={[]}
+        />
+        <DataGrid
+          columns={columns}
+          emptyMessage="No matching rows for this filter set."
+          getRowKey={(row) => row.id}
+          rows={[]}
+        />
       </div>
     </div>
   ),

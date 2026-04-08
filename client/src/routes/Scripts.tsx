@@ -1,6 +1,13 @@
-import { createMemo, createResource, createSignal, lazy, Show, Suspense, type Component } from 'solid-js';
-import { api } from '../api/client';
-import { Layout } from '../components/Layout';
+import {
+  createMemo,
+  createResource,
+  createSignal,
+  lazy,
+  Show,
+  Suspense,
+  type Component,
+} from 'solid-js';
+
 import Play from 'lucide-solid/icons/play';
 import Plus from 'lucide-solid/icons/plus';
 import Power from 'lucide-solid/icons/power';
@@ -9,7 +16,10 @@ import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import RotateCcw from 'lucide-solid/icons/rotate-ccw';
 import Save from 'lucide-solid/icons/save';
 import Trash2 from 'lucide-solid/icons/trash-2';
-import type { ScriptType, UserScript } from '../types';
+
+import { Layout } from '../components/Layout';
+import { api } from '../api/client';
+
 import {
   Alert,
   Button,
@@ -29,8 +39,15 @@ import {
   TextField,
 } from '../ui';
 
+import type {
+  CreateScriptInput,
+  ScriptType,
+  UpdateScriptInput,
+  UserScript,
+} from '../types';
+
 type NoticeTone = 'success' | 'warning' | 'danger' | 'info';
-const ScriptEditor = lazy(() => import('../components/ScriptEditor').then((module) => ({ default: module.ScriptEditor })));
+const ScriptEditor = lazy(() => import('../components/script-editor'));
 
 interface ScriptFormState {
   id?: number;
@@ -103,24 +120,56 @@ const scriptTypeLabels: Record<ScriptType, string> = {
   'per-user': 'Per User',
 };
 
-export const Scripts: Component = () => {
-  const [scripts, { refetch: refetchScripts }] = createResource(() => api.scripts.getAll());
-  const [users, { refetch: refetchUsers }] = createResource(() => api.users.getAll());
-  const [backends, { refetch: refetchBackends }] = createResource(() => api.backends.getAll());
+const Scripts: Component = () => {
+  const [scripts, { refetch: refetchScripts }] = createResource(() =>
+    api.scripts.getAll(),
+  );
+  const [users, { refetch: refetchUsers }] = createResource(() =>
+    api.users.getAll(),
+  );
+  const [backends, { refetch: refetchBackends }] = createResource(() =>
+    api.backends.getAll(),
+  );
   const [form, setForm] = createSignal<ScriptFormState>(emptyForm());
-  const [selectedScriptId, setSelectedScriptId] = createSignal<number | null>(null);
-  const [pendingDeleteScript, setPendingDeleteScript] = createSignal<UserScript | null>(null);
+  const [selectedScriptId, setSelectedScriptId] = createSignal<number | null>(
+    null,
+  );
+  const [pendingDeleteScript, setPendingDeleteScript] =
+    createSignal<UserScript | null>(null);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [submitting, setSubmitting] = createSignal(false);
-  const [notice, setNotice] = createSignal<{ tone: NoticeTone; message: string } | null>(null);
-  const [testResult, setTestResult] = createSignal<{ success: boolean; error?: string; executionTime?: number } | null>(null);
+  const [notice, setNotice] = createSignal<{
+    tone: NoticeTone;
+    message: string;
+  } | null>(null);
+  const [testResult, setTestResult] = createSignal<{
+    success: boolean;
+    error?: string;
+    executionTime?: number;
+  } | null>(null);
   const [testing, setTesting] = createSignal(false);
 
-  const userOptions = createMemo(() => (users() ?? []).map((user) => ({ value: String(user.id), label: user.name })));
-  const backendOptions = createMemo(() => (backends() ?? []).map((backend) => ({ value: String(backend.id), label: backend.name })));
+  const userOptions = createMemo(() =>
+    (users() ?? []).map((user) => ({
+      value: String(user.id),
+      label: user.name,
+    })),
+  );
+  const backendOptions = createMemo(() =>
+    (backends() ?? []).map((backend) => ({
+      value: String(backend.id),
+      label: backend.name,
+    })),
+  );
 
-  const activeCount = createMemo(() => (scripts() ?? []).filter((script) => script.is_active).length);
-  const selectedScript = createMemo(() => (scripts() ?? []).find((script) => script.id === selectedScriptId()) ?? null);
+  const activeCount = createMemo(
+    () => (scripts() ?? []).filter((script) => script.is_active).length,
+  );
+  const selectedScript = createMemo(
+    () =>
+      (scripts() ?? []).find((script) => script.id === selectedScriptId()) ??
+      null,
+  );
 
   const syncForm = (script?: UserScript | null) => {
     if (!script) {
@@ -135,17 +184,30 @@ export const Scripts: Component = () => {
       id: script.id,
       name: script.name,
       script_type: script.script_type,
-      target_user_id: script.target_user_id ? String(script.target_user_id) : '',
-      target_backend_id: script.target_backend_id ? String(script.target_backend_id) : '',
+      target_user_id: script.target_user_id
+        ? String(script.target_user_id)
+        : '',
+      target_backend_id: script.target_backend_id
+        ? String(script.target_backend_id)
+        : '',
       script_code: script.script_code,
       is_active: script.is_active,
     });
     setTestResult(null);
   };
 
-  const getTargetLabel = (script: Pick<UserScript, 'script_type' | 'target_user_id' | 'target_backend_id'>) => {
-    const user = (users() ?? []).find((item) => item.id === script.target_user_id);
-    const backend = (backends() ?? []).find((item) => item.id === script.target_backend_id);
+  const getTargetLabel = (
+    script: Pick<
+      UserScript,
+      'script_type' | 'target_user_id' | 'target_backend_id'
+    >,
+  ) => {
+    const user = (users() ?? []).find(
+      (item) => item.id === script.target_user_id,
+    );
+    const backend = (backends() ?? []).find(
+      (item) => item.id === script.target_backend_id,
+    );
 
     if (script.script_type === 'per-user-backend') {
       return {
@@ -171,7 +233,10 @@ export const Scripts: Component = () => {
     const current = form();
     if (!current.name.trim()) return 'Script name is required.';
     if (!current.script_code.trim()) return 'Script code is required.';
-    if (current.script_type === 'per-user-backend' && (!current.target_user_id || !current.target_backend_id)) {
+    if (
+      current.script_type === 'per-user-backend' &&
+      (!current.target_user_id || !current.target_backend_id)
+    ) {
       return 'Select both a target user and backend.';
     }
     if (current.script_type === 'per-user' && !current.target_user_id) {
@@ -183,6 +248,51 @@ export const Scripts: Component = () => {
     return null;
   };
 
+  const buildCreatePayload = (current: ScriptFormState): CreateScriptInput => {
+    const base = {
+      name: current.name.trim(),
+      script_code: current.script_code,
+      is_active: current.is_active,
+    };
+
+    // Use type narrowing on script_type so the discriminated union picks the
+    // right variant — no `as` casting required.
+    switch (current.script_type) {
+      case 'per-user-backend':
+        return {
+          ...base,
+          script_type: 'per-user-backend',
+          target_user_id: Number(current.target_user_id),
+          target_backend_id: Number(current.target_backend_id),
+        };
+      case 'per-backend':
+        return {
+          ...base,
+          script_type: 'per-backend',
+          target_backend_id: Number(current.target_backend_id),
+        };
+      case 'per-user':
+        return {
+          ...base,
+          script_type: 'per-user',
+          target_user_id: Number(current.target_user_id),
+        };
+    }
+  };
+
+  const buildUpdatePayload = (current: ScriptFormState): UpdateScriptInput => ({
+    name: current.name.trim(),
+    script_type: current.script_type,
+    target_user_id: current.target_user_id
+      ? Number(current.target_user_id)
+      : null,
+    target_backend_id: current.target_backend_id
+      ? Number(current.target_backend_id)
+      : null,
+    script_code: current.script_code,
+    is_active: current.is_active,
+  });
+
   const saveScript = async () => {
     const error = validateForm();
     if (error) {
@@ -191,23 +301,18 @@ export const Scripts: Component = () => {
     }
 
     const current = form();
-    const payload = {
-      name: current.name.trim(),
-      script_type: current.script_type,
-      target_user_id: current.target_user_id ? Number(current.target_user_id) : null,
-      target_backend_id: current.target_backend_id ? Number(current.target_backend_id) : null,
-      script_code: current.script_code,
-      is_active: current.is_active,
-    };
 
     setSubmitting(true);
     try {
       if (current.id) {
-        const updated = await api.scripts.update(current.id, payload);
+        const updated = await api.scripts.update(
+          current.id,
+          buildUpdatePayload(current),
+        );
         setNotice({ tone: 'success', message: 'Script updated.' });
         syncForm(updated);
       } else {
-        const created = await api.scripts.create(payload);
+        const created = await api.scripts.create(buildCreatePayload(current));
         setNotice({ tone: 'success', message: 'Script created.' });
         syncForm(created);
       }
@@ -215,7 +320,13 @@ export const Scripts: Component = () => {
       await refetchUsers();
       await refetchBackends();
     } catch (saveError) {
-      setNotice({ tone: 'danger', message: saveError instanceof Error ? saveError.message : 'Script save failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          saveError instanceof Error
+            ? saveError.message
+            : 'Script save failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -228,13 +339,20 @@ export const Scripts: Component = () => {
       } else {
         await api.scripts.activate(script.id);
       }
-      setNotice({ tone: 'success', message: `${script.name} ${script.is_active ? 'deactivated' : 'activated'}.` });
+      setNotice({
+        tone: 'success',
+        message: `${script.name} ${script.is_active ? 'deactivated' : 'activated'}.`,
+      });
       await refetchScripts();
       if (selectedScriptId() === script.id) {
         syncForm({ ...script, is_active: !script.is_active });
       }
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Status update failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Status update failed.',
+      });
     }
   };
 
@@ -258,7 +376,11 @@ export const Scripts: Component = () => {
       }
       await refetchScripts();
     } catch (error) {
-      setNotice({ tone: 'danger', message: error instanceof Error ? error.message : 'Script deletion failed.' });
+      setNotice({
+        tone: 'danger',
+        message:
+          error instanceof Error ? error.message : 'Script deletion failed.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -267,7 +389,10 @@ export const Scripts: Component = () => {
   const runTest = async () => {
     const current = selectedScript();
     if (!current) {
-      setNotice({ tone: 'warning', message: 'Save the script before running a test.' });
+      setNotice({
+        tone: 'warning',
+        message: 'Save the script before running a test.',
+      });
       return;
     }
 
@@ -281,7 +406,10 @@ export const Scripts: Component = () => {
           method: 'POST',
           path: '/v1/chat/completions',
           headers: { 'Content-Type': 'application/json' },
-          body: { model: 'test', messages: [{ role: 'user', content: 'test' }] },
+          body: {
+            model: 'test',
+            messages: [{ role: 'user', content: 'test' }],
+          },
           isStream: false,
         },
       });
@@ -300,13 +428,23 @@ export const Scripts: Component = () => {
     <Layout>
       <div class="ui-app-page">
         <PageHeader
-          title="Scripts"
           description="Create and maintain request and response middleware with compact editing, metadata, and test feedback."
+          title="Scripts"
         />
 
         <Show when={notice()}>
           {(currentNotice) => (
-            <Alert tone={currentNotice().tone === 'danger' ? 'danger' : currentNotice().tone === 'warning' ? 'warning' : currentNotice().tone === 'success' ? 'success' : 'info'}>
+            <Alert
+              tone={
+                currentNotice().tone === 'danger'
+                  ? 'danger'
+                  : currentNotice().tone === 'warning'
+                    ? 'warning'
+                    : currentNotice().tone === 'success'
+                      ? 'success'
+                      : 'info'
+              }
+            >
               {currentNotice().message}
             </Alert>
           )}
@@ -314,38 +452,53 @@ export const Scripts: Component = () => {
 
         <CommandBar>
           <CommandBarGroup>
-            <StatusBadge tone="info">{scripts.loading ? 'Syncing' : 'Ready'}</StatusBadge>
+            <StatusBadge tone="info">
+              {scripts.loading ? 'Syncing' : 'Ready'}
+            </StatusBadge>
             <StatusBadge tone="success">{`${activeCount()} active`}</StatusBadge>
           </CommandBarGroup>
         </CommandBar>
 
         <div class="ui-split-panel">
           <Panel
-            title="Script registry"
-            description="Select a script to edit, test, or change activation state."
             actions={
-              <IconButton icon={<RefreshCw />} label="Refresh" onClick={() => void refetchScripts()} />
+              <IconButton
+                icon={<RefreshCw />}
+                label="Refresh"
+                onClick={() => void refetchScripts()}
+              />
             }
             bodyClass="ui-stack ui-stack--tight"
+            description="Select a script to edit, test, or change activation state."
+            title="Script registry"
           >
             <Show
+              fallback={
+                <EmptyState
+                  description="Reading middleware definitions and target mappings."
+                  title="Loading scripts"
+                />
+              }
               when={!scripts.loading || (scripts()?.length ?? 0) > 0}
-              fallback={<EmptyState title="Loading scripts" description="Reading middleware definitions and target mappings." />}
             >
               <Show
-                when={(scripts()?.length ?? 0) > 0}
                 fallback={
                   <EmptyState
-                    title="No scripts yet"
-                    description="Create your first middleware script to intercept requests or responses."
                     action={
-                      <IconButton variant="primary" icon={<Plus />} label="Create Script" onClick={() => syncForm(null)} />
+                      <IconButton
+                        icon={<Plus />}
+                        label="Create Script"
+                        onClick={() => syncForm(null)}
+                        variant="primary"
+                      />
                     }
+                    description="Create your first middleware script to intercept requests or responses."
+                    title="No scripts yet"
                   />
                 }
+                when={(scripts()?.length ?? 0) > 0}
               >
                 <DataGrid
-                  rows={scripts() ?? []}
                   columns={[
                     {
                       id: 'name',
@@ -355,7 +508,11 @@ export const Scripts: Component = () => {
                     {
                       id: 'type',
                       header: 'Type',
-                      cell: (script) => <StatusBadge tone="info">{scriptTypeLabels[script.script_type]}</StatusBadge>,
+                      cell: (script) => (
+                        <StatusBadge tone="info">
+                          {scriptTypeLabels[script.script_type]}
+                        </StatusBadge>
+                      ),
                     },
                     {
                       id: 'target',
@@ -364,8 +521,12 @@ export const Scripts: Component = () => {
                         const target = getTargetLabel(script);
                         return (
                           <div class="script-target">
-                            <p class="script-target__primary">{target.primary}</p>
-                            <p class="script-target__secondary">{target.secondary}</p>
+                            <p class="script-target__primary">
+                              {target.primary}
+                            </p>
+                            <p class="script-target__secondary">
+                              {target.secondary}
+                            </p>
                           </div>
                         );
                       },
@@ -373,7 +534,13 @@ export const Scripts: Component = () => {
                     {
                       id: 'status',
                       header: 'Status',
-                      cell: (script) => <StatusBadge tone={script.is_active ? 'success' : 'warning'}>{script.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
+                      cell: (script) => (
+                        <StatusBadge
+                          tone={script.is_active ? 'success' : 'warning'}
+                        >
+                          {script.is_active ? 'Active' : 'Inactive'}
+                        </StatusBadge>
+                      ),
                     },
                   ]}
                   getRowKey={(script) => script.id}
@@ -386,80 +553,139 @@ export const Scripts: Component = () => {
                         label={script.is_active ? 'Disable' : 'Enable'}
                         onClick={() => void toggleActive(script)}
                       />
-                      <IconButton variant="danger" icon={<Trash2 />} label="Delete" onClick={() => requestDelete(script)} />
+                      <IconButton
+                        icon={<Trash2 />}
+                        label="Delete"
+                        onClick={() => requestDelete(script)}
+                        variant="danger"
+                      />
                     </div>
                   )}
+                  rows={scripts() ?? []}
                 />
               </Show>
             </Show>
           </Panel>
 
           <Panel
-            title={form().id ? `Editing ${form().name}` : 'New script draft'}
-            description="Configure middleware scripts, run validation tests before applying changes."
             actions={
               <div class="ui-chip-group">
-                <StatusBadge tone={form().is_active ? 'success' : 'warning'}>{form().is_active ? 'Active' : 'Draft'}</StatusBadge>
+                <StatusBadge tone={form().is_active ? 'success' : 'warning'}>
+                  {form().is_active ? 'Active' : 'Draft'}
+                </StatusBadge>
                 <IconButton
-                  variant="primary"
+                  disabled={submitting()}
                   icon={<Save />}
                   label={form().id ? 'Save Script' : 'Create Script'}
                   onClick={() => void saveScript()}
-                  disabled={submitting()}
+                  variant="primary"
                 />
-                <IconButton icon={<Plus />} label="New Script" onClick={() => syncForm(null)} />
-                <IconButton icon={<RotateCcw />} label="Reset" onClick={() => syncForm(selectedScript())} />
+                <IconButton
+                  icon={<Plus />}
+                  label="New Script"
+                  onClick={() => syncForm(null)}
+                />
+                <IconButton
+                  icon={<RotateCcw />}
+                  label="Reset"
+                  onClick={() => syncForm(selectedScript())}
+                />
               </div>
             }
             bodyClass="ui-stack"
+            description="Configure middleware scripts, run validation tests before applying changes."
+            title={form().id ? `Editing ${form().name}` : 'New script draft'}
           >
             <div class="ui-form__section">
-              <TextField label="Script name" value={form().name} onInput={(event) => setForm((current) => ({ ...current, name: event.currentTarget.value }))} />
+              <TextField
+                label="Script name"
+                onInput={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    name: event.currentTarget.value,
+                  }))
+                }
+                value={form().name}
+              />
 
               <Select
                 label="Scope"
-                value={form().script_type}
-                onChange={(value) => setForm((current) => ({ ...current, script_type: value as ScriptType, target_user_id: '', target_backend_id: '' }))}
+                onChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    script_type: value as ScriptType,
+                    target_user_id: '',
+                    target_backend_id: '',
+                  }))
+                }
                 options={[
-                  { value: 'per-user-backend', label: scriptTypeLabels['per-user-backend'] },
+                  {
+                    value: 'per-user-backend',
+                    label: scriptTypeLabels['per-user-backend'],
+                  },
                   { value: 'per-user', label: scriptTypeLabels['per-user'] },
-                  { value: 'per-backend', label: scriptTypeLabels['per-backend'] },
+                  {
+                    value: 'per-backend',
+                    label: scriptTypeLabels['per-backend'],
+                  },
                 ]}
+                value={form().script_type}
               />
 
               <Show when={form().script_type !== 'per-backend'}>
                 <Select
                   label="Target user"
-                  value={form().target_user_id}
-                  onChange={(value) => setForm((current) => ({ ...current, target_user_id: value }))}
+                  onChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      target_user_id: value,
+                    }))
+                  }
                   options={userOptions()}
                   placeholder="Select user"
+                  value={form().target_user_id}
                 />
               </Show>
 
               <Show when={form().script_type !== 'per-user'}>
                 <Select
                   label="Target backend"
-                  value={form().target_backend_id}
-                  onChange={(value) => setForm((current) => ({ ...current, target_backend_id: value }))}
+                  onChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      target_backend_id: value,
+                    }))
+                  }
                   options={backendOptions()}
                   placeholder="Select backend"
+                  value={form().target_backend_id}
                 />
               </Show>
 
               <Checkbox
-                label="Script is active"
-                description="Inactive scripts remain editable but are skipped during routing."
                 checked={form().is_active}
-                onChange={(checked) => setForm((current) => ({ ...current, is_active: checked }))}
+                description="Inactive scripts remain editable but are skipped during routing."
+                label="Script is active"
+                onChange={(checked) =>
+                  setForm((current) => ({ ...current, is_active: checked }))
+                }
               />
             </div>
 
             <MetaCluster
               items={[
-                { key: 'Mode', value: form().id ? 'Saved script' : 'Unsaved draft' },
-                { key: 'User context', value: form().target_user_id || 'Not assigned' },
-                { key: 'Backend context', value: form().target_backend_id || 'Not assigned' },
+                {
+                  key: 'Mode',
+                  value: form().id ? 'Saved script' : 'Unsaved draft',
+                },
+                {
+                  key: 'User context',
+                  value: form().target_user_id || 'Not assigned',
+                },
+                {
+                  key: 'Backend context',
+                  value: form().target_backend_id || 'Not assigned',
+                },
               ]}
             />
 
@@ -469,27 +695,59 @@ export const Scripts: Component = () => {
                 <Tabs.Trigger value="test">Test</Tabs.Trigger>
               </Tabs.List>
               <Tabs.Content value="editor">
-                <Suspense fallback={<Panel title="Loading Editor" description="Preparing the Monaco runtime for this script." class="script-editor__fallback-panel" />}>
+                <Suspense
+                  fallback={
+                    <Panel
+                      class="script-editor__fallback-panel"
+                      description="Preparing the Monaco runtime for this script."
+                      title="Loading Editor"
+                    />
+                  }
+                >
                   <ScriptEditor
+                    onChange={(value: string) =>
+                      setForm((current) => ({ ...current, script_code: value }))
+                    }
+                    path={
+                      form().id
+                        ? `inmemory://model/scripts/${form().id}.ts`
+                        : 'inmemory://model/scripts/draft.ts'
+                    }
                     value={form().script_code}
-                    path={form().id ? `inmemory://model/scripts/${form().id}.ts` : 'inmemory://model/scripts/draft.ts'}
-                    onChange={(value) => setForm((current) => ({ ...current, script_code: value }))}
                   />
                 </Suspense>
               </Tabs.Content>
               <Tabs.Content value="test">
                 <div class="ui-stack">
-                  <p class="ui-copy">The test runner uses the first available user/backend as sample context and a mock chat completion request.</p>
+                  <p class="ui-copy">
+                    The test runner uses the first available user/backend as
+                    sample context and a mock chat completion request.
+                  </p>
                   <div class="ui-row-actions">
-                    <IconButton variant="primary" icon={<Play />} label={testing() ? 'Running...' : 'Run Test'} onClick={() => void runTest()} disabled={testing()} />
+                    <IconButton
+                      disabled={testing()}
+                      icon={<Play />}
+                      label={testing() ? 'Running...' : 'Run Test'}
+                      onClick={() => void runTest()}
+                      variant="primary"
+                    />
                   </div>
                   <Show
+                    fallback={
+                      <EmptyState
+                        description="Save or select a script, then run the built-in test harness to inspect the result."
+                        title="No test run yet"
+                      />
+                    }
                     when={testResult()}
-                    fallback={<EmptyState title="No test run yet" description="Save or select a script, then run the built-in test harness to inspect the result." />}
                   >
                     {(result) => (
-                      <Alert tone={result().success ? 'success' : 'danger'} title={result().success ? 'Test passed' : 'Test failed'}>
-                        {result().error ?? `Execution time: ${result().executionTime ?? 0}ms`}
+                      <Alert
+                        title={result().success ? 'Test passed' : 'Test failed'}
+                        tone={result().success ? 'success' : 'danger'}
+                      >
+                        {result().error ??
+                          `Execution time: ${result().executionTime ?? 0}ms`}
                       </Alert>
                     )}
                   </Show>
@@ -500,20 +758,19 @@ export const Scripts: Component = () => {
         </div>
 
         <ConfirmDialog
-          open={confirmOpen()}
-          onOpenChange={setConfirmOpen}
-          title="Delete script"
-          description="This permanently removes the middleware definition and its current target binding."
-          confirmLabel="Delete Script"
-          tone="danger"
           busy={submitting()}
+          confirmLabel="Delete Script"
+          description="This permanently removes the middleware definition and its current target binding."
           details={
             <Show when={pendingDeleteScript()}>
               {(script) => (
                 <MetaCluster
                   items={[
                     { key: 'Name', value: script().name },
-                    { key: 'Type', value: scriptTypeLabels[script().script_type] },
+                    {
+                      key: 'Type',
+                      value: scriptTypeLabels[script().script_type],
+                    },
                     { key: 'Target', value: getTargetLabel(script()).primary },
                   ]}
                 />
@@ -521,8 +778,14 @@ export const Scripts: Component = () => {
             </Show>
           }
           onConfirm={() => void deleteScript()}
+          onOpenChange={setConfirmOpen}
+          open={confirmOpen()}
+          title="Delete script"
+          tone="danger"
         />
       </div>
     </Layout>
   );
 };
+
+export default Scripts;

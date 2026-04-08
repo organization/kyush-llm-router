@@ -1,6 +1,32 @@
+@import 'tailwindcss';
+
 @import './styles/tokens.css';
 @import './styles/base.css';
 @import './styles/primitives.css';
 @import './styles/patterns.css';
 @import './styles/layout.css';
 @import './styles/pages.css';
+
+/*
+ * Tailwind v4 theme bridging — expose existing CSS custom properties as theme tokens
+ * so utility classes (e.g. `text-(--color-text)`, `bg-(--color-surface)`) and the
+ * `theme()` function resolve to the same design tokens that the legacy stylesheets use.
+ */
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-border: var(--color-border);
+
+  --radius-1: var(--radius-1);
+  --radius-2: var(--radius-2);
+  --radius-3: var(--radius-3);
+
+  --font-sans: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--font-mono, ui-monospace, monospace);
+}

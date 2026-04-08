@@ -9,11 +9,21 @@ import Moon from 'lucide-solid/icons/moon';
 import Server from 'lucide-solid/icons/server';
 import Sun from 'lucide-solid/icons/sun';
 import Users from 'lucide-solid/icons/users';
-import { For, createMemo, createSignal, onCleanup, onMount, type JSX, type ParentComponent } from 'solid-js';
+import {
+  For,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+  type JSX,
+  type ParentComponent,
+} from 'solid-js';
+
 import SnakegroundBg from '../../components/SnakegroundBg';
 import { useAuth } from '../../auth';
 import { IconButton } from '../primitives/IconButton';
 import { cn } from '../lib/cn';
+
 import type { ThemeMode } from '../tokens';
 
 const navItems = [
@@ -53,12 +63,16 @@ export const AppShell: ParentComponent<AppShellProps> = (props) => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     const applyTheme = (mode: ThemeMode) => {
-      const nextTheme = mode === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : mode;
+      const nextTheme =
+        mode === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : mode;
       root.dataset.theme = nextTheme;
     };
 
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const initialMode: ThemeMode = storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'system';
+    const initialMode: ThemeMode =
+      storedTheme === 'light' || storedTheme === 'dark'
+        ? storedTheme
+        : 'system';
 
     const syncSystemTheme = () => {
       setSystemPrefersDark(mediaQuery.matches);
@@ -98,11 +112,17 @@ export const AppShell: ParentComponent<AppShellProps> = (props) => {
           </div>
         </div>
 
-        <nav class="nav-rail__nav" aria-label="Primary navigation">
+        <nav aria-label="Primary navigation" class="nav-rail__nav">
           <For each={navItems}>
             {(item) => (
-              <A href={item.path} class={cn('nav-rail__link', location.pathname === item.path && 'nav-rail__link--active')}>
-                <span class="nav-rail__link-mark" aria-hidden="true">
+              <A
+                class={cn(
+                  'nav-rail__link',
+                  location.pathname === item.path && 'nav-rail__link--active',
+                )}
+                href={item.path}
+              >
+                <span aria-hidden="true" class="nav-rail__link-mark">
                   <item.icon />
                 </span>
                 <span>{item.label}</span>
@@ -113,8 +133,14 @@ export const AppShell: ParentComponent<AppShellProps> = (props) => {
 
         <div class="nav-rail__footer">
           <div class="nav-rail__session">
-            <p class="nav-rail__session-name">{auth.session()?.principal?.displayName ?? 'Admin'}</p>
-            <p class="nav-rail__session-meta">{auth.session()?.principal?.email ?? auth.session()?.principal?.subject ?? ''}</p>
+            <p class="nav-rail__session-name">
+              {auth.session()?.principal?.displayName ?? 'Admin'}
+            </p>
+            <p class="nav-rail__session-meta">
+              {auth.session()?.principal?.email ??
+                auth.session()?.principal?.subject ??
+                ''}
+            </p>
           </div>
           <IconButton
             class="nav-rail__theme-toggle"

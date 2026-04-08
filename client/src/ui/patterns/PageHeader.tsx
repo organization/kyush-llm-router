@@ -1,5 +1,6 @@
-import type { JSX, ParentProps } from 'solid-js';
 import { cn } from '../lib/cn';
+
+import type { JSX, ParentProps } from 'solid-js';
 
 interface PageHeaderProps extends ParentProps {
   title: string;
@@ -14,7 +15,9 @@ export function PageHeader(props: PageHeaderProps) {
       <div class="page-header__copy">
         <p class="page-header__eyebrow">Operations</p>
         <h2 class="page-header__title">{props.title}</h2>
-        {props.description && <p class="page-header__description">{props.description}</p>}
+        {props.description && (
+          <p class="page-header__description">{props.description}</p>
+        )}
         {props.children}
       </div>
       {props.actions && <div class="page-header__actions">{props.actions}</div>}

@@ -4,7 +4,7 @@ declare global {
   interface Window {
     Snakeground?: new (
       canvas: HTMLCanvasElement,
-      opts?: Record<string, unknown>
+      opts?: Record<string, unknown>,
     ) => {
       stop?: () => void;
       setPageHeight?: (height: number) => void;
@@ -16,16 +16,21 @@ const SCRIPT_ID = 'snakeground-script';
 const SCRIPT_SRC = '/snakeground.js';
 const SEED_STORAGE_KEY = 'snakeground-seed';
 
-export default function SnakegroundBg(props: { opts?: Record<string, unknown> }) {
+export default function SnakegroundBg(props: {
+  opts?: Record<string, unknown>;
+}) {
   let canvasRef: HTMLCanvasElement | undefined;
   let wrapRef: HTMLDivElement | undefined;
-  let snakeground: { stop?: () => void; setPageHeight?: (height: number) => void } | undefined;
+  let snakeground:
+    | { stop?: () => void; setPageHeight?: (height: number) => void }
+    | undefined;
 
   const onScroll = () => {
     if (!wrapRef) return;
 
     const scrollY = window.scrollY;
-    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const maxScroll =
+      document.documentElement.scrollHeight - window.innerHeight;
     const ratio = maxScroll > 0 ? scrollY / maxScroll : 0;
     const offset = 5 - ratio * 30;
 
@@ -55,7 +60,9 @@ export default function SnakegroundBg(props: { opts?: Record<string, unknown> })
   };
 
   onMount(() => {
-    const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+    const existingScript = document.getElementById(
+      SCRIPT_ID,
+    ) as HTMLScriptElement | null;
 
     if (window.Snakeground) {
       mountSnakeground();
@@ -80,8 +87,8 @@ export default function SnakegroundBg(props: { opts?: Record<string, unknown> })
   });
 
   return (
-    <div ref={wrapRef} class="pub-bg-canvas-wrap">
-      <canvas ref={canvasRef} class="pub-bg-canvas" />
+    <div class="pub-bg-canvas-wrap" ref={wrapRef}>
+      <canvas class="pub-bg-canvas" ref={canvasRef} />
     </div>
   );
 }

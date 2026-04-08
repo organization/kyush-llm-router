@@ -1,5 +1,6 @@
-import type { JSX } from 'solid-js';
 import { Button, Dialog } from '../index';
+
+import type { JSX } from 'solid-js';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -16,7 +17,7 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog(props: ConfirmDialogProps) {
   return (
-    <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
+    <Dialog.Root onOpenChange={props.onOpenChange} open={props.open}>
       <Dialog.Portal>
         <Dialog.Overlay />
         <Dialog.Content class="ui-dialog__content ui-dialog__content--compact">
@@ -28,10 +29,17 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
           </div>
           {props.details && <div class="ui-dialog__body">{props.details}</div>}
           <div class="ui-dialog__footer">
-            <Button onClick={() => props.onOpenChange(false)} disabled={props.busy}>
+            <Button
+              disabled={props.busy}
+              onClick={() => props.onOpenChange(false)}
+            >
               {props.cancelLabel ?? 'Cancel'}
             </Button>
-            <Button variant={props.tone === 'danger' ? 'danger' : 'primary'} onClick={() => void props.onConfirm()} disabled={props.busy}>
+            <Button
+              disabled={props.busy}
+              onClick={() => void props.onConfirm()}
+              variant={props.tone === 'danger' ? 'danger' : 'primary'}
+            >
               {props.confirmLabel ?? 'Confirm'}
             </Button>
           </div>

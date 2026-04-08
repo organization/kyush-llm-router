@@ -1,365 +1,316 @@
-import { Router, Request, Response } from 'express';
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+
+import {
+  CreateBackendInputSchema,
+  CreateModelRewriteInputSchema,
+  CreatePermissionInputSchema,
+  CreateUserInputSchema,
+  UpdateBackendInputSchema,
+  UpdateModelRewriteInputSchema,
+  UpdateUserInputSchema,
+} from '@kyush/shared';
+
+import scriptRoutes from './scripts';
+
 import { UserModel } from '../models/User';
 import { BackendModel } from '../models/Backend';
 import { ModelRewriteModel } from '../models/ModelRewrite';
 import { PermissionModel } from '../models/Permission';
-import scriptRoutes from './scripts';
-import {
-  CreateBackendData,
-  CreateModelRewriteData,
-  CreatePermissionData,
-  CreateUserData,
-  UpdateBackendData,
-  UpdateModelRewriteData,
-  UpdateUserData,
-} from '../../../shared/types';
+
 import { getUtcTimestamp } from '../utils/time';
 import { ModelCatalogService } from '../services/ModelCatalogService';
 import { AnalyticsService } from '../services/AnalyticsService';
 
-const router: Router = Router();
+import type { AppEnv } from '../types/hono';
 
-router.use('/scripts', scriptRoutes);
+const router = new Hono<AppEnv>();
 
-router.get('/dashboard/summary', (req: Request, res: Response) => {
-  const days = req.query.days ? Number(req.query.days) : 30;
-  res.json(AnalyticsService.getDashboardSummary(days));
+router.route('/scripts', scriptRoutes);
+
+router.get('/dashboard/summary', (c) => {
+  const days = c.req.query('days') ? Number(c.req.query('days')) : 30;
+  return c.json(AnalyticsService.getDashboardSummary(days));
 });
 
 // ============ User Management ============
 
-router.get('/users', (req: Request, res: Response) => {
-  const users = UserModel.findAll();
-  res.json(users);
+router.get('/users', (c) => {
+  return c.json(UserModel.findAll());
 });
 
-router.post('/users', (req: Request, res: Response) => {
-  const { name, email, api_key, detail_logging } = req.body as CreateUserData;
-
-  if (!name?.trim()) {
-    res.status(400).json({ error: 'Name is required' });
-    return;
-  }
+router.post('/users', zValidator('json', CreateUserInputSchema), (c) => {
+  const data = c.req.valid('json');
 
   try {
-    const user = UserModel.create({
-      name: name.trim(),
-      email: email?.trim() || undefined,
-      api_key: api_key?.trim() || undefined,
-      detail_logging,
-    });
-
-    res.status(201).json(user);
+    const user = UserModel.create(data);
+    return c.json(user, 201);
   } catch (error) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
-      res.status(409).json({ error: 'API key already exists' });
-      return;
+      return c.json({ error: 'API key already exists' }, 409);
     }
-    res.status(500).json({ error: 'Failed to create user' });
+    return c.json({ error: 'Failed to create user' }, 500);
   }
 });
 
-router.get('/users/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.get('/users/:id', (c) => {
+  const id = Number(c.req.param('id'));
+  const user = UserModel.findById(id);
+  if (!user) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+  return c.json(user);
+});
+
+router.put('/users/:id', zValidator('json', UpdateUserInputSchema), (c) => {
+  const id = Number(c.req.param('id'));
   const user = UserModel.findById(id);
 
   if (!user) {
-    res.status(404).json({ error: 'User not found' });
-    return;
-  }
-
-  res.json(user);
-});
-
-router.put('/users/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
-  const user = UserModel.findById(id);
-
-  if (!user) {
-    res.status(404).json({ error: 'User not found' });
-    return;
-  }
-
-  const { name, email, api_key, is_active, detail_logging } = req.body as UpdateUserData;
-
-  if (typeof name === 'string' && !name.trim()) {
-    res.status(400).json({ error: 'Name cannot be empty' });
-    return;
+    return c.json({ error: 'User not found' }, 404);
   }
 
   try {
-    const updatedUser = UserModel.update(id, {
-      name: typeof name === 'string' ? name.trim() : undefined,
-      email: typeof email === 'string' ? email.trim() || undefined : undefined,
-      api_key: typeof api_key === 'string' ? api_key.trim() || undefined : undefined,
-      is_active,
-      detail_logging,
-    });
-
-    res.json(updatedUser);
+    const updatedUser = UserModel.update(id, c.req.valid('json'));
+    return c.json(updatedUser);
   } catch (error) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
-      res.status(409).json({ error: 'API key already exists' });
-      return;
+      return c.json({ error: 'API key already exists' }, 409);
     }
-    res.status(500).json({ error: 'Failed to update user' });
+    return c.json({ error: 'Failed to update user' }, 500);
   }
 });
 
-router.delete('/users/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.delete('/users/:id', (c) => {
+  const id = Number(c.req.param('id'));
   const success = UserModel.delete(id);
-
   if (!success) {
-    res.status(404).json({ error: 'User not found' });
-    return;
+    return c.json({ error: 'User not found' }, 404);
   }
-
-  res.status(204).send();
+  return c.body(null, 204);
 });
 
-router.post('/users/:id/regenerate-api-key', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.post('/users/:id/regenerate-api-key', (c) => {
+  const id = Number(c.req.param('id'));
   const user = UserModel.findById(id);
-
   if (!user) {
-    res.status(404).json({ error: 'User not found' });
-    return;
+    return c.json({ error: 'User not found' }, 404);
   }
 
   const newApiKey = UserModel.regenerateApiKey(id);
   if (!newApiKey) {
-    res.status(500).json({ error: 'Failed to regenerate API key' });
-    return;
+    return c.json({ error: 'Failed to regenerate API key' }, 500);
   }
 
-  res.json({ ...user, api_key: newApiKey });
+  return c.json({ ...user, api_key: newApiKey });
 });
 
 // ============ Backend Management ============
 
-router.get('/backends', (req: Request, res: Response) => {
-  const backends = ModelCatalogService.getBackendsWithSummary();
-  res.json(backends);
+router.get('/backends', (c) => {
+  return c.json(ModelCatalogService.getBackendsWithSummary());
 });
 
-router.post('/backends', (req: Request, res: Response) => {
-  const { name, base_url, api_key, detail_logging } = req.body as CreateBackendData;
-
-  if (!name || !base_url) {
-    res.status(400).json({ error: 'Name and base_url are required' });
-    return;
-  }
-
-  const backend = BackendModel.create({ name, base_url, api_key, detail_logging });
-  res.status(201).json(backend);
+router.post('/backends', zValidator('json', CreateBackendInputSchema), (c) => {
+  const backend = BackendModel.create(c.req.valid('json'));
+  return c.json(backend, 201);
 });
 
-router.get('/backends/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
-  const backend = ModelCatalogService.getBackendsWithSummary().find((item) => item.id === id);
-
+router.get('/backends/:id', (c) => {
+  const id = Number(c.req.param('id'));
+  const backend = ModelCatalogService.getBackendsWithSummary().find(
+    (item) => item.id === id,
+  );
   if (!backend) {
-    res.status(404).json({ error: 'Backend not found' });
-    return;
+    return c.json({ error: 'Backend not found' }, 404);
   }
-
-  res.json(backend);
+  return c.json(backend);
 });
 
-router.put('/backends/:id', async (req: Request, res: Response) => {
-  const id = Number(req.params.id);
-  const backend = BackendModel.findById(id);
+router.put(
+  '/backends/:id',
+  zValidator('json', UpdateBackendInputSchema),
+  async (c) => {
+    const id = Number(c.req.param('id'));
+    const backend = BackendModel.findById(id);
+    if (!backend) {
+      return c.json({ error: 'Backend not found' }, 404);
+    }
 
-  if (!backend) {
-    res.status(404).json({ error: 'Backend not found' });
-    return;
-  }
+    const updatedBackend = BackendModel.update(id, c.req.valid('json'));
+    await ModelCatalogService.handleBackendUpdated(id);
+    return c.json(
+      ModelCatalogService.getBackendsWithSummary().find(
+        (item) => item.id === id,
+      ) || updatedBackend,
+    );
+  },
+);
 
-  const { name, base_url, api_key, is_active, detail_logging } = req.body as UpdateBackendData;
-  const updatedBackend = BackendModel.update(id, { name, base_url, api_key, is_active, detail_logging });
-  await ModelCatalogService.handleBackendUpdated(id);
-  res.json(ModelCatalogService.getBackendsWithSummary().find((item) => item.id === id) || updatedBackend);
-});
-
-router.delete('/backends/:id', async (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.delete('/backends/:id', async (c) => {
+  const id = Number(c.req.param('id'));
   const success = BackendModel.delete(id);
-
   if (!success) {
-    res.status(404).json({ error: 'Backend not found' });
-    return;
+    return c.json({ error: 'Backend not found' }, 404);
   }
-
   await ModelCatalogService.handleBackendUpdated(id);
-  res.status(204).send();
+  return c.body(null, 204);
 });
 
-router.get('/backends/:id/models', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.get('/backends/:id/models', (c) => {
+  const id = Number(c.req.param('id'));
   const payload = ModelCatalogService.getBackendModelsResponse(id);
-
   if (!payload) {
-    res.status(404).json({ error: 'Backend not found' });
-    return;
+    return c.json({ error: 'Backend not found' }, 404);
   }
-
-  res.json(payload);
+  return c.json(payload);
 });
 
-router.post('/backends/:id/models/refresh', async (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+router.post('/backends/:id/models/refresh', async (c) => {
+  const id = Number(c.req.param('id'));
   const backend = BackendModel.findById(id);
-
   if (!backend) {
-    res.status(404).json({ error: 'Backend not found' });
-    return;
+    return c.json({ error: 'Backend not found' }, 404);
   }
 
   if (!backend.is_active) {
-    res.status(409).json({ error: 'Inactive backends cannot refresh model cache' });
-    return;
+    return c.json(
+      { error: 'Inactive backends cannot refresh model cache' },
+      409,
+    );
   }
 
-  const cache = await ModelCatalogService.refreshBackendModels(id, { force: true, reason: 'admin-manual' });
-  res.json({
-    backend: ModelCatalogService.getBackendsWithSummary().find((item) => item.id === id) || backend,
+  const cache = await ModelCatalogService.refreshBackendModels(id, {
+    force: true,
+    reason: 'admin-manual',
+  });
+  return c.json({
+    backend:
+      ModelCatalogService.getBackendsWithSummary().find(
+        (item) => item.id === id,
+      ) || backend,
     cache,
-    snapshots: ModelCatalogService.getBackendModelsResponse(id)?.snapshots || [],
+    snapshots:
+      ModelCatalogService.getBackendModelsResponse(id)?.snapshots || [],
     models: ModelCatalogService.getBackendModelsResponse(id)?.models || [],
   });
 });
 
-router.get('/models/cache', (req: Request, res: Response) => {
-  res.json(ModelCatalogService.getCacheOverview());
+router.get('/models/cache', (c) => {
+  return c.json(ModelCatalogService.getCacheOverview());
 });
 
 // ============ Permission Management ============
 
-router.get('/permissions', (req: Request, res: Response) => {
-  const permissions = PermissionModel.findAll();
-  res.json(permissions);
+router.get('/permissions', (c) => {
+  return c.json(PermissionModel.findAll());
 });
 
-router.get('/permissions/user/:userId', (req: Request, res: Response) => {
-  const userId = Number(req.params.userId);
-  const permissions = PermissionModel.findByUserId(userId);
-  res.json(permissions);
+router.get('/permissions/user/:userId', (c) => {
+  const userId = Number(c.req.param('userId'));
+  return c.json(PermissionModel.findByUserId(userId));
 });
 
-router.get('/permissions/backend/:backendId', (req: Request, res: Response) => {
-  const backendId = Number(req.params.backendId);
-  const permissions = PermissionModel.findByBackendId(backendId);
-  res.json(permissions);
+router.get('/permissions/backend/:backendId', (c) => {
+  const backendId = Number(c.req.param('backendId'));
+  return c.json(PermissionModel.findByBackendId(backendId));
 });
 
-router.post('/permissions', (req: Request, res: Response) => {
-  const { user_id, backend_id } = req.body as CreatePermissionData;
-
-  if (!user_id || !backend_id) {
-    res.status(400).json({ error: 'user_id and backend_id are required' });
-    return;
-  }
-
-  try {
-    const permission = PermissionModel.create({ user_id, backend_id });
-    res.status(201).json(permission);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) {
-      res.status(409).json({ error: error.message });
-      return;
+router.post(
+  '/permissions',
+  zValidator('json', CreatePermissionInputSchema),
+  (c) => {
+    try {
+      const permission = PermissionModel.create(c.req.valid('json'));
+      return c.json(permission, 201);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already exists')) {
+        return c.json({ error: error.message }, 409);
+      }
+      return c.json({ error: 'Failed to create permission' }, 500);
     }
-    res.status(500).json({ error: 'Failed to create permission' });
-  }
-});
+  },
+);
 
-router.delete('/permissions', (req: Request, res: Response) => {
-  const { user_id, backend_id } = req.query as { user_id?: string; backend_id?: string };
+router.delete('/permissions', (c) => {
+  const user_id = c.req.query('user_id');
+  const backend_id = c.req.query('backend_id');
 
   if (!user_id || !backend_id) {
-    res.status(400).json({ error: 'user_id and backend_id are required' });
-    return;
+    return c.json({ error: 'user_id and backend_id are required' }, 400);
   }
 
   const success = PermissionModel.delete(Number(user_id), Number(backend_id));
-
   if (!success) {
-    res.status(404).json({ error: 'Permission not found' });
-    return;
+    return c.json({ error: 'Permission not found' }, 404);
   }
-
-  res.status(204).send();
+  return c.body(null, 204);
 });
 
-router.get('/model-rewrites', (req: Request, res: Response) => {
-  res.json(ModelRewriteModel.findAll());
+router.get('/model-rewrites', (c) => {
+  return c.json(ModelRewriteModel.findAll());
 });
 
-router.post('/model-rewrites', (req: Request, res: Response) => {
-  const { source_model, target_model, is_active, force, note } = req.body as CreateModelRewriteData;
-
-  if (!source_model?.trim() || !target_model?.trim()) {
-    res.status(400).json({ error: 'source_model and target_model are required' });
-    return;
-  }
-
-  try {
-    const rule = ModelRewriteModel.create({
-      source_model: source_model.trim(),
-      target_model: target_model.trim(),
-      is_active,
-      force,
-      note,
-    });
-    ModelCatalogService.loadRewriteMap();
-    res.status(201).json(rule);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('UNIQUE')) {
-      res.status(409).json({ error: 'Rewrite rule already exists for this source_model' });
-      return;
+router.post(
+  '/model-rewrites',
+  zValidator('json', CreateModelRewriteInputSchema),
+  (c) => {
+    try {
+      const rule = ModelRewriteModel.create(c.req.valid('json'));
+      ModelCatalogService.loadRewriteMap();
+      return c.json(rule, 201);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE')) {
+        return c.json(
+          { error: 'Rewrite rule already exists for this source_model' },
+          409,
+        );
+      }
+      return c.json({ error: 'Failed to create model rewrite rule' }, 500);
     }
-    res.status(500).json({ error: 'Failed to create model rewrite rule' });
-  }
-});
+  },
+);
 
-router.put('/model-rewrites/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
-  const existing = ModelRewriteModel.findById(id);
-  if (!existing) {
-    res.status(404).json({ error: 'Model rewrite rule not found' });
-    return;
-  }
-
-  try {
-    const updated = ModelRewriteModel.update(id, req.body as UpdateModelRewriteData);
-    ModelCatalogService.loadRewriteMap();
-    res.json(updated);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('UNIQUE')) {
-      res.status(409).json({ error: 'Rewrite rule already exists for this source_model' });
-      return;
+router.put(
+  '/model-rewrites/:id',
+  zValidator('json', UpdateModelRewriteInputSchema),
+  (c) => {
+    const id = Number(c.req.param('id'));
+    const existing = ModelRewriteModel.findById(id);
+    if (!existing) {
+      return c.json({ error: 'Model rewrite rule not found' }, 404);
     }
-    res.status(500).json({ error: 'Failed to update model rewrite rule' });
-  }
-});
 
-router.delete('/model-rewrites/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+    try {
+      const updated = ModelRewriteModel.update(id, c.req.valid('json'));
+      ModelCatalogService.loadRewriteMap();
+      return c.json(updated);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE')) {
+        return c.json(
+          { error: 'Rewrite rule already exists for this source_model' },
+          409,
+        );
+      }
+      return c.json({ error: 'Failed to update model rewrite rule' }, 500);
+    }
+  },
+);
+
+router.delete('/model-rewrites/:id', (c) => {
+  const id = Number(c.req.param('id'));
   const success = ModelRewriteModel.delete(id);
-
   if (!success) {
-    res.status(404).json({ error: 'Model rewrite rule not found' });
-    return;
+    return c.json({ error: 'Model rewrite rule not found' }, 404);
   }
-
   ModelCatalogService.loadRewriteMap();
-  res.status(204).send();
+  return c.body(null, 204);
 });
 
 // ============ Health Check ============
 
-router.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: getUtcTimestamp() });
+router.get('/health', (c) => {
+  return c.json({ status: 'ok', timestamp: getUtcTimestamp() });
 });
 
 export default router;

@@ -1,81 +1,68 @@
-import { createHash } from 'crypto';
-import { AdminAuthMode } from '../../../shared/types';
+import { createHash } from 'node:crypto';
 
-function normalizeAuthMode(value?: string): AdminAuthMode {
-  if (value === 'env' || value === 'oidc' || value === 'both') {
-    return value;
-  }
-  return 'both';
-}
+import { env } from './env';
 
-function parseList(value?: string): string[] {
-  return (value ?? '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
+import type { AdminAuthMode } from '../../../shared/types';
 
 export function getAdminAuthMode(): AdminAuthMode {
-  return normalizeAuthMode(process.env.ADMIN_AUTH_MODE);
+  return env.ADMIN_AUTH_MODE;
 }
 
 export function isEnvAdminEnabled(): boolean {
-  const mode = getAdminAuthMode();
+  const mode = env.ADMIN_AUTH_MODE;
   return mode === 'env' || mode === 'both';
 }
 
 export function isOidcEnabled(): boolean {
-  const mode = getAdminAuthMode();
+  const mode = env.ADMIN_AUTH_MODE;
   return mode === 'oidc' || mode === 'both';
 }
 
 export function getAdminUsername(): string | null {
-  return process.env.ADMIN_USERNAME?.trim() || null;
+  return env.ADMIN_USERNAME;
 }
 
 export function getAdminPasswordHash(): string | null {
-  return process.env.ADMIN_PASSWORD_HASH?.trim() || null;
+  return env.ADMIN_PASSWORD_HASH;
 }
 
 export function getAdminSessionSecret(): string {
-  return process.env.ADMIN_SESSION_SECRET?.trim() || 'development-admin-session-secret';
+  return env.ADMIN_SESSION_SECRET;
 }
 
 export function getAdminSessionTtlHours(): number {
-  const parsed = Number(process.env.ADMIN_SESSION_TTL_HOURS ?? 12);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 12;
+  return env.ADMIN_SESSION_TTL_HOURS;
 }
 
 export function getAdminApiTokenTtlDays(): number {
-  const parsed = Number(process.env.ADMIN_API_TOKEN_TTL_DAYS ?? 30);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+  return env.ADMIN_API_TOKEN_TTL_DAYS;
 }
 
 export function getCookieSecure(): boolean {
-  return process.env.NODE_ENV === 'production' && process.env.ADMIN_COOKIE_SECURE !== 'false';
+  return env.ADMIN_COOKIE_SECURE;
 }
 
 export function getAllowedOidcEmails(): string[] {
-  return parseList(process.env.OIDC_ALLOWED_EMAILS).map((entry) => entry.toLowerCase());
+  return env.OIDC_ALLOWED_EMAILS;
 }
 
 export function getTrustedProxyIps(): string[] {
-  return parseList(process.env.ADMIN_TRUSTED_PROXY_IPS);
+  return env.ADMIN_TRUSTED_PROXY_IPS;
 }
 
 export function getOidcConfig() {
   return {
-    issuerUrl: process.env.OIDC_ISSUER_URL?.trim() || '',
-    clientId: process.env.OIDC_CLIENT_ID?.trim() || '',
-    clientSecret: process.env.OIDC_CLIENT_SECRET?.trim() || '',
-    redirectUri: process.env.OIDC_REDIRECT_URI?.trim() || '',
-    scopes: process.env.OIDC_SCOPES?.trim() || 'openid profile email',
+    issuerUrl: env.OIDC_ISSUER_URL,
+    clientId: env.OIDC_CLIENT_ID,
+    clientSecret: env.OIDC_CLIENT_SECRET,
+    redirectUri: env.OIDC_REDIRECT_URI,
+    scopes: env.OIDC_SCOPES,
   };
 }
 
 export function hashOpaqueToken(token: string): string {
   return createHash('sha256')
-    .update(getAdminSessionSecret())
+    .update(env.ADMIN_SESSION_SECRET)
     .update(':')
     .update(token)
     .digest('hex');

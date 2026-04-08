@@ -10,7 +10,11 @@ const colors = {
   gray: '\x1b[90m',
 };
 
-export function log(level: 'log' | 'debug' | 'info' | 'warn' | 'error', message: string, meta?: unknown): void {
+export function log(
+  level: 'log' | 'debug' | 'info' | 'warn' | 'error',
+  message: string,
+  meta?: unknown,
+): void {
   const timestamp = getUtcTimestamp();
   const levelColor = {
     log: colors.blue,

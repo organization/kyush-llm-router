@@ -1,9 +1,15 @@
 import { splitProps, type JSX, type ParentProps } from 'solid-js';
+
 import { cn } from '../lib/cn';
 
 type ButtonVariant = 'neutral' | 'primary' | 'danger';
 
-interface ButtonProps extends ParentProps, Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, 'class' | 'type' | 'onClick'> {
+interface ButtonProps
+  extends ParentProps,
+    Omit<
+      JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+      'class' | 'type' | 'onClick'
+    > {
   type?: 'button' | 'submit' | 'reset';
   variant?: ButtonVariant;
   class?: string;
@@ -12,12 +18,18 @@ interface ButtonProps extends ParentProps, Omit<JSX.ButtonHTMLAttributes<HTMLBut
 }
 
 export function Button(props: ButtonProps) {
-  const [local, rest] = splitProps(props, ['children', 'class', 'disabled', 'onClick', 'type', 'variant']);
+  const [local, rest] = splitProps(props, [
+    'children',
+    'class',
+    'disabled',
+    'onClick',
+    'type',
+    'variant',
+  ]);
 
   return (
     <button
       {...rest}
-      type={local.type ?? 'button'}
       class={cn(
         'ui-button',
         local.variant === 'primary' && 'ui-button--primary',
@@ -26,6 +38,7 @@ export function Button(props: ButtonProps) {
       )}
       disabled={local.disabled}
       onClick={local.onClick}
+      type={local.type ?? 'button'}
     >
       {local.children}
     </button>

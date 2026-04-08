@@ -1,6 +1,7 @@
-import { AdminPrincipal } from '../../../shared/types';
 import { getDb } from '../config/database';
 import { getUtcTimestamp } from '../utils/time';
+
+import type { AdminPrincipal } from '../../../shared/types';
 
 export interface AdminSessionRecord {
   id: number;
@@ -26,55 +27,76 @@ export class AdminSessionModel {
     expiresAt: string;
   }): AdminSessionRecord {
     const timestamp = getUtcTimestamp();
-    const result = getDb().prepare(`
+    const result = getDb()
+      .prepare(
+        `
       INSERT INTO admin_sessions (
         session_token_hash, provider, subject, username, email, display_name,
         csrf_token, expires_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      data.sessionTokenHash,
-      data.principal.provider,
-      data.principal.subject,
-      data.principal.username ?? null,
-      data.principal.email ?? null,
-      data.principal.displayName,
-      data.csrfToken,
-      data.expiresAt,
-      timestamp,
-      timestamp,
-    );
+    `,
+      )
+      .run(
+        data.sessionTokenHash,
+        data.principal.provider,
+        data.principal.subject,
+        data.principal.username ?? null,
+        data.principal.email ?? null,
+        data.principal.displayName,
+        data.csrfToken,
+        data.expiresAt,
+        timestamp,
+        timestamp,
+      );
 
     return this.findById(Number(result.lastInsertRowid))!;
   }
 
   static findById(id: number): AdminSessionRecord | undefined {
-    return this.maybeRow(getDb().prepare('SELECT * FROM admin_sessions WHERE id = ?').get(id));
+    return this.maybeRow(
+      getDb().prepare('SELECT * FROM admin_sessions WHERE id = ?').get(id),
+    );
   }
 
-  static findByTokenHash(sessionTokenHash: string): AdminSessionRecord | undefined {
+  static findByTokenHash(
+    sessionTokenHash: string,
+  ): AdminSessionRecord | undefined {
     this.deleteExpired();
     return this.maybeRow(
-      getDb().prepare(`
+      getDb()
+        .prepare(
+          `
         SELECT * FROM admin_sessions
         WHERE session_token_hash = ? AND revoked_at IS NULL AND expires_at > ?
-      `).get(sessionTokenHash, getUtcTimestamp())
+      `,
+        )
+        .get(sessionTokenHash, getUtcTimestamp()),
     );
   }
 
   static touch(id: number): void {
     const timestamp = getUtcTimestamp();
-    getDb().prepare('UPDATE admin_sessions SET last_used_at = ?, updated_at = ? WHERE id = ?')
+    getDb()
+      .prepare(
+        'UPDATE admin_sessions SET last_used_at = ?, updated_at = ? WHERE id = ?',
+      )
       .run(timestamp, timestamp, id);
   }
 
   static revoke(id: number): void {
     const timestamp = getUtcTimestamp();
-    getDb().prepare('UPDATE admin_sessions SET revoked_at = ?, updated_at = ? WHERE id = ? AND revoked_at IS NULL')
+    getDb()
+      .prepare(
+        'UPDATE admin_sessions SET revoked_at = ?, updated_at = ? WHERE id = ? AND revoked_at IS NULL',
+      )
       .run(timestamp, timestamp, id);
   }
 
   static deleteExpired(): void {
-    getDb().prepare('DELETE FROM admin_sessions WHERE expires_at <= ? OR revoked_at IS NOT NULL')
+    getDb()
+      .prepare(
+        'DELETE FROM admin_sessions WHERE expires_at <= ? OR revoked_at IS NOT NULL',
+      )
       .run(getUtcTimestamp());
   }
 

@@ -26,12 +26,10 @@ export const Scenarios = {
     method: 'POST',
     payload: {
       model: 'test-model',
-      messages: [
-        { role: 'user', content: 'Hello' }
-      ],
+      messages: [{ role: 'user', content: 'Hello' }],
       temperature: 0.7,
-      max_tokens: 100
-    }
+      max_tokens: 100,
+    },
   }),
 
   largePayload: (): Scenario => ({
@@ -42,14 +40,30 @@ export const Scenarios = {
     payload: {
       model: 'test-model',
       messages: [
-        { role: 'system', content: 'You are a helpful assistant that provides detailed and accurate information to users. Always respond in a clear and concise manner.' },
-        { role: 'user', content: 'Can you explain the difference between supervised and unsupervised learning in machine learning? Please provide examples of each and discuss their use cases.' },
-        { role: 'assistant', content: 'Supervised learning uses labeled data to train models, while unsupervised learning finds patterns in unlabeled data.' },
-        { role: 'user', content: 'That is helpful. Can you also explain reinforcement learning and how it differs from these approaches? What are some practical applications?' }
+        {
+          role: 'system',
+          content:
+            'You are a helpful assistant that provides detailed and accurate information to users. Always respond in a clear and concise manner.',
+        },
+        {
+          role: 'user',
+          content:
+            'Can you explain the difference between supervised and unsupervised learning in machine learning? Please provide examples of each and discuss their use cases.',
+        },
+        {
+          role: 'assistant',
+          content:
+            'Supervised learning uses labeled data to train models, while unsupervised learning finds patterns in unlabeled data.',
+        },
+        {
+          role: 'user',
+          content:
+            'That is helpful. Can you also explain reinforcement learning and how it differs from these approaches? What are some practical applications?',
+        },
       ],
       temperature: 0.7,
-      max_tokens: 500
-    }
+      max_tokens: 500,
+    },
   }),
 
   modelsEndpoint: (): Scenario => ({
@@ -57,8 +71,8 @@ export const Scenarios = {
     description: 'GET /models request',
     endpoint: '/v1/models',
     method: 'GET',
-    payload: {} as ChatCompletionPayload
-  })
+    payload: {} as ChatCompletionPayload,
+  }),
 };
 
 export function createRealBackendPayload(): Scenario {
@@ -69,11 +83,9 @@ export function createRealBackendPayload(): Scenario {
     method: 'POST',
     payload: {
       model: process.env.REAL_MODEL || 'default-model',
-      messages: [
-        { role: 'user', content: 'Hello, this is a benchmark test.' }
-      ],
+      messages: [{ role: 'user', content: 'Hello, this is a benchmark test.' }],
       temperature: 0.7,
-      max_tokens: 100
-    }
+      max_tokens: 100,
+    },
   };
 }

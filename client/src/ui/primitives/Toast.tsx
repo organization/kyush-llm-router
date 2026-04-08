@@ -1,35 +1,56 @@
-import * as KToast from '@kobalte/core/toast';
-import type { ParentProps } from 'solid-js';
+import * as ToastPrimitive from '@kobalte/core/toast';
+
 import { cn } from '../lib/cn';
+
+import type { ParentProps } from 'solid-js';
 
 type WrapperProps = ParentProps<{ class?: string; [key: string]: unknown }>;
 
 export const Toast = {
   Region: (props: WrapperProps) => (
-    <KToast.Region {...(props as KToast.ToastRegionProps)} class={cn('ui-toast-region', props.class)}>
+    <ToastPrimitive.Region
+      {...(props as ToastPrimitive.ToastRegionProps)}
+      class={cn('ui-toast-region', props.class)}
+    >
       {props.children}
-    </KToast.Region>
+    </ToastPrimitive.Region>
   ),
   List: (props: WrapperProps) => (
-    <KToast.List {...(props as KToast.ToastListProps)} class={cn('ui-toast-list', props.class)}>
+    <ToastPrimitive.List
+      {...(props as ToastPrimitive.ToastListProps)}
+      class={cn('ui-toast-list', props.class)}
+    >
       {props.children}
-    </KToast.List>
+    </ToastPrimitive.List>
   ),
   Root: (props: WrapperProps) => (
-    <KToast.Root {...(props as unknown as KToast.ToastRootProps)} class={cn('ui-toast', props.class)}>
+    <ToastPrimitive.Root
+      {...(props as unknown as ToastPrimitive.ToastRootProps)}
+      class={cn('ui-toast', props.class)}
+    >
       {props.children}
-    </KToast.Root>
+    </ToastPrimitive.Root>
   ),
-  Title: (props: WrapperProps) => <KToast.Title {...(props as KToast.ToastTitleProps)}>{props.children}</KToast.Title>,
-  Description: (props: WrapperProps) => (
-    <KToast.Description {...(props as KToast.ToastDescriptionProps)} class={cn('ui-subtitle', props.class)}>
+  Title: (props: WrapperProps) => (
+    <ToastPrimitive.Title {...(props as ToastPrimitive.ToastTitleProps)}>
       {props.children}
-    </KToast.Description>
+    </ToastPrimitive.Title>
+  ),
+  Description: (props: WrapperProps) => (
+    <ToastPrimitive.Description
+      {...(props as ToastPrimitive.ToastDescriptionProps)}
+      class={cn('ui-subtitle', props.class)}
+    >
+      {props.children}
+    </ToastPrimitive.Description>
   ),
   CloseButton: (props: WrapperProps) => (
-    <KToast.CloseButton {...(props as KToast.ToastCloseButtonProps)} class={cn('ui-button', props.class)}>
+    <ToastPrimitive.CloseButton
+      {...(props as ToastPrimitive.ToastCloseButtonProps)}
+      class={cn('ui-button', props.class)}
+    >
       {props.children}
-    </KToast.CloseButton>
+    </ToastPrimitive.CloseButton>
   ),
-  toaster: KToast.toaster,
+  toaster: ToastPrimitive.toaster,
 };

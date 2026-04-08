@@ -1,60 +1,70 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
-import { ensureDir, getCoreDbPath } from './db-paths';
 
-let db: Database.Database;
+import { ensureDir, getCoreDbPath, getSchemaPath } from './db-paths';
 
-function hasColumn(database: Database.Database, tableName: string, columnName: string): boolean {
-  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
-  return columns.some((column) => column.name === columnName);
+// Lazy singleton — `getDb()` instantiates on first access, `closeDb()` resets
+// it back to `undefined` so the next `getDb()` reopens a fresh handle.
+let db: Database.Database | undefined;
+
+function isPragmaColumnRow(value: unknown): value is { name: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    typeof (value as { name: unknown }).name === 'string'
+  );
+}
+
+function hasColumn(
+  database: Database.Database,
+  tableName: string,
+  columnName: string,
+): boolean {
+  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all();
+  return columns.some(
+    (column) => isPragmaColumnRow(column) && column.name === columnName,
+  );
 }
 
 function runCoreMigrations(database: Database.Database): void {
   if (hasColumn(database, 'model_rewrites', 'force') === false) {
-    database.exec('ALTER TABLE model_rewrites ADD COLUMN force BOOLEAN DEFAULT 0');
+    database.exec(
+      'ALTER TABLE model_rewrites ADD COLUMN force BOOLEAN DEFAULT 0',
+    );
   }
 }
 
+function loadSchema(database: Database.Database): void {
+  const schema = fs.readFileSync(getSchemaPath('schema.sql'), 'utf-8');
+  database.exec(schema);
+}
+
+function openDb(): Database.Database {
+  const coreDbPath = getCoreDbPath();
+  ensureDir(path.dirname(coreDbPath));
+
+  const handle = new Database(coreDbPath);
+  handle.pragma('foreign_keys = ON');
+  loadSchema(handle);
+  runCoreMigrations(handle);
+  return handle;
+}
+
 export function getDb(): Database.Database {
-  if (!db) {
-    const coreDbPath = getCoreDbPath();
-    ensureDir(path.dirname(coreDbPath));
-
-    db = new Database(coreDbPath);
-    db.pragma('foreign_keys = ON');
-
-    const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf-8');
-    db.exec(schema);
-    runCoreMigrations(db);
-  }
+  db ??= openDb();
   return db;
 }
 
 export function initDb(): Database.Database {
-  // Close existing connection if any
-  if (db) {
-    db.close();
-  }
-  
-  const coreDbPath = getCoreDbPath();
-  ensureDir(path.dirname(coreDbPath));
-
-  db = new Database(coreDbPath);
-  db.pragma('foreign_keys = ON');
-
-  const schemaPath = path.join(__dirname, '..', '..', '..', 'database', 'schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf-8');
-  db.exec(schema);
-  runCoreMigrations(db);
-
+  db?.close();
+  db = openDb();
   return db;
 }
 
 export function closeDb(): void {
-  if (db) {
-    db.close();
-    db = undefined as unknown as Database.Database;
-  }
+  db?.close();
+  db = undefined;
 }

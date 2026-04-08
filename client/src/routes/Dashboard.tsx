@@ -1,8 +1,12 @@
+import { useQuery } from '@tanstack/solid-query';
 import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
-import { Show, createMemo, createResource, createSignal, type Component } from 'solid-js';
+import { Show, createSignal, type Component, For } from 'solid-js';
+
 import { api } from '../api/client';
+import { queryKeys } from '../api/query-keys';
 import { Layout } from '../components/Layout';
 import {
+  Button,
   ChartLegend,
   ComboChart,
   CommandBar,
@@ -22,38 +26,68 @@ const dayOptions = [
   { value: '90', label: 'Last 90 days' },
 ];
 
-const palette = ['#2357d8', '#1f7a45', '#c05621', '#8b5cf6', '#0f766e', '#b42318'];
+const palette = [
+  '#2357d8',
+  '#1f7a45',
+  '#c05621',
+  '#8b5cf6',
+  '#0f766e',
+  '#b42318',
+];
 const formatInteger = new Intl.NumberFormat('en-US');
 
-type DashboardChartRow = { date: string } & Record<string, string | number | null>;
+type DashboardChartRow = { date: string } & Record<
+  string,
+  string | number | null
+>;
 
-export const Dashboard: Component = () => {
+const Dashboard: Component = () => {
   const [days, setDays] = createSignal('30');
-  const [hiddenTrafficSeries, setHiddenTrafficSeries] = createSignal<Set<string>>(new Set());
-  const [hiddenLatencySeries, setHiddenLatencySeries] = createSignal<Set<string>>(new Set());
-  const [hiddenModelSeries, setHiddenModelSeries] = createSignal<Set<string>>(new Set());
+  const [hiddenTrafficSeries, setHiddenTrafficSeries] = createSignal<
+    Set<string>
+  >(new Set());
+  const [hiddenLatencySeries, setHiddenLatencySeries] = createSignal<
+    Set<string>
+  >(new Set());
+  const [hiddenModelSeries, setHiddenModelSeries] = createSignal<Set<string>>(
+    new Set(),
+  );
 
-  const windowDays = createMemo(() => Number(days()));
-  const [summary, { refetch }] = createResource(windowDays, (value) => api.dashboard.getSummary(value));
-  const [backends] = createResource(() => api.backends.getAll());
+  // Reactive data: TanStack Query handles fetching, caching, and refetch.
+  // The query key tracks `windowDays()` so changing the time window kicks off
+  // a fresh fetch automatically.
+  const windowDays = () => Number(days());
+  const summaryQuery = useQuery(() => ({
+    queryKey: queryKeys.dashboard.summary(windowDays()),
+    queryFn: () => api.dashboard.getSummary(windowDays()),
+  }));
+  const backendsQuery = useQuery(() => ({
+    queryKey: queryKeys.backends.all(),
+    queryFn: () => api.backends.getAll(),
+  }));
 
-  const backendNameById = createMemo(() => {
+  const summary = () => summaryQuery.data;
+  const backends = () => backendsQuery.data;
+  const refetch = () => summaryQuery.refetch();
+
+  // Inline derivations — Solid's reactive prop reads keep these cheap, no
+  // need to wrap in createMemo for what amounts to a single Map build.
+  const backendNameById = (): ReadonlyMap<number, string> => {
     const entries = new Map<number, string>();
     for (const backend of backends() ?? []) {
       entries.set(backend.id, backend.name);
     }
     return entries;
-  });
+  };
 
-  const trafficRows = createMemo(() =>
+  const trafficRows = () =>
     (summary()?.series.daily_totals ?? []).map((row) => ({
       date: row.date,
       requests: row.total_requests,
       tokens: row.total_tokens,
-    }))
-  );
+    }));
 
-  const reliabilityRows = createMemo(() => {
+  const reliabilityRows = () => {
     const grouped = new Map<string, { requests: number; errors: number }>();
     for (const row of summary()?.series.backend_quality ?? []) {
       const entry = grouped.get(row.date) ?? { requests: 0, errors: 0 };
@@ -66,62 +100,100 @@ export const Dashboard: Component = () => {
       .sort((left, right) => left[0].localeCompare(right[0]))
       .map(([date, value]) => ({
         date,
-        lineValue: value.requests === 0 ? 0 : ((value.requests - value.errors) / value.requests) * 100,
+        lineValue:
+          value.requests === 0
+            ? 0
+            : ((value.requests - value.errors) / value.requests) * 100,
         barValue: value.errors,
       }));
-  });
+  };
 
-  const latencyRows = createMemo(() => {
+  const latencyRows = (): DashboardChartRow[] => {
     const grouped = new Map<string, DashboardChartRow>();
     for (const row of summary()?.series.backend_quality ?? []) {
-      const entry: DashboardChartRow = grouped.get(row.date) ?? { date: row.date };
+      const entry: DashboardChartRow = grouped.get(row.date) ?? {
+        date: row.date,
+      };
       entry[`backend_${row.backend_id}`] = row.avg_response_time_ms;
       grouped.set(row.date, entry);
     }
-    return Array.from(grouped.values()).sort((left, right) => left.date.localeCompare(right.date));
-  });
+    return Array.from(grouped.values()).sort((left, right) =>
+      left.date.localeCompare(right.date),
+    );
+  };
 
-  const latencySeries = createMemo(() => {
-    const ids = Array.from(new Set((summary()?.series.backend_quality ?? []).map((row) => row.backend_id))).sort((left, right) => left - right);
+  const latencySeries = () => {
+    const ids = Array.from(
+      new Set(
+        (summary()?.series.backend_quality ?? []).map((row) => row.backend_id),
+      ),
+    ).sort((left, right) => left - right);
     return ids.map((backendId, index) => ({
       key: `backend_${backendId}`,
       label: backendNameById().get(backendId) ?? `Backend ${backendId}`,
       color: palette[index % palette.length],
     }));
-  });
+  };
 
-  const modelRows = createMemo(() => {
+  const modelRows = (): DashboardChartRow[] => {
     const grouped = new Map<string, DashboardChartRow>();
     for (const row of summary()?.series.model_trends ?? []) {
-      const entry: DashboardChartRow = grouped.get(row.date) ?? { date: row.date };
+      const entry: DashboardChartRow = grouped.get(row.date) ?? {
+        date: row.date,
+      };
       entry[`model_${row.model}`] = row.request_count;
       grouped.set(row.date, entry);
     }
-    return Array.from(grouped.values()).sort((left, right) => left.date.localeCompare(right.date));
-  });
+    return Array.from(grouped.values()).sort((left, right) =>
+      left.date.localeCompare(right.date),
+    );
+  };
 
-  const modelSeries = createMemo(() => {
-    const models = Array.from(new Set((summary()?.series.model_trends ?? []).map((row) => row.model)));
+  const modelSeries = () => {
+    const models = Array.from(
+      new Set((summary()?.series.model_trends ?? []).map((row) => row.model)),
+    );
     return models.map((model, index) => ({
       key: `model_${model}`,
       label: model,
       color: palette[index % palette.length],
     }));
-  });
+  };
 
-  const summaryItems = createMemo(() => {
+  const summaryItems = () => {
     const payload = summary();
-    const latestTraffic = payload?.series.daily_totals[payload.series.daily_totals.length - 1];
+    const latestTraffic =
+      payload?.series.daily_totals[payload.series.daily_totals.length - 1];
 
     return [
-      { label: 'Active Users', value: payload?.overview.active_users ?? 0, hint: `${payload?.overview.total_users ?? 0} total identities` },
-      { label: 'Active Backends', value: payload?.overview.active_backends ?? 0, hint: `${payload?.overview.total_backends ?? 0} configured upstreams` },
-      { label: 'Live Scripts', value: payload?.overview.active_scripts ?? 0, hint: `${payload?.overview.total_scripts ?? 0} total middleware rules` },
-      { label: 'Latest Volume', value: latestTraffic ? formatInteger.format(latestTraffic.total_requests) : '0', hint: latestTraffic ? `${latestTraffic.date} request count` : 'No traffic in window' },
+      {
+        label: 'Active Users',
+        value: payload?.overview.active_users ?? 0,
+        hint: `${payload?.overview.total_users ?? 0} total identities`,
+      },
+      {
+        label: 'Active Backends',
+        value: payload?.overview.active_backends ?? 0,
+        hint: `${payload?.overview.total_backends ?? 0} configured upstreams`,
+      },
+      {
+        label: 'Live Scripts',
+        value: payload?.overview.active_scripts ?? 0,
+        hint: `${payload?.overview.total_scripts ?? 0} total middleware rules`,
+      },
+      {
+        label: 'Latest Volume',
+        value: latestTraffic
+          ? formatInteger.format(latestTraffic.total_requests)
+          : '0',
+        hint: latestTraffic
+          ? `${latestTraffic.date} request count`
+          : 'No traffic in window',
+      },
     ];
-  });
+  };
 
-  const cacheStateItems = createMemo(() => {
+  const cacheStateItems = () => {
     const counts = summary()?.health.cache_state_counts;
     if (!counts) return [];
     return [
@@ -130,33 +202,56 @@ export const Dashboard: Component = () => {
       { key: 'Error', value: String(counts.error) },
       { key: 'Inactive', value: String(counts.inactive) },
     ];
-  });
+  };
 
-  const scriptItems = createMemo(() => {
+  const scriptItems = () => {
     const payload = summary();
     if (!payload) return [];
 
     return [
-      { key: 'Per User', value: `${payload.scripts.active_by_type['per-user']} active / ${payload.scripts.total_by_type['per-user']} total` },
-      { key: 'Per Backend', value: `${payload.scripts.active_by_type['per-backend']} active / ${payload.scripts.total_by_type['per-backend']} total` },
-      { key: 'Scoped', value: `${payload.scripts.active_by_type['per-user-backend']} active / ${payload.scripts.total_by_type['per-user-backend']} total` },
+      {
+        key: 'Per User',
+        value: `${payload.scripts.active_by_type['per-user']} active / ${payload.scripts.total_by_type['per-user']} total`,
+      },
+      {
+        key: 'Per Backend',
+        value: `${payload.scripts.active_by_type['per-backend']} active / ${payload.scripts.total_by_type['per-backend']} total`,
+      },
+      {
+        key: 'Scoped',
+        value: `${payload.scripts.active_by_type['per-user-backend']} active / ${payload.scripts.total_by_type['per-user-backend']} total`,
+      },
     ];
-  });
+  };
 
-  const accessItems = createMemo(() => {
+  const accessItems = () => {
     const payload = summary();
     if (!payload) return [];
 
     return [
-      { key: 'Assignments', value: formatInteger.format(payload.access.permission_assignments) },
-      { key: 'No Backend Access', value: String(payload.access.users_without_permissions) },
-      { key: 'User Detail Logs', value: String(payload.logging.users_with_detail_logging) },
-      { key: 'Backend Detail Logs', value: String(payload.logging.backends_with_detail_logging) },
+      {
+        key: 'Assignments',
+        value: formatInteger.format(payload.access.permission_assignments),
+      },
+      {
+        key: 'No Backend Access',
+        value: String(payload.access.users_without_permissions),
+      },
+      {
+        key: 'User Detail Logs',
+        value: String(payload.logging.users_with_detail_logging),
+      },
+      {
+        key: 'Backend Detail Logs',
+        value: String(payload.logging.backends_with_detail_logging),
+      },
     ];
-  });
+  };
 
   const toggleHiddenKey = (
-    setter: (value: Set<string> | ((current: Set<string>) => Set<string>)) => void,
+    setter: (
+      value: Set<string> | ((current: Set<string>) => Set<string>),
+    ) => void,
     key: string,
   ) => {
     setter((current) => {
@@ -174,24 +269,49 @@ export const Dashboard: Component = () => {
     <Layout>
       <div class="ui-app-page">
         <PageHeader
-          title="Dashboard"
+          actions={
+            <Button onClick={() => void refetch()} type="button">
+              <RefreshCcw aria-hidden="true" size={14} />
+              Refresh
+            </Button>
+          }
           description="Operations cockpit for router health, traffic shape, and the configuration context behind current behavior."
-          actions={<button class="ui-button" type="button" onClick={() => void refetch()}><RefreshCcw />Refresh</button>}
+          title="Dashboard"
         />
 
         <CommandBar class="analytics__filters">
           <CommandBarGroup>
-            <Select label="Window" value={days()} options={dayOptions} onChange={setDays} />
+            <Select
+              label="Window"
+              onChange={setDays}
+              options={dayOptions}
+              value={days()}
+            />
           </CommandBarGroup>
         </CommandBar>
 
         <SummaryStrip items={summaryItems()} />
 
-        <Show when={!summary.error} fallback={<Panel title="Dashboard unavailable" description={summary.error instanceof Error ? summary.error.message : 'Failed to load dashboard summary.'}><EmptyState title="Failed to load summary" description="Refresh the page or verify the admin API is available." /></Panel>}>
+        <Show
+          fallback={
+            <Panel
+              description={
+                summaryQuery.error instanceof Error
+                  ? summaryQuery.error.message
+                  : 'Failed to load dashboard summary.'
+              }
+              title="Dashboard unavailable"
+            >
+              <EmptyState
+                description="Refresh the page or verify the admin API is available."
+                title="Failed to load summary"
+              />
+            </Panel>
+          }
+          when={!summaryQuery.isError}
+        >
           <div class="ui-section-grid">
             <Panel
-              title="Traffic Volume"
-              description="Daily request and token totals for the selected window."
               actions={
                 <ChartLegend
                   items={[
@@ -199,38 +319,63 @@ export const Dashboard: Component = () => {
                     { key: 'tokens', label: 'Tokens', color: '#1f7a45' },
                   ]}
                   mutedKeys={hiddenTrafficSeries()}
-                  onToggle={(key) => toggleHiddenKey(setHiddenTrafficSeries, key)}
+                  onToggle={(key) =>
+                    toggleHiddenKey(setHiddenTrafficSeries, key)
+                  }
                 />
               }
+              description="Daily request and token totals for the selected window."
+              title="Traffic Volume"
             >
               <TimeSeriesChart
                 data={trafficRows()}
+                formatLeftValue={(value) =>
+                  formatInteger.format(Math.round(value))
+                }
+                formatRightValue={(value) =>
+                  new Intl.NumberFormat('en-US', {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  }).format(value)
+                }
+                hiddenKeys={hiddenTrafficSeries()}
+                onToggleLegend={(key) =>
+                  toggleHiddenKey(setHiddenTrafficSeries, key)
+                }
                 series={[
                   { key: 'requests', label: 'Requests', color: '#2357d8' },
-                  { key: 'tokens', label: 'Tokens', color: '#1f7a45', axis: 'right' },
+                  {
+                    key: 'tokens',
+                    label: 'Tokens',
+                    color: '#1f7a45',
+                    axis: 'right',
+                  },
                 ]}
                 showLegend={false}
-                hiddenKeys={hiddenTrafficSeries()}
-                onToggleLegend={(key) => toggleHiddenKey(setHiddenTrafficSeries, key)}
+                tooltipTitle="Traffic volume"
                 yLeftLabel="Requests"
                 yRightLabel="Tokens"
-                formatLeftValue={(value) => formatInteger.format(Math.round(value))}
-                formatRightValue={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
-                tooltipTitle="Traffic volume"
               />
             </Panel>
 
             <Panel
-              title="Reliability Snapshot"
+              actions={
+                <ChartLegend
+                  items={[
+                    { key: 'line', label: 'Success Rate', color: '#2357d8' },
+                    { key: 'bar', label: 'Errors', color: '#b42318' },
+                  ]}
+                />
+              }
               description="Success rate and absolute error count across all visible traffic."
-              actions={<ChartLegend items={[{ key: 'line', label: 'Success Rate', color: '#2357d8' }, { key: 'bar', label: 'Errors', color: '#b42318' }]} />}
+              title="Reliability Snapshot"
             >
               <ComboChart
-                data={reliabilityRows()}
-                lineLabel="Success Rate"
-                barLabel="Errors"
-                lineColor="#2357d8"
                 barColor="#b42318"
+                barLabel="Errors"
+                data={reliabilityRows()}
+                lineColor="#2357d8"
+                lineLabel="Success Rate"
                 showLegend={false}
               />
             </Panel>
@@ -238,69 +383,113 @@ export const Dashboard: Component = () => {
 
           <div class="ui-section-grid">
             <Panel
-              title="Backend Latency"
+              actions={
+                <ChartLegend
+                  items={latencySeries()}
+                  mutedKeys={hiddenLatencySeries()}
+                  onToggle={(key) =>
+                    toggleHiddenKey(setHiddenLatencySeries, key)
+                  }
+                />
+              }
               description="Average response time by backend with per-series toggles."
-              actions={<ChartLegend items={latencySeries()} mutedKeys={hiddenLatencySeries()} onToggle={(key) => toggleHiddenKey(setHiddenLatencySeries, key)} />}
+              title="Backend Latency"
             >
               <TimeSeriesChart
                 data={latencyRows()}
+                formatLeftValue={(value) => `${value.toFixed(0)}ms`}
+                hiddenKeys={hiddenLatencySeries()}
+                onToggleLegend={(key) =>
+                  toggleHiddenKey(setHiddenLatencySeries, key)
+                }
                 series={latencySeries()}
                 showLegend={false}
-                hiddenKeys={hiddenLatencySeries()}
-                onToggleLegend={(key) => toggleHiddenKey(setHiddenLatencySeries, key)}
-                yLeftLabel="Milliseconds"
-                formatLeftValue={(value) => `${value.toFixed(0)}ms`}
                 tooltipTitle="Backend latency"
+                yLeftLabel="Milliseconds"
               />
             </Panel>
 
             <Panel
-              title="Model Activity"
+              actions={
+                <ChartLegend
+                  items={modelSeries()}
+                  mutedKeys={hiddenModelSeries()}
+                  onToggle={(key) => toggleHiddenKey(setHiddenModelSeries, key)}
+                />
+              }
               description="Top models by request volume across the current window."
-              actions={<ChartLegend items={modelSeries()} mutedKeys={hiddenModelSeries()} onToggle={(key) => toggleHiddenKey(setHiddenModelSeries, key)} />}
+              title="Model Activity"
             >
               <TimeSeriesChart
                 data={modelRows()}
+                formatLeftValue={(value) => `${Math.round(value)}`}
+                hiddenKeys={hiddenModelSeries()}
+                onToggleLegend={(key) =>
+                  toggleHiddenKey(setHiddenModelSeries, key)
+                }
                 series={modelSeries()}
                 showLegend={false}
-                hiddenKeys={hiddenModelSeries()}
-                onToggleLegend={(key) => toggleHiddenKey(setHiddenModelSeries, key)}
-                yLeftLabel="Requests"
-                formatLeftValue={(value) => `${Math.round(value)}`}
                 tooltipTitle="Model activity"
+                yLeftLabel="Requests"
               />
             </Panel>
           </div>
 
           <div class="ui-section-grid dashboard__context-grid">
-            <Panel title="Backend Health" description="Cache readiness, liveness, and sync drift indicators for current backends.">
+            <Panel
+              description="Cache readiness, liveness, and sync drift indicators for current backends."
+              title="Backend Health"
+            >
               <MetaCluster items={cacheStateItems()} />
               <Show
+                fallback={
+                  <EmptyState
+                    description="All active backends synced within the freshness window."
+                    title="No stale backend syncs"
+                  />
+                }
                 when={(summary()?.health.stale_backends.length ?? 0) > 0}
-                fallback={<EmptyState title="No stale backend syncs" description="All active backends synced within the freshness window." />}
               >
                 <div class="dashboard__status-list">
-                  {summary()?.health.stale_backends.map((backend) => (
-                    <div class="dashboard__status-item">
-                      <div>
-                        <strong>{backend.name}</strong>
-                        <p>Last sync: {backend.last_synced_at ? new Date(backend.last_synced_at).toLocaleString() : 'Never'}</p>
-                      </div>
-                      <span>{backend.state}</span>
-                    </div>
-                  ))}
+                  {
+                    <For each={summary()?.health.stale_backends}>
+                      {(backend) => (
+                        <div class="dashboard__status-item">
+                          <div>
+                            <strong>{backend.name}</strong>
+                            <p>
+                              Last sync:{' '}
+                              {backend.last_synced_at
+                                ? new Date(
+                                    backend.last_synced_at,
+                                  ).toLocaleString()
+                                : 'Never'}
+                            </p>
+                          </div>
+                          <span>{backend.state}</span>
+                        </div>
+                      )}
+                    </For>
+                  }
                 </div>
               </Show>
             </Panel>
 
-            <Panel title="Script Runtime" description="Active middleware footprint and target distribution.">
+            <Panel
+              description="Active middleware footprint and target distribution."
+              title="Script Runtime"
+            >
               <MetaCluster items={scriptItems()} />
               <div class="dashboard__note">
-                Active scripts shape request and response behavior before traffic reaches the upstream backend.
+                Active scripts shape request and response behavior before
+                traffic reaches the upstream backend.
               </div>
             </Panel>
 
-            <Panel title="Access Context" description="Identity and logging posture behind current routing activity.">
+            <Panel
+              description="Identity and logging posture behind current routing activity."
+              title="Access Context"
+            >
               <MetaCluster items={accessItems()} />
             </Panel>
           </div>
@@ -309,3 +498,5 @@ export const Dashboard: Component = () => {
     </Layout>
   );
 };
+
+export default Dashboard;

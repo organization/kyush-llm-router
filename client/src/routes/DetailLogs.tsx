@@ -1,9 +1,34 @@
-import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
+import {
+  createMemo,
+  createResource,
+  createSignal,
+  Show,
+  type Component,
+} from 'solid-js';
 import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
+
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
+
+import {
+  Button,
+  CommandBar,
+  CommandBarGroup,
+  ConversationTimeline,
+  DataGrid,
+  EmptyState,
+  MetaCluster,
+  PageHeader,
+  Panel,
+  Select,
+  StatusBadge,
+  SummaryStrip,
+  Tabs,
+  TextField,
+  hasRenderableConversation,
+} from '../ui';
+
 import type { RequestLog } from '../types';
-import { Button, CommandBar, CommandBarGroup, ConversationTimeline, DataGrid, EmptyState, MetaCluster, PageHeader, Panel, Select, StatusBadge, SummaryStrip, Tabs, TextField, hasRenderableConversation } from '../ui';
 
 interface FilterState {
   month: string;
@@ -39,13 +64,12 @@ function extractAssistantPreview(responseBody?: string): string {
     const content = parsed.choices?.[0]?.message?.content;
     if (typeof content !== 'string') return '-';
 
-    const normalized = content
-      .replace(/\r/g, '')
-      .replace(/\n+/g, ' ')
-      .trim();
+    const normalized = content.replace(/\r/g, '').replace(/\n+/g, ' ').trim();
 
     if (!normalized) return '-';
-    return normalized.length > 50 ? `${normalized.slice(0, 50)}...` : normalized;
+    return normalized.length > 50
+      ? `${normalized.slice(0, 50)}...`
+      : normalized;
   } catch {
     return '-';
   }
@@ -61,7 +85,7 @@ function prettyPrint(value?: string): string {
   }
 }
 
-export const DetailLogs: Component = () => {
+const DetailLogs: Component = () => {
   const [filters, setFilters] = createSignal<FilterState>(emptyFilters());
   const [page, setPage] = createSignal(1);
   const [pageSize, setPageSize] = createSignal(25);
@@ -85,14 +109,18 @@ export const DetailLogs: Component = () => {
         userId: params.userId ? Number(params.userId) : undefined,
         backendId: params.backendId ? Number(params.backendId) : undefined,
         endpoint: params.endpoint || undefined,
-      })
+      }),
   );
 
   const requestPage = createMemo(() => logs());
   const requestRows = createMemo(() => requestPage()?.rows ?? []);
   const totalRows = createMemo(() => requestPage()?.total ?? 0);
-  const pageCount = createMemo(() => Math.max(1, Math.ceil(totalRows() / pageSize())));
-  const rangeStart = createMemo(() => (totalRows() === 0 ? 0 : (page() - 1) * pageSize() + 1));
+  const pageCount = createMemo(() =>
+    Math.max(1, Math.ceil(totalRows() / pageSize())),
+  );
+  const rangeStart = createMemo(() =>
+    totalRows() === 0 ? 0 : (page() - 1) * pageSize() + 1,
+  );
   const rangeEnd = createMemo(() => Math.min(totalRows(), page() * pageSize()));
   const sourceScope = createMemo(() => {
     const currentFilters = filters();
@@ -117,7 +145,12 @@ export const DetailLogs: Component = () => {
   });
   const activeFilterCount = createMemo(() => {
     const currentFilters = filters();
-    return [currentFilters.q, currentFilters.userId, currentFilters.backendId, currentFilters.endpoint].filter((value) => value.trim().length > 0).length;
+    return [
+      currentFilters.q,
+      currentFilters.userId,
+      currentFilters.backendId,
+      currentFilters.endpoint,
+    ].filter((value) => value.trim().length > 0).length;
   });
   const activeFilterHint = createMemo(() => {
     const currentFilters = filters();
@@ -128,7 +161,9 @@ export const DetailLogs: Component = () => {
       currentFilters.endpoint.trim() ? 'Endpoint' : null,
     ].filter((value): value is string => Boolean(value));
 
-    return labels.length > 0 ? labels.join(' + ') : 'No search/user/backend/endpoint filters';
+    return labels.length > 0
+      ? labels.join(' + ')
+      : 'No search/user/backend/endpoint filters';
   });
   const pageWindow = createMemo(() => {
     if (totalRows() === 0) {
@@ -144,19 +179,32 @@ export const DetailLogs: Component = () => {
     }
     return previews;
   });
-  const selectedLog = createMemo<RequestLog | undefined>(() => requestRows().find((row) => row.id === selectedLogId()));
+  const selectedLog = createMemo<RequestLog | undefined>(() =>
+    requestRows().find((row) => row.id === selectedLogId()),
+  );
   const selectedLogHasConversation = createMemo(() =>
-    selectedLog() ? hasRenderableConversation(selectedLog()!.request_body, selectedLog()!.response_body) : false
+    selectedLog()
+      ? hasRenderableConversation(
+          selectedLog()!.request_body,
+          selectedLog()!.response_body,
+        )
+      : false,
   );
 
   const userOptions = createMemo(() => [
     { value: '', label: 'All users' },
-    ...((users() ?? []).map((user) => ({ value: String(user.id), label: `${user.id} - ${user.name}` }))),
+    ...(users() ?? []).map((user) => ({
+      value: String(user.id),
+      label: `${user.id} - ${user.name}`,
+    })),
   ]);
 
   const backendOptions = createMemo(() => [
     { value: '', label: 'All backends' },
-    ...((backends() ?? []).map((backend) => ({ value: String(backend.id), label: `${backend.id} - ${backend.name}` }))),
+    ...(backends() ?? []).map((backend) => ({
+      value: String(backend.id),
+      label: `${backend.id} - ${backend.name}`,
+    })),
   ]);
 
   const endpointOptions = [
@@ -178,16 +226,33 @@ export const DetailLogs: Component = () => {
     <Layout>
       <div class="ui-app-page">
         <PageHeader
-          title="Detail Logs"
+          actions={
+            <Button onClick={() => void refetch()}>
+              <RefreshCcw />
+              Refresh
+            </Button>
+          }
           description="Inspect verbose request logs with monthly filters, text search, and full request/response payload views."
-          actions={<Button onClick={() => void refetch()}><RefreshCcw />Refresh</Button>}
+          title="Detail Logs"
         />
 
         <SummaryStrip
           items={[
-            { label: 'Source Scope', value: sourceScope().value, hint: sourceScope().hint },
-            { label: 'Active Filters', value: activeFilterCount(), hint: activeFilterHint() },
-            { label: 'Page Window', value: pageWindow(), hint: `Page ${page()} of ${pageCount()} - ${pageSize()} per page` },
+            {
+              label: 'Source Scope',
+              value: sourceScope().value,
+              hint: sourceScope().hint,
+            },
+            {
+              label: 'Active Filters',
+              value: activeFilterCount(),
+              hint: activeFilterHint(),
+            },
+            {
+              label: 'Page Window',
+              value: pageWindow(),
+              hint: `Page ${page()} of ${pageCount()} - ${pageSize()} per page`,
+            },
           ]}
         />
 
@@ -195,42 +260,97 @@ export const DetailLogs: Component = () => {
           <CommandBarGroup>
             <TextField
               label="Search"
-              value={filters().q}
-              placeholder="Search body, headers, models, errors"
               onInput={(event) => updateFilter('q', event.currentTarget.value)}
+              placeholder="Search body, headers, models, errors"
+              value={filters().q}
             />
             <TextField
               label="Month"
-              value={filters().month}
+              onInput={(event) =>
+                updateFilter('month', event.currentTarget.value)
+              }
               placeholder="YYYY-MM"
-              onInput={(event) => updateFilter('month', event.currentTarget.value)}
+              value={filters().month}
             />
             <TextField
               label="Date"
-              value={filters().date}
+              onInput={(event) =>
+                updateFilter('date', event.currentTarget.value)
+              }
               placeholder="YYYY-MM-DD"
-              onInput={(event) => updateFilter('date', event.currentTarget.value)}
+              value={filters().date}
             />
           </CommandBarGroup>
           <CommandBarGroup>
-            <Select label="User" value={filters().userId} options={userOptions()} onChange={(value) => updateFilter('userId', value)} />
-            <Select label="Backend" value={filters().backendId} options={backendOptions()} onChange={(value) => updateFilter('backendId', value)} />
-            <Select label="Endpoint" value={filters().endpoint} options={endpointOptions} onChange={(value) => updateFilter('endpoint', value)} />
+            <Select
+              label="User"
+              onChange={(value) => updateFilter('userId', value)}
+              options={userOptions()}
+              value={filters().userId}
+            />
+            <Select
+              label="Backend"
+              onChange={(value) => updateFilter('backendId', value)}
+              options={backendOptions()}
+              value={filters().backendId}
+            />
+            <Select
+              label="Endpoint"
+              onChange={(value) => updateFilter('endpoint', value)}
+              options={endpointOptions}
+              value={filters().endpoint}
+            />
             <Button onClick={resetFilters}>Reset</Button>
           </CommandBarGroup>
         </CommandBar>
 
         <div class="ui-section-grid">
-          <Panel title="Log Results" description="Monthly request log rows. Select one to inspect full payload snapshots.">
+          <Panel
+            description="Monthly request log rows. Select one to inspect full payload snapshots."
+            title="Log Results"
+          >
             <DataGrid
-              tableLayout="fixed"
-              rows={requestRows()}
               columns={[
-                { id: 'id', header: 'ID', width: '48px', mono: true, cell: (row) => <span>{row.id}</span> },
-                { id: 'created_at', header: 'UTC Time', width: '148px', cell: (row) => <span>{new Date(row.created_at).toLocaleString()}</span> },
-                { id: 'user_id', header: 'User', width: '40px', mono: true, cell: (row) => <span>{row.user_id}</span> },
-                { id: 'backend_id', header: 'Backend', width: '56px', mono: true, cell: (row) => <span>{row.backend_id}</span> },
-                { id: 'request_model', header: 'Model', width: '120px', truncate: true, cell: (row) => <span title={row.request_model ?? '-'}>{row.request_model || '-'}</span> },
+                {
+                  id: 'id',
+                  header: 'ID',
+                  width: '48px',
+                  mono: true,
+                  cell: (row) => <span>{row.id}</span>,
+                },
+                {
+                  id: 'created_at',
+                  header: 'UTC Time',
+                  width: '148px',
+                  cell: (row) => (
+                    <span>{new Date(row.created_at).toLocaleString()}</span>
+                  ),
+                },
+                {
+                  id: 'user_id',
+                  header: 'User',
+                  width: '40px',
+                  mono: true,
+                  cell: (row) => <span>{row.user_id}</span>,
+                },
+                {
+                  id: 'backend_id',
+                  header: 'Backend',
+                  width: '56px',
+                  mono: true,
+                  cell: (row) => <span>{row.backend_id}</span>,
+                },
+                {
+                  id: 'request_model',
+                  header: 'Model',
+                  width: '120px',
+                  truncate: true,
+                  cell: (row) => (
+                    <span title={row.request_model ?? '-'}>
+                      {row.request_model || '-'}
+                    </span>
+                  ),
+                },
                 {
                   id: 'assistant_preview',
                   header: 'Assistant',
@@ -244,18 +364,30 @@ export const DetailLogs: Component = () => {
                   id: 'status_code',
                   header: 'Status',
                   width: '48px',
-                  cell: (row) => <StatusBadge tone={row.status_code >= 400 ? 'danger' : 'success'}>{String(row.status_code)}</StatusBadge>,
+                  cell: (row) => (
+                    <StatusBadge
+                      tone={row.status_code >= 400 ? 'danger' : 'success'}
+                    >
+                      {String(row.status_code)}
+                    </StatusBadge>
+                  ),
                 },
                 {
                   id: 'detail_logged',
                   header: 'Detail',
                   width: '68px',
-                  cell: (row) => <StatusBadge tone={row.detail_logged ? 'warning' : 'neutral'}>{row.detail_logged ? 'Verbose' : 'Meta'}</StatusBadge>,
+                  cell: (row) => (
+                    <StatusBadge
+                      tone={row.detail_logged ? 'warning' : 'neutral'}
+                    >
+                      {row.detail_logged ? 'Verbose' : 'Meta'}
+                    </StatusBadge>
+                  ),
                 },
               ]}
+              emptyMessage="No detailed logs matched the current filters."
               getRowKey={(row) => row.id}
               loading={logs.loading}
-              emptyMessage="No detailed logs matched the current filters."
               onRowClick={(row) => setSelectedLogId(row.id)}
               pagination={{
                 page: page(),
@@ -268,16 +400,29 @@ export const DetailLogs: Component = () => {
                 },
                 pageSizeOptions: PAGE_SIZE_OPTIONS,
               }}
+              rows={requestRows()}
+              tableLayout="fixed"
             />
             {!logs.loading && requestRows().length === 0 && (
-              <EmptyState title="No logs found" description="Try a different month, date, or search term." />
+              <EmptyState
+                description="Try a different month, date, or search term."
+                title="No logs found"
+              />
             )}
           </Panel>
 
-          <Panel title="Selected Log" description="Expanded metadata and serialized request/response snapshots for the active row.">
+          <Panel
+            description="Expanded metadata and serialized request/response snapshots for the active row."
+            title="Selected Log"
+          >
             <Show
+              fallback={
+                <EmptyState
+                  description="Select a row from the log table to inspect the request and response snapshots."
+                  title="No log selected"
+                />
+              }
               when={selectedLog()}
-              fallback={<EmptyState title="No log selected" description="Select a row from the log table to inspect the request and response snapshots." />}
             >
               {(log) => (
                 <div class="ui-stack">
@@ -289,19 +434,35 @@ export const DetailLogs: Component = () => {
                       { key: 'Backend', value: String(log().backend_id) },
                       { key: 'Endpoint', value: log().endpoint },
                       { key: 'Status', value: String(log().status_code) },
-                      { key: 'Latency', value: `${log().response_time_ms ?? 0}ms` },
-                      { key: 'Verbose', value: log().detail_logged ? 'Yes' : 'No' },
+                      {
+                        key: 'Latency',
+                        value: `${log().response_time_ms ?? 0}ms`,
+                      },
+                      {
+                        key: 'Verbose',
+                        value: log().detail_logged ? 'Yes' : 'No',
+                      },
                     ]}
                   />
 
                   <Show when={log().error_message}>
-                    <TextField label="Error" value={log().error_message ?? ''} multiline />
+                    <TextField
+                      label="Error"
+                      multiline
+                      value={log().error_message ?? ''}
+                    />
                   </Show>
 
-                  <Tabs.Root defaultValue={selectedLogHasConversation() ? 'conversation' : 'request'}>
+                  <Tabs.Root
+                    defaultValue={
+                      selectedLogHasConversation() ? 'conversation' : 'request'
+                    }
+                  >
                     <Tabs.List aria-label="Detail log inspector">
                       <Show when={selectedLogHasConversation()}>
-                        <Tabs.Trigger value="conversation">Conversation</Tabs.Trigger>
+                        <Tabs.Trigger value="conversation">
+                          Conversation
+                        </Tabs.Trigger>
                       </Show>
                       <Tabs.Trigger value="request">Request</Tabs.Trigger>
                       <Tabs.Trigger value="response">Response</Tabs.Trigger>
@@ -319,15 +480,31 @@ export const DetailLogs: Component = () => {
 
                     <Tabs.Content value="request">
                       <div class="ui-stack">
-                        <TextField label="Request Headers" value={prettyPrint(log().request_headers)} multiline />
-                        <TextField label="Request Body" value={prettyPrint(log().request_body)} multiline />
+                        <TextField
+                          label="Request Headers"
+                          multiline
+                          value={prettyPrint(log().request_headers)}
+                        />
+                        <TextField
+                          label="Request Body"
+                          multiline
+                          value={prettyPrint(log().request_body)}
+                        />
                       </div>
                     </Tabs.Content>
 
                     <Tabs.Content value="response">
                       <div class="ui-stack">
-                        <TextField label="Response Headers" value={prettyPrint(log().response_headers)} multiline />
-                        <TextField label="Response Body" value={prettyPrint(log().response_body)} multiline />
+                        <TextField
+                          label="Response Headers"
+                          multiline
+                          value={prettyPrint(log().response_headers)}
+                        />
+                        <TextField
+                          label="Response Body"
+                          multiline
+                          value={prettyPrint(log().response_body)}
+                        />
                       </div>
                     </Tabs.Content>
 
@@ -335,8 +512,8 @@ export const DetailLogs: Component = () => {
                       <div class="ui-stack">
                         <TextField
                           label="Raw Log JSON"
-                          value={JSON.stringify(log(), null, 2)}
                           multiline
+                          value={JSON.stringify(log(), null, 2)}
                         />
                       </div>
                     </Tabs.Content>
@@ -350,3 +527,5 @@ export const DetailLogs: Component = () => {
     </Layout>
   );
 };
+
+export default DetailLogs;

@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+
 import {
   Alert,
   Button,
@@ -32,7 +33,9 @@ export const Default = {
       <div class="ui-workbench ui-stack">
         <div>
           <h1 class="ui-title">Kobalte Wrapper Workbench</h1>
-          <p class="ui-subtitle">Compact primitives for the router admin console.</p>
+          <p class="ui-subtitle">
+            Compact primitives for the router admin console.
+          </p>
         </div>
 
         <CommandBar>
@@ -52,7 +55,9 @@ export const Default = {
           <div class="ui-panel__header">
             <div>
               <h2 style={{ margin: '0 0 4px 0' }}>Controls</h2>
-              <p class="ui-subtitle">Dense inputs and Kobalte primitives with project styling.</p>
+              <p class="ui-subtitle">
+                Dense inputs and Kobalte primitives with project styling.
+              </p>
             </div>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger>Actions</DropdownMenu.Trigger>
@@ -67,32 +72,38 @@ export const Default = {
             </DropdownMenu.Root>
           </div>
           <div class="ui-panel__body ui-stack">
-            <TextField label="Backend Name" value="OpenAI Primary" description="Shown in routing and analytics views.">
+            <TextField
+              description="Shown in routing and analytics views."
+              label="Backend Name"
+              value="OpenAI Primary"
+            >
               <Button variant="primary">Save</Button>
             </TextField>
 
             <FieldRow>
               <Select
                 label="Primary Route"
-                value={selected()}
                 onChange={setSelected}
                 options={[
                   { value: 'analytics', label: 'Analytics' },
                   { value: 'users', label: 'Users' },
                   { value: 'scripts', label: 'Scripts' },
                 ]}
+                value={selected()}
               />
               <Tooltip.Root>
                 <Tooltip.Trigger class="ui-button">Hover hint</Tooltip.Trigger>
                 <Tooltip.Portal>
-                  <Tooltip.Content>Long values should still stay readable in dense layouts.</Tooltip.Content>
+                  <Tooltip.Content>
+                    Long values should still stay readable in dense layouts.
+                  </Tooltip.Content>
                 </Tooltip.Portal>
               </Tooltip.Root>
             </FieldRow>
 
             <div class="ui-cluster">
-              <Checkbox label="Active only" defaultChecked />
-              <Switch label="Auto refresh" defaultChecked />
+              <Checkbox defaultChecked label="Active only" />
+              <Switch defaultChecked label="Auto refresh" />
             </div>
 
             <Tabs.Root defaultValue="request">
@@ -101,9 +112,15 @@ export const Default = {
                 <Tabs.Trigger value="response">Response</Tabs.Trigger>
                 <Tabs.Trigger value="test">Test</Tabs.Trigger>
               </Tabs.List>
-              <Tabs.Content value="request">Request transform settings and headers.</Tabs.Content>
-              <Tabs.Content value="response">Response inspection and fallback rules.</Tabs.Content>
-              <Tabs.Content value="test">Console output, sample payloads, and validation feedback.</Tabs.Content>
+              <Tabs.Content value="request">
+                Request transform settings and headers.
+              </Tabs.Content>
+              <Tabs.Content value="response">
+                Response inspection and fallback rules.
+              </Tabs.Content>
+              <Tabs.Content value="test">
+                Console output, sample payloads, and validation feedback.
+              </Tabs.Content>
             </Tabs.Root>
 
             <div class="ui-cluster">
@@ -112,7 +129,10 @@ export const Default = {
                 <Popover.Portal>
                   <Popover.Content>
                     <Popover.Title>Backend metadata</Popover.Title>
-                    <Popover.Description>Compact metadata clusters live in popovers when space is tight.</Popover.Description>
+                    <Popover.Description>
+                      Compact metadata clusters live in popovers when space is
+                      tight.
+                    </Popover.Description>
                   </Popover.Content>
                 </Popover.Portal>
               </Popover.Root>
@@ -122,18 +142,21 @@ export const Default = {
           </div>
         </div>
 
-        <Alert tone="warning" title="Migration note">
-          Wrapper components should replace direct primitive usage before route-level refactors begin.
+        <Alert title="Migration note" tone="warning">
+          Wrapper components should replace direct primitive usage before
+          route-level refactors begin.
         </Alert>
 
-        <Dialog.Root open={dialogOpen()} onOpenChange={setDialogOpen}>
+        <Dialog.Root onOpenChange={setDialogOpen} open={dialogOpen()}>
           <Dialog.Portal>
             <Dialog.Overlay />
             <Dialog.Content>
               <div class="ui-dialog__header">
                 <div>
                   <Dialog.Title>Compact Dialog</Dialog.Title>
-                  <Dialog.Description>Dense forms should still remain keyboard-friendly.</Dialog.Description>
+                  <Dialog.Description>
+                    Dense forms should still remain keyboard-friendly.
+                  </Dialog.Description>
                 </div>
               </div>
               <div class="ui-dialog__body ui-stack">
@@ -146,7 +169,7 @@ export const Default = {
               </div>
               <div class="ui-dialog__footer">
                 <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button variant="primary" onClick={() => setDialogOpen(false)}>
+                <Button onClick={() => setDialogOpen(false)} variant="primary">
                   Save
                 </Button>
               </div>

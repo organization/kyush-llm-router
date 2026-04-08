@@ -1,6 +1,16 @@
-import { listRequestLogMonths, getRequestLogsDb } from '../config/request-logs-db';
-import { RequestLog, RequestLogPage } from '../../../shared/types';
-import { getLocalDateKey, getLocalMonthKey, getMonthKeyFromDateString, getUtcTimestamp } from '../utils/time';
+import {
+  listRequestLogMonths,
+  getRequestLogsDb,
+} from '../config/request-logs-db';
+
+import {
+  getLocalDateKey,
+  getLocalMonthKey,
+  getMonthKeyFromDateString,
+  getUtcTimestamp,
+} from '../utils/time';
+
+import type { RequestLog, RequestLogPage } from '../../../shared/types';
 
 export interface RequestLogInsert {
   user_id: number;
@@ -46,7 +56,10 @@ function normalizeRequestLog(row: any): RequestLog {
   return row as RequestLog;
 }
 
-function buildWhereClause(query: RequestLogQuery): { whereClause: string; params: unknown[] } {
+function buildWhereClause(query: RequestLogQuery): {
+  whereClause: string;
+  params: unknown[];
+} {
   const clauses: string[] = [];
   const params: unknown[] = [];
 
@@ -92,24 +105,43 @@ function buildWhereClause(query: RequestLogQuery): { whereClause: string; params
   };
 }
 
-function getMonthRowCount(monthKey: string, whereClause: string, params: unknown[]): number {
+function getMonthRowCount(
+  monthKey: string,
+  whereClause: string,
+  params: unknown[],
+): number {
   const db = getRequestLogsDb(monthKey);
-  const matchedInMonth = db.prepare(`
+  const matchedInMonth = db
+    .prepare(
+      `
     SELECT COUNT(*) as count FROM request_logs
     ${whereClause}
-  `).get(...params) as { count: number };
+  `,
+    )
+    .get(...params) as { count: number };
 
   return matchedInMonth.count;
 }
 
-function getMonthRows(monthKey: string, whereClause: string, params: unknown[], limit: number, offset: number): RequestLog[] {
+function getMonthRows(
+  monthKey: string,
+  whereClause: string,
+  params: unknown[],
+  limit: number,
+  offset: number,
+): RequestLog[] {
   const db = getRequestLogsDb(monthKey);
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT * FROM request_logs
     ${whereClause}
     ORDER BY created_at DESC
     LIMIT ? OFFSET ?
-  `).all(...params, limit, offset).map(normalizeRequestLog);
+  `,
+    )
+    .all(...params, limit, offset)
+    .map(normalizeRequestLog);
 }
 
 function getQueryMonth(query: RequestLogQuery): string {
@@ -148,14 +180,16 @@ export class RequestLogService {
     const detailLogged = logData.detail_logged ?? false;
     const db = getRequestLogsDb(monthKey);
 
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO request_logs (
         user_id, backend_id, endpoint, request_model, routed_model, response_model,
         prompt_tokens, completion_tokens, total_tokens,
         status_code, response_time_ms, error_message, detail_logged,
         local_date, request_headers, request_body, response_headers, response_body, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       logData.user_id,
       logData.backend_id,
       logData.endpoint,
@@ -174,7 +208,7 @@ export class RequestLogService {
       stringifySnapshot(logData.request_body),
       stringifySnapshot(logData.response_headers),
       stringifySnapshot(logData.response_body),
-      createdAt
+      createdAt,
     );
   }
 
@@ -186,7 +220,10 @@ export class RequestLogService {
     if (query.month || query.date) {
       const monthKey = getQueryMonth(query);
       const total = getMonthRowCount(monthKey, whereClause, params);
-      const rows = offset >= total ? [] : getMonthRows(monthKey, whereClause, params, limit, offset);
+      const rows =
+        offset >= total
+          ? []
+          : getMonthRows(monthKey, whereClause, params, limit, offset);
 
       return {
         rows,
@@ -216,7 +253,13 @@ export class RequestLogService {
 
       if (results.length < limit) {
         const remaining = limit - results.length;
-        const rows = getMonthRows(month, whereClause, params, remaining, offset);
+        const rows = getMonthRows(
+          month,
+          whereClause,
+          params,
+          remaining,
+          offset,
+        );
         results.push(...rows);
         offset = 0;
       }

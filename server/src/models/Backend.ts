@@ -1,6 +1,12 @@
 import { getDb } from '../config/database';
-import { Backend, CreateBackendData, UpdateBackendData } from '../../../shared/types';
+
 import { getUtcTimestamp } from '../utils/time';
+
+import type {
+  Backend,
+  CreateBackendData,
+  UpdateBackendData,
+} from '../../../shared/types';
 
 export class BackendModel {
   static asBackend(row: any): Backend {
@@ -15,24 +21,39 @@ export class BackendModel {
   }
 
   static findAll(): Backend[] {
-    return getDb().prepare('SELECT * FROM backends ORDER BY created_at DESC').all().map(this.asBackend);
+    return getDb()
+      .prepare('SELECT * FROM backends ORDER BY created_at DESC')
+      .all()
+      .map(this.asBackend);
   }
 
   static findById(id: number): Backend | undefined {
-    return this.mightBeBackend(getDb().prepare('SELECT * FROM backends WHERE id = ?').get(id));
+    return this.mightBeBackend(
+      getDb().prepare('SELECT * FROM backends WHERE id = ?').get(id),
+    );
   }
 
   static findActive(): Backend[] {
-    return getDb().prepare('SELECT * FROM backends WHERE is_active = 1 ORDER BY name').all().map(this.asBackend);
+    return getDb()
+      .prepare('SELECT * FROM backends WHERE is_active = 1 ORDER BY name')
+      .all()
+      .map(this.asBackend);
   }
 
   static create(data: CreateBackendData): Backend {
     const timestamp = getUtcTimestamp();
     const detailLogging = data.detail_logging ?? false;
     const stmt = getDb().prepare(
-      'INSERT INTO backends (name, base_url, api_key, detail_logging, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO backends (name, base_url, api_key, detail_logging, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
     );
-    const result = stmt.run(data.name, data.base_url, data.api_key || null, detailLogging ? 1 : 0, timestamp, timestamp);
+    const result = stmt.run(
+      data.name,
+      data.base_url,
+      data.api_key || null,
+      detailLogging ? 1 : 0,
+      timestamp,
+      timestamp,
+    );
 
     return {
       id: result.lastInsertRowid as number,
@@ -79,7 +100,9 @@ export class BackendModel {
     values.push(getUtcTimestamp());
     values.push(id);
 
-    getDb().prepare(`UPDATE backends SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    getDb()
+      .prepare(`UPDATE backends SET ${updates.join(', ')} WHERE id = ?`)
+      .run(...values);
     return this.findById(id);
   }
 
@@ -89,7 +112,9 @@ export class BackendModel {
   }
 
   static deactivate(id: number): boolean {
-    const result = getDb().prepare('UPDATE backends SET is_active = 0, updated_at = ? WHERE id = ?').run(getUtcTimestamp(), id);
+    const result = getDb()
+      .prepare('UPDATE backends SET is_active = 0, updated_at = ? WHERE id = ?')
+      .run(getUtcTimestamp(), id);
     return result.changes > 0;
   }
 }
