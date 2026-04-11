@@ -220,13 +220,32 @@ export type CreateAdminTokenInput = z.infer<typeof CreateAdminTokenInputSchema>;
  * OpenAI v1
  * ────────────────────────────────────────────────────────────────────────── */
 
-export const ChatRoleSchema = z.enum(['system', 'user', 'assistant']);
+/**
+ * The router is a proxy — it must not reject roles or content shapes that
+ * a backend legitimately supports. The OpenAI spec defines `system`,
+ * `user`, `assistant`, `tool`, and `function`; other providers may add
+ * more. Accept any string so messages pass through unaltered.
+ */
+export const ChatRoleSchema = z.string();
 export type ChatRole = z.infer<typeof ChatRoleSchema>;
 
-export const ChatMessageSchema = z.object({
-  role: ChatRoleSchema,
-  content: z.string(),
-});
+/**
+ * `content` may be:
+ *   - a plain string (most common)
+ *   - `null` (e.g. assistant messages that only carry tool_calls)
+ *   - an array of content-part objects (multimodal: images, video, etc.)
+ *
+ * We validate the structural envelope but leave the inner content
+ * unconstrained so the backend decides what's valid.
+ */
+export const ChatMessageSchema = z
+  .object({
+    role: ChatRoleSchema,
+    content: z
+      .union([z.string(), z.array(z.record(z.unknown())), z.null()])
+      .optional(),
+  })
+  .passthrough();
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
 export const ChatCompletionRequestSchema = z
@@ -250,11 +269,13 @@ export const ChatCompletionUsageSchema = z.object({
 });
 export type ChatCompletionUsage = z.infer<typeof ChatCompletionUsageSchema>;
 
-export const ChatCompletionChoiceSchema = z.object({
-  index: z.number().int(),
-  message: ChatMessageSchema,
-  finish_reason: z.string(),
-});
+export const ChatCompletionChoiceSchema = z
+  .object({
+    index: z.number().int(),
+    message: ChatMessageSchema,
+    finish_reason: z.string().nullable().optional(),
+  })
+  .passthrough();
 export type ChatCompletionChoice = z.infer<typeof ChatCompletionChoiceSchema>;
 
 export const ChatCompletionResponseSchema = z
