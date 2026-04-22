@@ -115,6 +115,13 @@ function getDateTicks(values: Date[], width: number): Date[] {
   return scale.ticks(Math.max(2, Math.floor(width / 120)));
 }
 
+function getSvgPointerX(event: PointerEvent): number {
+  const target = event.currentTarget as SVGGraphicsElement;
+  const container = target.ownerSVGElement ?? target;
+  const [x] = d3.pointer(event, container);
+  return x;
+}
+
 interface TimeSeriesChartSeries {
   key: string;
   label: string;
@@ -279,9 +286,7 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
   };
 
   const handlePointerMove = (event: PointerEvent) => {
-    const rect = (event.currentTarget as SVGRectElement).getBoundingClientRect();
-    const offsetX = event.clientX - rect.left;
-    const hoveredDate = xScale().invert(offsetX);
+    const hoveredDate = xScale().invert(getSvgPointerX(event));
     const nearestIndex = d3.leastIndex(points(), (point: ParsedTimeSeriesDatum) => Math.abs(point.parsedDate.getTime() - hoveredDate.getTime()));
     setHoverIndex(nearestIndex ?? null);
   };
@@ -486,9 +491,7 @@ export function ComboChart(props: ComboChartProps) {
   });
 
   const handlePointerMove = (event: PointerEvent) => {
-    const rect = (event.currentTarget as SVGRectElement).getBoundingClientRect();
-    const offsetX = event.clientX - rect.left;
-    const hoveredDate = xScale().invert(offsetX);
+    const hoveredDate = xScale().invert(getSvgPointerX(event));
     const nearestIndex = d3.leastIndex(points(), (point: ParsedComboDatum) => Math.abs(point.parsedDate.getTime() - hoveredDate.getTime()));
     setHoverIndex(nearestIndex ?? null);
   };
