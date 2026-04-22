@@ -9,7 +9,6 @@ import {
   CommandBar,
   CommandBarGroup,
   HistogramChart,
-  MetaCluster,
   PageHeader,
   Panel,
   Select,
@@ -284,23 +283,15 @@ export const Analytics: Component = () => {
         </div>
 
         <div class="ui-section-grid analytics__grid--spread-wide">
-          <Panel title="Response Length Distribution" description="Histogram of completion token lengths across the selected window.">
-            <MetaCluster
-              items={[
-                { key: 'Metric', value: 'completion_tokens' },
-                { key: 'Scale', value: 'Log' },
-              ]}
+          <Panel title="Response Length Distribution" description="Log-scaled completion_tokens histogram across the selected window.">
+            <HistogramChart
+              data={histogram() ?? []}
+              xTickUnit="tok"
+              yTickUnit="req"
             />
-            <HistogramChart data={histogram() ?? []} />
           </Panel>
 
-          <Panel title="Daily Response Length Spread" description="Completion token box plot by day using min / q1 / median / q3 / max summary.">
-            <MetaCluster
-              items={[
-                { key: 'Scale', value: 'Log' },
-                { key: 'Outliers', value: 'Hidden in this view' },
-              ]}
-            />
+          <Panel title="Daily Response Length Spread" description="Log-scaled daily completion_tokens spread; outliers are hidden.">
             <BoxPlotChart data={boxPlot() ?? []} />
           </Panel>
         </div>

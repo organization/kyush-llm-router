@@ -99,12 +99,69 @@ function formatCompactNumber(value: number): string {
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 
+function formatNumberWithUnit(value: number, unit?: string): string {
+  const formatted = formatCompactNumber(value);
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
 function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
 function getSymlogMax(value: number): number {
   return value <= 0 ? 1 : value * 1.1;
+}
+
+function roundSymlogTick(value: number, max: number): number {
+  if (value <= 0) {
+    return 0;
+  }
+
+  if (value < 10) {
+    return Math.min(max, Math.max(1, Math.round(value)));
+  }
+
+  const power = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / power;
+  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return Math.min(max, niceNormalized * power);
+}
+
+function getSymlogTicks(maxValue: number, intervals: number = 4): number[] {
+  const max = Math.max(1, Math.round(maxValue));
+  const transformedMax = Math.log1p(max);
+  const safeIntervals = Math.max(2, intervals);
+  const ticks = new Set<number>();
+
+  for (let index = 0; index <= safeIntervals; index += 1) {
+    const rawTick = index === safeIntervals ? max : Math.expm1((transformedMax / safeIntervals) * index);
+    ticks.add(roundSymlogTick(rawTick, max));
+  }
+
+  return Array.from(ticks).sort((left, right) => left - right);
+}
+
+function getSymlogTicksInRange(minValue: number, maxValue: number, intervals: number = 4): number[] {
+  const min = Math.max(0, minValue);
+  const max = Math.max(min + 1, Math.round(maxValue));
+  const transformedMin = Math.log1p(min);
+  const transformedMax = Math.log1p(max);
+  const safeIntervals = Math.max(2, intervals);
+  const ticks = new Set<number>();
+
+  for (let index = 0; index <= safeIntervals; index += 1) {
+    const rawTick = index === 0
+      ? min
+      : index === safeIntervals
+        ? max
+        : Math.expm1(transformedMin + ((transformedMax - transformedMin) / safeIntervals) * index);
+    const tick = roundSymlogTick(rawTick, max);
+    if (tick >= min && tick <= max) {
+      ticks.add(tick);
+    }
+  }
+
+  return Array.from(ticks).sort((left, right) => left - right);
 }
 
 function getDateTicks(values: Date[], width: number): Date[] {
@@ -637,6 +694,8 @@ export function ComboChart(props: ComboChartProps) {
 interface HistogramChartProps {
   data: Array<{ bin_start: number; bin_end: number; count: number }>;
   height?: number;
+  xTickUnit?: string;
+  yTickUnit?: string;
 }
 
 export function HistogramChart(props: HistogramChartProps) {
@@ -646,23 +705,34 @@ export function HistogramChart(props: HistogramChartProps) {
     return readChartTheme();
   });
   const dimensions = createMemo(() => buildChartDimensions(env.width(), props.height ?? 200, 20));
-  const xScale = createMemo(() => {
+  const xDomain = createMemo(() => {
     const min = d3.min(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_start) ?? 0;
     const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_end) ?? 1;
-    return d3.scaleSymlog().domain([Math.max(0, min), getSymlogMax(max)]).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
+    return {
+      min: Math.max(0, min),
+      max,
+    };
+  });
+  const xScale = createMemo(() => {
+    const domain = xDomain();
+    return d3.scaleSymlog().domain([domain.min, getSymlogMax(domain.max)]).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
   });
   const yScale = createMemo(() => {
     const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.count) ?? 0;
     return d3.scaleSymlog().domain([0, getSymlogMax(max)]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
   });
-  const xTicks = createMemo(() => xScale().ticks(Math.max(2, Math.floor(getInnerWidth(dimensions()) / 100))));
+  const yTicks = createMemo(() => getSymlogTicks(d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.count) ?? 0));
+  const xTicks = createMemo(() => {
+    const domain = xDomain();
+    return getSymlogTicksInRange(domain.min, domain.max);
+  });
 
   return (
     <div class="ui-chart">
       <div class="ui-chart__frame" ref={env.rootRef}>
         <Show when={env.width() > 0 && props.data.length > 0} fallback={<div class="ui-chart__empty">No histogram data available.</div>}>
           <svg viewBox={`0 0 ${dimensions().width} ${dimensions().height}`} class="ui-chart__svg" role="img" aria-label="Histogram">
-            <For each={yScale().ticks(4)}>
+            <For each={yTicks()}>
               {(tick) => (
                 <>
                   <line
@@ -674,7 +744,7 @@ export function HistogramChart(props: HistogramChartProps) {
                     stroke-dasharray="3 4"
                   />
                   <text x={dimensions().marginLeft - 8} y={yScale()(tick)} fill={theme().textMuted} text-anchor="end" dominant-baseline="middle" class="ui-chart__tick">
-                    {formatCompactNumber(tick)}
+                    {formatNumberWithUnit(tick, props.yTickUnit)}
                   </text>
                 </>
               )}
@@ -703,7 +773,7 @@ export function HistogramChart(props: HistogramChartProps) {
                   text-anchor="middle"
                   class="ui-chart__tick"
                 >
-                  {formatCompactNumber(tick)}
+                  {formatNumberWithUnit(tick, props.xTickUnit)}
                 </text>
               )}
             </For>
@@ -740,13 +810,14 @@ export function BoxPlotChart(props: BoxPlotChartProps) {
     const max = d3.max(points(), (point: ParsedBoxPlotDatum) => point.max) ?? 0;
     return d3.scaleSymlog().domain([0, getSymlogMax(max)]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
   });
+  const yTicks = createMemo(() => getSymlogTicks(d3.max(points(), (point: ParsedBoxPlotDatum) => point.max) ?? 0));
 
   return (
     <div class="ui-chart">
       <div class="ui-chart__frame" ref={env.rootRef}>
         <Show when={env.width() > 0 && points().length > 0} fallback={<div class="ui-chart__empty">No box plot data available.</div>}>
           <svg viewBox={`0 0 ${dimensions().width} ${dimensions().height}`} class="ui-chart__svg" role="img" aria-label="Box plot chart">
-            <For each={yScale().ticks(4)}>
+            <For each={yTicks()}>
               {(tick) => (
                 <>
                   <line
