@@ -288,6 +288,7 @@ export const Analytics: Component = () => {
             <MetaCluster
               items={[
                 { key: 'Metric', value: 'completion_tokens' },
+                { key: 'Scale', value: 'Log' },
               ]}
             />
             <HistogramChart data={histogram() ?? []} />
@@ -296,6 +297,7 @@ export const Analytics: Component = () => {
           <Panel title="Daily Response Length Spread" description="Completion token box plot by day using min / q1 / median / q3 / max summary.">
             <MetaCluster
               items={[
+                { key: 'Scale', value: 'Log' },
                 { key: 'Outliers', value: 'Hidden in this view' },
               ]}
             />

@@ -338,15 +338,17 @@ export class AnalyticsService {
       return [{ bin_start: min, bin_end: max, count: values.length }];
     }
 
-    const width = (max - min) / safeBinCount;
+    const transformedMin = Math.log1p(min);
+    const transformedMax = Math.log1p(max);
+    const width = (transformedMax - transformedMin) / safeBinCount;
     const histogram = Array.from({ length: safeBinCount }, (_, index) => ({
-      bin_start: min + width * index,
-      bin_end: index === safeBinCount - 1 ? max : min + width * (index + 1),
+      bin_start: Math.expm1(transformedMin + width * index),
+      bin_end: index === safeBinCount - 1 ? max : Math.expm1(transformedMin + width * (index + 1)),
       count: 0,
     }));
 
     for (const value of values) {
-      const index = Math.min(safeBinCount - 1, Math.floor((value - min) / width));
+      const index = Math.min(safeBinCount - 1, Math.floor((Math.log1p(value) - transformedMin) / width));
       histogram[index].count += 1;
     }
 

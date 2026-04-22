@@ -27,4 +27,5 @@
 
 - 모델 추이의 모델 키는 `response_model -> routed_model -> request_model -> unknown` 순서로 결정한다.
 - response length 계열 시각화는 `completion_tokens` 값이 있는 요청만 집계한다.
+- response length 계열 시각화는 긴 꼬리 분포를 읽기 쉽도록 로그 계열 스케일을 사용한다.
 - 상세 요청 단위의 latency/body 확인은 계속 `DetailLogs` 화면에서 담당한다.

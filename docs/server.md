@@ -73,6 +73,7 @@ server/src/
 - `AnalyticsService` 는 `analytics.db` 의 일별 집계와 `request_logs_YYYY-MM.db` 의 범위 조회를 함께 사용해 시계열/분포 데이터를 만든다.
 - 모델 추이 키는 `response_model -> routed_model -> request_model -> unknown` 순서로 결정한다.
 - response length 계열 집계는 `completion_tokens` 가 있는 요청만 포함한다.
+- response length histogram은 긴 꼬리 분포를 위해 로그 간격 bin을 사용한다.
 - 자세한 화면/API 설명은 [docs/analytics.md](./analytics.md) 참고.
 
 ## Deployment Notes

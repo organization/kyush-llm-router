@@ -103,6 +103,10 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+function getSymlogMax(value: number): number {
+  return value <= 0 ? 1 : value * 1.1;
+}
+
 function getDateTicks(values: Date[], width: number): Date[] {
   if (values.length <= 7) {
     return values;
@@ -645,11 +649,11 @@ export function HistogramChart(props: HistogramChartProps) {
   const xScale = createMemo(() => {
     const min = d3.min(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_start) ?? 0;
     const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_end) ?? 1;
-    return d3.scaleLinear().domain([min, max]).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
+    return d3.scaleSymlog().domain([Math.max(0, min), getSymlogMax(max)]).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
   });
   const yScale = createMemo(() => {
     const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.count) ?? 0;
-    return d3.scaleLinear().domain([0, max === 0 ? 1 : max * 1.1]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    return d3.scaleSymlog().domain([0, getSymlogMax(max)]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
   });
   const xTicks = createMemo(() => xScale().ticks(Math.max(2, Math.floor(getInnerWidth(dimensions()) / 100))));
 
@@ -734,7 +738,7 @@ export function BoxPlotChart(props: BoxPlotChartProps) {
   });
   const yScale = createMemo(() => {
     const max = d3.max(points(), (point: ParsedBoxPlotDatum) => point.max) ?? 0;
-    return d3.scaleLinear().domain([0, max === 0 ? 1 : max * 1.1]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    return d3.scaleSymlog().domain([0, getSymlogMax(max)]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
   });
 
   return (
