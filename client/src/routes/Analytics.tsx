@@ -141,7 +141,7 @@ export const Analytics: Component = () => {
 
     return [
       { label: 'Requests', value: formatInteger.format(totals.requests), hint: `Last ${days()} days` },
-      { label: 'Tokens', value: formatInteger.format(totals.tokens), hint: 'Aggregated daily total tokens' },
+      { label: 'Tokens', value: formatInteger.format(totals.tokens), hint: `Selected ${days()}-day window total` },
       { label: 'Avg Response', value: `${avgLatency.toFixed(1)}ms`, hint: 'Across visible backend series' },
       { label: 'Errors', value: formatInteger.format(errorCount), hint: 'Absolute backend error count' },
     ];
