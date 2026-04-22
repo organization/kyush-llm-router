@@ -374,6 +374,57 @@ describe('OpenAI Compatible Backend Integration', () => {
       expect(receivedAuthorization).toBe('Bearer upstream-secret-key');
       expect(receivedAuthorization).not.toBe(`Bearer ${userApiKey}`);
     });
+
+    it('should preserve multimodal image messages and chat template kwargs when proxying', async () => {
+      let receivedBody: any;
+      const { server, port } = createMockBackend({
+        onRequest: (req) => {
+          if (req.path === '/v1/chat/completions') {
+            receivedBody = req.body;
+          }
+        },
+        modelsResponse: [{ id: 'vision-test-model', object: 'model' }],
+      });
+      mockServer = server;
+      mockPort = port;
+
+      const userResponse = await admin.post('/admin/users').send({ name: 'Vision Payload User 6-6' });
+      const userApiKey = userResponse.body.api_key;
+      const userId = userResponse.body.id;
+
+      const backendResponse = await admin.post('/admin/backends').send({
+        name: 'Vision Payload Backend 6-6',
+        base_url: `http://localhost:${mockPort}`,
+      });
+      const backendId = backendResponse.body.id;
+
+      await admin
+        .post('/admin/permissions')
+        .send({ user_id: userId, backend_id: backendId });
+
+      const imageDataUrl = `data:image/jpeg;base64,${'a'.repeat(128 * 1024)}`;
+      const payload = {
+        model: 'vision-test-model',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: '이 이미지는 무엇인가요?' },
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+          ],
+        }],
+        chat_template_kwargs: {
+          enable_thinking: true,
+        },
+      };
+
+      const response = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send(payload);
+
+      expect(response.status).toBe(200);
+      expect(receivedBody).toEqual(payload);
+    });
   });
 
   describe('Scenario 7: Models endpoint routing', () => {

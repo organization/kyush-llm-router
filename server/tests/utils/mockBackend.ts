@@ -33,7 +33,9 @@ export function createMockBackend(options: MockBackendOptions = {}) {
   } = options;
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({
+    limit: '30mb',
+  }));
 
   app.post('/v1/chat/completions', (req, res) => {
     onRequest?.(req);
