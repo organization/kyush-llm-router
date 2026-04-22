@@ -1,4 +1,5 @@
 import express from 'express';
+import { createJsonBodyParser, requestBodyErrorHandler } from '../../src/utils/requestBody';
 
 export interface MockBackendOptions {
   port?: number;
@@ -33,9 +34,8 @@ export function createMockBackend(options: MockBackendOptions = {}) {
   } = options;
 
   const app = express();
-  app.use(express.json({
-    limit: '30mb',
-  }));
+  app.use(createJsonBodyParser());
+  app.use(requestBodyErrorHandler);
 
   app.post('/v1/chat/completions', (req, res) => {
     onRequest?.(req);

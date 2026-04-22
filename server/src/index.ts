@@ -12,6 +12,7 @@ import { requireAdminAccess, requireSessionCsrf } from './utils/adminAuth';
 import { logger } from './utils/logger';
 import { getUtcTimestamp } from './utils/time';
 import { ModelCatalogService } from './services/ModelCatalogService';
+import { createJsonBodyParser, JSON_BODY_LIMIT, requestBodyErrorHandler } from './utils/requestBody';
 
 const envPathCandidates = [
   path.resolve(__dirname, '..', '..', '.env'),
@@ -43,9 +44,8 @@ export function createServer(): Application {
     origin: corsOrigins,
     credentials: true,
   }));
-  app.use(express.json({
-    limit: '30mb',
-  }));
+  app.use(createJsonBodyParser());
+  app.use(requestBodyErrorHandler);
 
   app.use('/admin/auth', adminAuthRoutes);
   app.use('/admin/analytics', requireAdminAccess, requireSessionCsrf, analyticsRoutes);

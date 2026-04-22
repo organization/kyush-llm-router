@@ -10,6 +10,7 @@ import { initRequestLogsDb } from '../../src/config/request-logs-db';
 import { getUtcTimestamp } from '../../src/utils/time';
 import { requireAdminAccess, requireSessionCsrf } from '../../src/utils/adminAuth';
 import { ModelCatalogService } from '../../src/services/ModelCatalogService';
+import { createJsonBodyParser, requestBodyErrorHandler } from '../../src/utils/requestBody';
 
 export function createTestApp() {
   // Initialize both databases
@@ -22,9 +23,8 @@ export function createTestApp() {
   const app = express();
   
   app.use(cors());
-  app.use(express.json({
-    limit: '30mb',
-  }));
+  app.use(createJsonBodyParser());
+  app.use(requestBodyErrorHandler);
   
   app.use('/admin/auth', adminAuthRoutes);
   app.use('/admin/analytics', requireAdminAccess, requireSessionCsrf, analyticsRoutes);
