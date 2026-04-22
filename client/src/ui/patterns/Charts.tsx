@@ -251,6 +251,7 @@ export function ChartLegend(props: ChartLegendProps) {
 type ParsedTimeSeriesDatum = TimeSeriesDatum & { parsedDate: Date };
 type ParsedComboDatum = { date: string; lineValue: number; barValue: number; parsedDate: Date };
 type ParsedBoxPlotDatum = { date: string; min: number; q1: number; median: number; q3: number; max: number; parsedDate: Date };
+type HistogramBin = { bin_start: number; bin_end: number; count: number };
 
 export function TimeSeriesChart(props: TimeSeriesChartProps) {
   const env = createChartEnvironment();
@@ -692,7 +693,7 @@ export function ComboChart(props: ComboChartProps) {
 }
 
 interface HistogramChartProps {
-  data: Array<{ bin_start: number; bin_end: number; count: number }>;
+  data: HistogramBin[];
   height?: number;
   xTickUnit?: string;
   yTickUnit?: string;
@@ -700,14 +701,15 @@ interface HistogramChartProps {
 
 export function HistogramChart(props: HistogramChartProps) {
   const env = createChartEnvironment();
+  const [hoverIndex, setHoverIndex] = createSignal<number | null>(null);
   const theme = createMemo(() => {
     env.themeVersion();
     return readChartTheme();
   });
   const dimensions = createMemo(() => buildChartDimensions(env.width(), props.height ?? 200, 20));
   const xDomain = createMemo(() => {
-    const min = d3.min(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_start) ?? 0;
-    const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.bin_end) ?? 1;
+    const min = d3.min(props.data, (bin: HistogramBin) => bin.bin_start) ?? 0;
+    const max = d3.max(props.data, (bin: HistogramBin) => bin.bin_end) ?? 1;
     return {
       min: Math.max(0, min),
       max,
@@ -718,14 +720,35 @@ export function HistogramChart(props: HistogramChartProps) {
     return d3.scaleSymlog().domain([domain.min, getSymlogMax(domain.max)]).range([dimensions().marginLeft, dimensions().marginLeft + getInnerWidth(dimensions())]);
   });
   const yScale = createMemo(() => {
-    const max = d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.count) ?? 0;
+    const max = d3.max(props.data, (bin: HistogramBin) => bin.count) ?? 0;
     return d3.scaleSymlog().domain([0, getSymlogMax(max)]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
   });
-  const yTicks = createMemo(() => getSymlogTicks(d3.max(props.data, (bin: { bin_start: number; bin_end: number; count: number }) => bin.count) ?? 0));
+  const yTicks = createMemo(() => getSymlogTicks(d3.max(props.data, (bin: HistogramBin) => bin.count) ?? 0));
   const xTicks = createMemo(() => {
     const domain = xDomain();
     return getSymlogTicksInRange(domain.min, domain.max);
   });
+  const hoveredBin = createMemo(() => {
+    const index = hoverIndex();
+    return index === null ? null : props.data[index] ?? null;
+  });
+
+  const handlePointerMove = (event: PointerEvent) => {
+    const x = getSvgPointerX(event);
+    const hoveredValue = xScale().invert(x);
+    const index = props.data.findIndex((bin) => hoveredValue >= bin.bin_start && hoveredValue <= bin.bin_end);
+
+    if (index >= 0) {
+      setHoverIndex(index);
+      return;
+    }
+
+    const nearestIndex = d3.leastIndex(props.data, (bin: HistogramBin) => {
+      const center = (xScale()(bin.bin_start) + xScale()(bin.bin_end)) / 2;
+      return Math.abs(center - x);
+    });
+    setHoverIndex(nearestIndex ?? null);
+  };
 
   return (
     <div class="ui-chart">
@@ -758,7 +781,9 @@ export function HistogramChart(props: HistogramChartProps) {
                   width={Math.max(2, xScale()(bin.bin_end) - xScale()(bin.bin_start) - 2)}
                   height={dimensions().marginTop + getInnerHeight(dimensions()) - yScale()(bin.count)}
                   fill={theme().warning}
-                  opacity="0.8"
+                  opacity={hoveredBin() === bin ? '0.95' : '0.8'}
+                  stroke={hoveredBin() === bin ? theme().text : 'transparent'}
+                  stroke-width={hoveredBin() === bin ? '1.5' : '0'}
                   rx="2"
                 />
               )}
@@ -777,7 +802,36 @@ export function HistogramChart(props: HistogramChartProps) {
                 </text>
               )}
             </For>
+            <rect
+              x={dimensions().marginLeft}
+              y={dimensions().marginTop}
+              width={getInnerWidth(dimensions())}
+              height={getInnerHeight(dimensions())}
+              fill="transparent"
+              onPointerMove={handlePointerMove}
+              onPointerLeave={() => setHoverIndex(null)}
+            />
           </svg>
+
+          <Show when={hoveredBin()}>
+            {(bin) => (
+              <div class="ui-chart__tooltip">
+                <div class="ui-chart__tooltip-title">Completion tokens</div>
+                <div class="ui-chart__tooltip-row">
+                  <span class="ui-chart__legend-swatch" style={{ background: theme().warning }} />
+                  <span>Range</span>
+                  <strong>
+                    {formatNumberWithUnit(bin().bin_start, props.xTickUnit)} - {formatNumberWithUnit(bin().bin_end, props.xTickUnit)}
+                  </strong>
+                </div>
+                <div class="ui-chart__tooltip-row">
+                  <span class="ui-chart__legend-swatch" style={{ background: theme().accent }} />
+                  <span>Requests</span>
+                  <strong>{formatNumberWithUnit(bin().count, props.yTickUnit)}</strong>
+                </div>
+              </div>
+            )}
+          </Show>
         </Show>
       </div>
     </div>
@@ -791,6 +845,7 @@ interface BoxPlotChartProps {
 
 export function BoxPlotChart(props: BoxPlotChartProps) {
   const env = createChartEnvironment();
+  const [hoverIndex, setHoverIndex] = createSignal<number | null>(null);
   const theme = createMemo(() => {
     env.themeVersion();
     return readChartTheme();
@@ -811,6 +866,19 @@ export function BoxPlotChart(props: BoxPlotChartProps) {
     return d3.scaleSymlog().domain([0, getSymlogMax(max)]).range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
   });
   const yTicks = createMemo(() => getSymlogTicks(d3.max(points(), (point: ParsedBoxPlotDatum) => point.max) ?? 0));
+  const hoveredPoint = createMemo(() => {
+    const index = hoverIndex();
+    return index === null ? null : points()[index] ?? null;
+  });
+
+  const handlePointerMove = (event: PointerEvent) => {
+    const x = getSvgPointerX(event);
+    const nearestIndex = d3.leastIndex(points(), (point: ParsedBoxPlotDatum) => {
+      const center = (xScale()(point.date) ?? dimensions().marginLeft) + xScale().bandwidth() / 2;
+      return Math.abs(center - x);
+    });
+    setHoverIndex(nearestIndex ?? null);
+  };
 
   return (
     <div class="ui-chart">
@@ -847,8 +915,9 @@ export function BoxPlotChart(props: BoxPlotChartProps) {
                       width={xScale().bandwidth()}
                       height={Math.max(2, yScale()(point.q1) - yScale()(point.q3))}
                       fill={theme().accent}
-                      opacity="0.25"
+                      opacity={hoveredPoint() === point ? '0.4' : '0.25'}
                       stroke={theme().accent}
+                      stroke-width={hoveredPoint() === point ? '2' : '1'}
                     />
                     <line x1={xScale()(point.date)} x2={(xScale()(point.date) ?? 0) + xScale().bandwidth()} y1={yScale()(point.median)} y2={yScale()(point.median)} stroke={theme().accent} stroke-width="2" />
                     <text
@@ -864,7 +933,61 @@ export function BoxPlotChart(props: BoxPlotChartProps) {
                 );
               }}
             </For>
+            <Show when={hoveredPoint()}>
+              {(point) => (
+                <line
+                  x1={(xScale()(point().date) ?? dimensions().marginLeft) + xScale().bandwidth() / 2}
+                  x2={(xScale()(point().date) ?? dimensions().marginLeft) + xScale().bandwidth() / 2}
+                  y1={dimensions().marginTop}
+                  y2={dimensions().marginTop + getInnerHeight(dimensions())}
+                  stroke={theme().textMuted}
+                  stroke-dasharray="4 4"
+                />
+              )}
+            </Show>
+            <rect
+              x={dimensions().marginLeft}
+              y={dimensions().marginTop}
+              width={getInnerWidth(dimensions())}
+              height={getInnerHeight(dimensions())}
+              fill="transparent"
+              onPointerMove={handlePointerMove}
+              onPointerLeave={() => setHoverIndex(null)}
+            />
           </svg>
+
+          <Show when={hoveredPoint()}>
+            {(point) => (
+              <div class="ui-chart__tooltip">
+                <div class="ui-chart__tooltip-title">{formatDate(point().parsedDate)}</div>
+                <div class="ui-chart__tooltip-row">
+                  <span class="ui-chart__legend-swatch" style={{ background: theme().textMuted }} />
+                  <span>Max</span>
+                  <strong>{formatNumberWithUnit(point().max, 'tok')}</strong>
+                </div>
+                <div class="ui-chart__tooltip-row">
+                  <span class="ui-chart__legend-swatch" style={{ background: theme().accent }} />
+                  <span>Q3</span>
+                  <strong>{formatNumberWithUnit(point().q3, 'tok')}</strong>
+                </div>
+                <div class="ui-chart__tooltip-row">
+                  <span class="ui-chart__legend-swatch" style={{ background: theme().accent }} />
+                  <span>Median</span>
+                  <strong>{formatNumberWithUnit(point().median, 'tok')}</strong>
+                </div>
+                <div class="ui-chart__tooltip-row">
+                  <span class="ui-chart__legend-swatch" style={{ background: theme().accent }} />
+                  <span>Q1</span>
+                  <strong>{formatNumberWithUnit(point().q1, 'tok')}</strong>
+                </div>
+                <div class="ui-chart__tooltip-row">
+                  <span class="ui-chart__legend-swatch" style={{ background: theme().textMuted }} />
+                  <span>Min</span>
+                  <strong>{formatNumberWithUnit(point().min, 'tok')}</strong>
+                </div>
+              </div>
+            )}
+          </Show>
         </Show>
       </div>
     </div>
