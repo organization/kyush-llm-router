@@ -2,6 +2,7 @@ import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
 import { Show, createMemo, createResource, createSignal, type Component } from 'solid-js';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
+import { formatDurationMs } from '../ui/lib/format';
 import {
   ChartLegend,
   ComboChart,
@@ -248,8 +249,8 @@ export const Dashboard: Component = () => {
                 showLegend={false}
                 hiddenKeys={hiddenLatencySeries()}
                 onToggleLegend={(key) => toggleHiddenKey(setHiddenLatencySeries, key)}
-                yLeftLabel="Milliseconds"
-                formatLeftValue={(value) => `${value.toFixed(0)}ms`}
+                yLeftLabel="Latency"
+                formatLeftValue={formatDurationMs}
                 tooltipTitle="Backend latency"
               />
             </Panel>

@@ -1,6 +1,7 @@
 import { Show, createMemo, createResource, createSignal, type Component } from 'solid-js';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
+import { formatDurationMs } from '../ui/lib/format';
 import {
   BoxPlotChart,
   ChartLegend,
@@ -142,7 +143,7 @@ export const Analytics: Component = () => {
     return [
       { label: 'Requests', value: formatInteger.format(totals.requests), hint: `Last ${days()} days` },
       { label: 'Tokens', value: formatInteger.format(totals.tokens), hint: `Selected ${days()}-day window total` },
-      { label: 'Avg Response', value: `${avgLatency.toFixed(1)}ms`, hint: 'Across visible backend series' },
+      { label: 'Avg Response', value: formatDurationMs(avgLatency), hint: 'Across visible backend series' },
       { label: 'Errors', value: formatInteger.format(errorCount), hint: 'Absolute backend error count' },
     ];
   });
@@ -252,8 +253,8 @@ export const Analytics: Component = () => {
               showLegend={false}
               hiddenKeys={hiddenResponseSeries()}
               onToggleLegend={(key) => toggleHiddenKey(setHiddenResponseSeries, key)}
-              yLeftLabel="Milliseconds"
-              formatLeftValue={(value) => `${value.toFixed(0)}ms`}
+              yLeftLabel="Response time"
+              formatLeftValue={formatDurationMs}
               tooltipTitle="Average backend response time"
             />
           </Panel>
