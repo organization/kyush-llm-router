@@ -80,7 +80,7 @@ pnpm run bench      # 벤치마크 실행
 | `MODEL_CATALOG_REFRESH_MIN_MS` | `300000` 예시 | 모델 카탈로그 refresh 최소 간격(ms) |
 
 ## Detailed Docs
-관련 기능을 수정하기 전에 해당 문서를 반드시 먼저 읽으세요.
+관련 기능을 수정하기 전에 해당 문서를 반드시 UTF-8로 먼저 읽으세요.
 
 클라이언트 중심
 - [docs/client.md](docs/client.md) — 클라이언트 구조, `/dashboard` 라우팅, 관리자 UI 동작
