@@ -27,6 +27,7 @@
 - `force=true` rewrite 는 항상 적용되고 target 모델의 다음 규칙까지 계속 평가한다
 - `force=false` rewrite 는 현재 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용되고 target 모델의 다음 규칙까지 계속 평가한다
 - `/v1/models` 는 native backend 모델뿐 아니라 현재 사용자 권한에서 최종 후보가 있는 rewrite source alias도 함께 반환한다
+- `MODEL_LIST_INCLUDE_ROUTING_METADATA=1|true|yes|on` 이면 `/v1/models` 의 각 model object에 비표준 `kyush_router` metadata를 추가한다. 이 metadata는 `requested_model`, `routed_model`, `was_rewritten`, `rule_type`, `rewrite_path` 를 포함한다
 - 최종 후보가 없으면 모델 미지원 오류를 반환하고 `request_model`, `routed_model` 을 함께 내려준다
 
 ## Admin API

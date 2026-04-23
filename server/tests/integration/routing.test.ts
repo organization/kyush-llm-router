@@ -280,6 +280,8 @@ describe('OpenAI Compatible Backend Integration', () => {
   });
 
   afterEach(async () => {
+    delete process.env.MODEL_LIST_INCLUDE_ROUTING_METADATA;
+
     if (mockServer) {
       await new Promise<void>(resolve => mockServer.close(resolve));
       mockServer = undefined;
@@ -778,9 +780,74 @@ describe('OpenAI Compatible Backend Integration', () => {
         expect(ids).not.toContain('models-missing-alias');
         expect(ids).not.toContain('models-denied-alias');
         expect(ids).not.toContain('models-native-forced-away');
+        expect(response.body.data.every((item: any) => item.kyush_router === undefined)).toBe(true);
       } finally {
         await new Promise<void>((resolve) => deniedBackend.server.close(() => resolve()));
       }
+    });
+
+    it('should include kyush_router metadata for /v1/models when enabled', async () => {
+      process.env.MODEL_LIST_INCLUDE_ROUTING_METADATA = 'true';
+
+      const { server, port } = createMockBackend({
+        modelsResponse: [
+          { id: 'metadata-native', object: 'model' },
+          { id: 'metadata-final', object: 'model' },
+          { id: 'metadata-skip-current', object: 'model' },
+        ],
+      });
+      mockServer = server;
+      mockPort = port;
+
+      const userResponse = await admin.post('/admin/users').send({ name: 'Model Metadata User 8-14' });
+      const backendResponse = await admin.post('/admin/backends').send({
+        name: 'Model Metadata Backend 8-14',
+        base_url: `http://localhost:${port}`,
+      });
+      await admin.post('/admin/permissions').send({ user_id: userResponse.body.id, backend_id: backendResponse.body.id });
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'metadata-alias-a', target_model: 'metadata-alias-b', force: true })).status).toBe(201);
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'metadata-alias-b', target_model: 'metadata-missing-c', force: true })).status).toBe(201);
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'metadata-missing-c', target_model: 'metadata-final', force: false })).status).toBe(201);
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'metadata-skip-current', target_model: 'metadata-skip-target', force: false })).status).toBe(201);
+
+      const response = await request(app)
+        .get('/v1/models')
+        .set('Authorization', `Bearer ${userResponse.body.api_key}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.length).toBeGreaterThan(0);
+      expect(response.body.data.every((item: any) => item.kyush_router && !('backend_ids' in item.kyush_router))).toBe(true);
+
+      const native = response.body.data.find((item: any) => item.id === 'metadata-native');
+      expect(native.kyush_router).toEqual({
+        requested_model: 'metadata-native',
+        routed_model: 'metadata-native',
+        was_rewritten: false,
+        rule_type: 'none',
+        rewrite_path: [],
+      });
+
+      const alias = response.body.data.find((item: any) => item.id === 'metadata-alias-a');
+      expect(alias.kyush_router).toEqual({
+        requested_model: 'metadata-alias-a',
+        routed_model: 'metadata-final',
+        was_rewritten: true,
+        rule_type: 'chain',
+        rewrite_path: [
+          { source_model: 'metadata-alias-a', target_model: 'metadata-alias-b', mode: 'force' },
+          { source_model: 'metadata-alias-b', target_model: 'metadata-missing-c', mode: 'force' },
+          { source_model: 'metadata-missing-c', target_model: 'metadata-final', mode: 'fallback' },
+        ],
+      });
+
+      const skippedFallback = response.body.data.find((item: any) => item.id === 'metadata-skip-current');
+      expect(skippedFallback.kyush_router).toEqual({
+        requested_model: 'metadata-skip-current',
+        routed_model: 'metadata-skip-current',
+        was_rewritten: false,
+        rule_type: 'none',
+        rewrite_path: [],
+      });
     });
 
     it('should reject active rewrite cycles while allowing inactive cycles until activation', async () => {

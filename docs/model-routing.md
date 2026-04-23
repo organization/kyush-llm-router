@@ -19,6 +19,7 @@
 2. 접근 가능한 활성 백엔드의 메모리 카탈로그를 확인
 3. native backend 모델과 rewrite `source_model` alias를 같은 체인 해석기로 평가
 4. 최종 모델 후보가 있는 requestable 모델 ID 합집합을 반환
+5. `MODEL_LIST_INCLUDE_ROUTING_METADATA` 가 켜져 있으면 각 model object에 비표준 `kyush_router` routing metadata를 추가한다
 
 ## Caching Rules
 
@@ -49,6 +50,8 @@
 - 활성 rewrite 그래프에 cycle이 생기는 관리자 생성/수정은 거부된다
 - 직접 DB 조작 등으로 runtime cycle이 발견되면 라우터는 설정 오류를 반환한다
 - 체인 평가는 요청별 allowed backend set과 candidate memo를 사용해 반복 DB 조회를 피한다
+- `/v1/models` 의 `kyush_router` metadata는 적용된 rewrite hop만 `rewrite_path` 에 담는다. 후보가 있어 fallback이 중단된 규칙은 path에 포함하지 않는다
+- `kyush_router` 는 public routing 설명용이며 backend id/name 같은 내부 라우팅 대상 정보는 포함하지 않는다
 
 예시:
 `AutoModelTranslate -(Force)-> Qwen3.5 -(Force)-> Qwen/Qwen3.5-397B-A17B-FP8 -(Fallback)-> Gemma4 -(Force)-> cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`

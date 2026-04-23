@@ -78,6 +78,7 @@ pnpm run bench      # 벤치마크 실행
 | `OIDC_ALLOWED_EMAILS` | empty | 관리자 접근을 허용할 이메일 목록 |
 | `OIDC_SCOPES` | `openid profile email` | OIDC authorization scope |
 | `MODEL_CATALOG_REFRESH_MIN_MS` | `300000` 예시 | 모델 카탈로그 refresh 최소 간격(ms) |
+| `MODEL_LIST_INCLUDE_ROUTING_METADATA` | `false` | `true`이면 `/v1/models` model object에 비표준 `kyush_router` routing metadata 추가 |
 | `DETAIL_STREAM_LOG_MODE` | `compact` | 상세 로그에서 stream response body 저장 방식 (`compact`, `raw`, `both`, `off`) |
 
 ## Detailed Docs

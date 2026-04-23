@@ -6,6 +6,7 @@ import { ScriptEngine } from '../services/ScriptEngine';
 import { logger } from '../utils/logger';
 import { ModelCatalogService, ModelRewriteCycleError } from '../services/ModelCatalogService';
 import { getDetailStreamLogMode } from '../config/stream-logging';
+import { shouldIncludeModelListRoutingMetadata } from '../config/model-list-metadata';
 import { ChatStreamLogAccumulator } from '../utils/streamLog';
 
 const router: Router = Router();
@@ -364,12 +365,40 @@ router.get('/models', async (req: AuthenticatedRequest, res: Response) => {
     res.status(403).json({ error: 'No active backends available' });
     return;
   }
-  let models: Array<{ id: string; object: string }>;
+  let models: Array<{
+    id: string;
+    object: string;
+    kyush_router?: {
+      requested_model: string;
+      routed_model: string;
+      was_rewritten: boolean;
+      rule_type: string;
+      rewrite_path: Array<{ source_model: string; target_model: string; mode: string }>;
+    };
+  }>;
   try {
-    models = ModelCatalogService.getRequestableModelsForAllowedBackends(activeAllowedBackendIds).map((entry) => ({
-      id: entry.model_id,
-      object: 'model',
-    }));
+    const includeRoutingMetadata = shouldIncludeModelListRoutingMetadata();
+    models = ModelCatalogService.getRequestableModelsForAllowedBackends(activeAllowedBackendIds).map((entry) => {
+      const model = {
+        id: entry.model_id,
+        object: 'model',
+      };
+
+      if (!includeRoutingMetadata) {
+        return model;
+      }
+
+      return {
+        ...model,
+        kyush_router: {
+          requested_model: entry.routing.requestedModel,
+          routed_model: entry.routing.routedModel,
+          was_rewritten: entry.routing.wasRewritten,
+          rule_type: entry.routing.ruleType,
+          rewrite_path: entry.routing.rewritePath,
+        },
+      };
+    });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Model rewrite resolution failed';
     logger.error(`Model list resolution failed: ${errorMsg}`);

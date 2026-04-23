@@ -31,11 +31,18 @@ interface FetchModelsResponse {
   rawModels: Array<{ model_id: string; raw_json?: string }>;
 }
 
-interface RewriteResolution {
+export interface RewritePathHop {
+  source_model: string;
+  target_model: string;
+  mode: 'force' | 'fallback';
+}
+
+export interface RewriteResolution {
   requestedModel: string;
   routedModel: string;
   wasRewritten: boolean;
   ruleType: 'none' | 'force' | 'fallback' | 'chain';
+  rewritePath: RewritePathHop[];
 }
 
 interface RewriteConfig {
@@ -49,6 +56,10 @@ interface ResolutionContext {
   allowedActiveBackendIds: number[];
   allowedActiveBackendIdSet: Set<number>;
   candidateMemo: Map<string, number[]>;
+}
+
+export interface RequestableModelCatalogEntry extends BackendModelCatalogEntry {
+  routing: RewriteResolution;
 }
 
 const DEFAULT_REFRESH_MIN_MS = 5 * 60 * 1000;
@@ -303,6 +314,11 @@ export class ModelCatalogService {
           routedModel: currentModel,
           wasRewritten: currentModel !== requestedModel,
           ruleType: this.getRuleTypeFromAppliedRules(appliedRules),
+          rewritePath: appliedRules.map((rule) => ({
+            source_model: rule.sourceModel,
+            target_model: rule.targetModel,
+            mode: rule.force ? 'force' : 'fallback',
+          })),
         };
       }
 
@@ -314,6 +330,11 @@ export class ModelCatalogService {
             routedModel: currentModel,
             wasRewritten: currentModel !== requestedModel,
             ruleType: this.getRuleTypeFromAppliedRules(appliedRules),
+            rewritePath: appliedRules.map((rule) => ({
+              source_model: rule.sourceModel,
+              target_model: rule.targetModel,
+              mode: rule.force ? 'force' : 'fallback',
+            })),
           };
         }
       }
@@ -377,7 +398,7 @@ export class ModelCatalogService {
     return null;
   }
 
-  static getRequestableModelsForAllowedBackends(allowedBackendIds: number[]): BackendModelCatalogEntry[] {
+  static getRequestableModelsForAllowedBackends(allowedBackendIds: number[]): RequestableModelCatalogEntry[] {
     const context = this.createResolutionContext(allowedBackendIds);
     const requestableModelIds = new Set<string>();
     const candidateModelIds = new Set<string>([
@@ -400,6 +421,7 @@ export class ModelCatalogService {
         return {
           model_id: modelId,
           backend_ids: this.getCandidateBackendIdsWithContext(resolution.routedModel, context),
+          routing: resolution,
         };
       });
   }
