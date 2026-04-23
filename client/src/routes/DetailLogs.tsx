@@ -3,7 +3,7 @@ import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import type { RequestLog } from '../types';
-import { Button, CommandBar, CommandBarGroup, ConversationTimeline, DataGrid, EmptyState, MetaCluster, PageHeader, Panel, Select, StatusBadge, SummaryStrip, Tabs, TextField, hasRenderableConversation } from '../ui';
+import { Button, CommandBar, CommandBarGroup, ConversationTimeline, DataGrid, EmptyState, MetaCluster, PageHeader, Panel, Select, StatusBadge, SummaryStrip, Tabs, TextField, extractAssistantConversationPreview, hasRenderableConversation } from '../ui';
 
 interface FilterState {
   month: string;
@@ -24,32 +24,6 @@ const emptyFilters = (): FilterState => ({
   backendId: '',
   endpoint: '',
 });
-
-function extractAssistantPreview(responseBody?: string): string {
-  if (!responseBody) return '-';
-
-  try {
-    const parsed = JSON.parse(responseBody) as {
-      choices?: Array<{
-        message?: {
-          content?: unknown;
-        };
-      }>;
-    };
-    const content = parsed.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') return '-';
-
-    const normalized = content
-      .replace(/\r/g, '')
-      .replace(/\n+/g, ' ')
-      .trim();
-
-    if (!normalized) return '-';
-    return normalized.length > 50 ? `${normalized.slice(0, 50)}...` : normalized;
-  } catch {
-    return '-';
-  }
-}
 
 function prettyPrint(value?: string): string {
   if (!value) return '';
@@ -140,7 +114,7 @@ export const DetailLogs: Component = () => {
   const assistantPreviewById = createMemo(() => {
     const previews = new Map<number, string>();
     for (const row of requestRows()) {
-      previews.set(row.id, extractAssistantPreview(row.response_body));
+      previews.set(row.id, extractAssistantConversationPreview(row.response_body));
     }
     return previews;
   });
