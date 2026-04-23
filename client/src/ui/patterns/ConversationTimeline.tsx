@@ -70,6 +70,24 @@ function prettyJson(value: unknown): string {
   }
 }
 
+function hasMeaningfulToolCall(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.some((item) => hasMeaningfulToolCall(item));
+  if (isRecord(value)) {
+    return Object.entries(value).some(([key, item]) => key !== 'index' && hasMeaningfulToolCall(item));
+  }
+  return true;
+}
+
+function normalizeToolCalls(value: unknown): string | undefined {
+  if (!hasMeaningfulToolCall(value)) return undefined;
+
+  const rendered = prettyJson(value).trim();
+  if (!rendered || rendered === '[]' || rendered === '{}') return undefined;
+  return rendered;
+}
+
 function normalizePayload(value: unknown): Record<string, unknown> | null {
   if (!value) return null;
 
@@ -113,7 +131,7 @@ function normalizeCompactStreamResponse(payload: Record<string, unknown> | null)
             role: typeof choice.role === 'string' ? choice.role : 'assistant',
             content: stringifyValue(choice.content),
             reasoning: stringifyValue(choice.reasoning).trim() || undefined,
-            toolCalls: choice.tool_calls !== undefined ? prettyJson(choice.tool_calls) : undefined,
+            toolCalls: normalizeToolCalls(choice.tool_calls),
             metadata,
           };
         })
@@ -152,7 +170,7 @@ function normalizeAssistantMessages(payload: Record<string, unknown> | null): Pa
       const messageRecord = message as Record<string, unknown>;
       const content = stringifyValue(messageRecord.content);
       const reasoning = stringifyValue(messageRecord.reasoning_content ?? messageRecord.reasoning).trim();
-      const toolCalls = messageRecord.tool_calls !== undefined ? prettyJson(messageRecord.tool_calls) : undefined;
+      const toolCalls = normalizeToolCalls(messageRecord.tool_calls);
       const metadata = [
         (choice as Record<string, unknown>).finish_reason !== undefined
           ? { key: 'Finish', value: String((choice as Record<string, unknown>).finish_reason) }
@@ -306,7 +324,7 @@ function parseStreamResponse(value: unknown): ParsedStreamResponse | null {
         role: choice.role ?? 'assistant',
         content: choice.content.join(''),
         reasoning: choice.reasoning.join('') || undefined,
-        toolCalls: toolCalls.length > 0 ? prettyJson(toolCalls) : undefined,
+        toolCalls: normalizeToolCalls(toolCalls),
         metadata,
       };
     })
