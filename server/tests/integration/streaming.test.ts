@@ -323,7 +323,7 @@ describe('Streaming Response Proxying', () => {
 
     const { userApiKey, userId } = await setupUserAndBackend(port, { detailLogging: true });
 
-    await request(app)
+    const response = await request(app)
       .post('/v1/chat/completions')
       .set('Authorization', `Bearer ${userApiKey}`)
       .send({
@@ -331,6 +331,9 @@ describe('Streaming Response Proxying', () => {
         messages: [{ role: 'user', content: 'Hello' }],
         stream: true,
       });
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toMatch(/text\/event-stream/);
 
     const logsResponse = await admin.get(`/admin/analytics/requests?limit=1&userId=${userId}&detailLogged=1`);
     expect(logsResponse.body.rows).toHaveLength(1);
