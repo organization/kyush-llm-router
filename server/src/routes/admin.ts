@@ -21,6 +21,19 @@ const router: Router = Router();
 
 router.use('/scripts', scriptRoutes);
 
+function sendRewriteCycleError(res: Response, rules: ReturnType<typeof ModelRewriteModel.findAll>): boolean {
+  const cycle = ModelCatalogService.detectRewriteCycle(rules);
+  if (!cycle) {
+    return false;
+  }
+
+  res.status(409).json({
+    error: 'Model rewrite cycle detected',
+    cycle,
+  });
+  return true;
+}
+
 router.get('/dashboard/summary', (req: Request, res: Response) => {
   const days = req.query.days ? Number(req.query.days) : 30;
   res.json(AnalyticsService.getDashboardSummary(days));
@@ -303,10 +316,30 @@ router.post('/model-rewrites', (req: Request, res: Response) => {
     return;
   }
 
+  const sourceModel = source_model.trim();
+  const targetModel = target_model.trim();
+  const timestamp = getUtcTimestamp();
+  const candidateRules = [
+    ...ModelRewriteModel.findAll(),
+    {
+      id: 0,
+      source_model: sourceModel,
+      target_model: targetModel,
+      is_active: is_active === false ? false : true,
+      force: !!force,
+      note,
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+  ];
+  if (sendRewriteCycleError(res, candidateRules)) {
+    return;
+  }
+
   try {
     const rule = ModelRewriteModel.create({
-      source_model: source_model.trim(),
-      target_model: target_model.trim(),
+      source_model: sourceModel,
+      target_model: targetModel,
       is_active,
       force,
       note,
@@ -330,8 +363,40 @@ router.put('/model-rewrites/:id', (req: Request, res: Response) => {
     return;
   }
 
+  const data = req.body as UpdateModelRewriteData;
+  if (typeof data.source_model === 'string' && !data.source_model.trim()) {
+    res.status(400).json({ error: 'source_model cannot be empty' });
+    return;
+  }
+  if (typeof data.target_model === 'string' && !data.target_model.trim()) {
+    res.status(400).json({ error: 'target_model cannot be empty' });
+    return;
+  }
+
+  const candidateRules = ModelRewriteModel.findAll().map((rule) => {
+    if (rule.id !== id) {
+      return rule;
+    }
+
+    return {
+      ...rule,
+      source_model: typeof data.source_model === 'string' ? data.source_model.trim() : rule.source_model,
+      target_model: typeof data.target_model === 'string' ? data.target_model.trim() : rule.target_model,
+      is_active: data.is_active !== undefined ? data.is_active : rule.is_active,
+      force: data.force !== undefined ? data.force : rule.force,
+      note: data.note !== undefined ? data.note : rule.note,
+    };
+  });
+  if (sendRewriteCycleError(res, candidateRules)) {
+    return;
+  }
+
   try {
-    const updated = ModelRewriteModel.update(id, req.body as UpdateModelRewriteData);
+    const updated = ModelRewriteModel.update(id, {
+      ...data,
+      source_model: typeof data.source_model === 'string' ? data.source_model.trim() : undefined,
+      target_model: typeof data.target_model === 'string' ? data.target_model.trim() : undefined,
+    });
     ModelCatalogService.loadRewriteMap();
     res.json(updated);
   } catch (error) {

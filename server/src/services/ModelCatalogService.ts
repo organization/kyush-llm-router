@@ -35,15 +35,33 @@ interface RewriteResolution {
   requestedModel: string;
   routedModel: string;
   wasRewritten: boolean;
-  ruleType: 'none' | 'force' | 'fallback';
+  ruleType: 'none' | 'force' | 'fallback' | 'chain';
 }
 
 interface RewriteConfig {
+  id: number;
+  sourceModel: string;
   targetModel: string;
   force: boolean;
 }
 
+interface ResolutionContext {
+  allowedActiveBackendIds: number[];
+  allowedActiveBackendIdSet: Set<number>;
+  candidateMemo: Map<string, number[]>;
+}
+
 const DEFAULT_REFRESH_MIN_MS = 5 * 60 * 1000;
+
+export class ModelRewriteCycleError extends Error {
+  cycle: string[];
+
+  constructor(cycle: string[]) {
+    super(`Model rewrite cycle detected: ${cycle.join(' -> ')}`);
+    this.name = 'ModelRewriteCycleError';
+    this.cycle = cycle;
+  }
+}
 
 export class ModelCatalogService {
   private static backendModelsByBackendId = new Map<number, BackendCacheEntry>();
@@ -188,12 +206,58 @@ export class ModelCatalogService {
     this.modelRewriteMap.clear();
     for (const rule of ModelRewriteModel.findAll()) {
       if (rule.is_active) {
-        this.modelRewriteMap.set(rule.source_model, {
-          targetModel: rule.target_model,
+        const sourceModel = this.normalizeModelId(rule.source_model);
+        const targetModel = this.normalizeModelId(rule.target_model);
+        this.modelRewriteMap.set(sourceModel, {
+          id: rule.id,
+          sourceModel,
+          targetModel,
           force: rule.force,
         });
       }
     }
+  }
+
+  private static createResolutionContext(allowedBackendIds: number[]): ResolutionContext {
+    const allowed = new Set(allowedBackendIds);
+    const allowedActiveBackendIds = BackendModel.findActive()
+      .map((backend) => backend.id)
+      .filter((backendId) => allowed.has(backendId));
+
+    return {
+      allowedActiveBackendIds,
+      allowedActiveBackendIdSet: new Set(allowedActiveBackendIds),
+      candidateMemo: new Map<string, number[]>(),
+    };
+  }
+
+  static getActiveAllowedBackendIds(allowedBackendIds: number[]): number[] {
+    return this.createResolutionContext(allowedBackendIds).allowedActiveBackendIds;
+  }
+
+  private static getCandidateBackendIdsWithContext(modelId: string, context: ResolutionContext): number[] {
+    const normalized = this.normalizeModelId(modelId);
+    const memoized = context.candidateMemo.get(normalized);
+    if (memoized) return memoized;
+
+    const backendIds = this.backendIdsByModel.get(normalized);
+    const candidates = backendIds
+      ? Array.from(backendIds).filter((backendId) => context.allowedActiveBackendIdSet.has(backendId))
+      : [];
+    const sorted = candidates.sort((a, b) => a - b);
+
+    context.candidateMemo.set(normalized, sorted);
+    return sorted;
+  }
+
+  private static getRuleTypeFromAppliedRules(appliedRules: RewriteConfig[]): RewriteResolution['ruleType'] {
+    if (appliedRules.length === 0) {
+      return 'none';
+    }
+    if (appliedRules.length === 1) {
+      return appliedRules[0].force ? 'force' : 'fallback';
+    }
+    return 'chain';
   }
 
   static syncActiveBackendCacheState(): void {
@@ -216,44 +280,128 @@ export class ModelCatalogService {
     this.rebuildModelIndex();
   }
 
-  static resolveRequestedModel(modelId: string, allowedBackendIds: number[]): RewriteResolution {
+  private static resolveRequestedModelWithContext(modelId: string, context: ResolutionContext): RewriteResolution {
     const requestedModel = this.normalizeModelId(modelId);
-    const rewrite = this.modelRewriteMap.get(requestedModel);
-    if (!rewrite) {
-      return {
-        requestedModel,
-        routedModel: requestedModel,
-        wasRewritten: false,
-        ruleType: 'none',
-      };
+    const visitedModels = new Map<string, number>();
+    const path: string[] = [];
+    const appliedRules: RewriteConfig[] = [];
+    let currentModel = requestedModel;
+    const maxSteps = this.modelRewriteMap.size + 1;
+
+    for (let step = 0; step <= maxSteps; step += 1) {
+      const firstSeenAt = visitedModels.get(currentModel);
+      if (firstSeenAt !== undefined) {
+        throw new ModelRewriteCycleError([...path.slice(firstSeenAt), currentModel]);
+      }
+      visitedModels.set(currentModel, path.length);
+      path.push(currentModel);
+
+      const rewrite = this.modelRewriteMap.get(currentModel);
+      if (!rewrite) {
+        return {
+          requestedModel,
+          routedModel: currentModel,
+          wasRewritten: currentModel !== requestedModel,
+          ruleType: this.getRuleTypeFromAppliedRules(appliedRules),
+        };
+      }
+
+      if (!rewrite.force) {
+        const originalCandidates = this.getCandidateBackendIdsWithContext(currentModel, context);
+        if (originalCandidates.length > 0) {
+          return {
+            requestedModel,
+            routedModel: currentModel,
+            wasRewritten: currentModel !== requestedModel,
+            ruleType: this.getRuleTypeFromAppliedRules(appliedRules),
+          };
+        }
+      }
+
+      appliedRules.push(rewrite);
+      currentModel = this.normalizeModelId(rewrite.targetModel);
     }
 
-    if (rewrite.force) {
-      return {
-        requestedModel,
-        routedModel: rewrite.targetModel,
-        wasRewritten: rewrite.targetModel !== requestedModel,
-        ruleType: 'force',
-      };
+    throw new ModelRewriteCycleError([...path, currentModel]);
+  }
+
+  static resolveRequestedModel(modelId: string, allowedBackendIds: number[]): RewriteResolution {
+    return this.resolveRequestedModelWithContext(modelId, this.createResolutionContext(allowedBackendIds));
+  }
+
+  static detectRewriteCycle(rules: ModelRewriteRule[]): string[] | null {
+    const activeRules = new Map<string, string>();
+    for (const rule of rules) {
+      if (rule.is_active) {
+        activeRules.set(this.normalizeModelId(rule.source_model), this.normalizeModelId(rule.target_model));
+      }
     }
 
-    const originalCandidates = this.getCandidateBackendIds(requestedModel, allowedBackendIds);
-    if (originalCandidates.length > 0) {
-      return {
-        requestedModel,
-        routedModel: requestedModel,
-        wasRewritten: false,
-        ruleType: 'none',
-      };
-    }
+    const visited = new Set<string>();
+    const visiting = new Map<string, number>();
+    const path: string[] = [];
 
-    const routedModel = rewrite.targetModel;
-    return {
-      requestedModel,
-      routedModel,
-      wasRewritten: routedModel !== requestedModel,
-      ruleType: 'fallback',
+    const visit = (modelId: string): string[] | null => {
+      const firstSeenAt = visiting.get(modelId);
+      if (firstSeenAt !== undefined) {
+        return [...path.slice(firstSeenAt), modelId];
+      }
+      if (visited.has(modelId)) {
+        return null;
+      }
+
+      visiting.set(modelId, path.length);
+      path.push(modelId);
+
+      const targetModel = activeRules.get(modelId);
+      if (targetModel) {
+        const cycle = visit(targetModel);
+        if (cycle) {
+          return cycle;
+        }
+      }
+
+      path.pop();
+      visiting.delete(modelId);
+      visited.add(modelId);
+      return null;
     };
+
+    for (const sourceModel of activeRules.keys()) {
+      const cycle = visit(sourceModel);
+      if (cycle) {
+        return cycle;
+      }
+    }
+
+    return null;
+  }
+
+  static getRequestableModelsForAllowedBackends(allowedBackendIds: number[]): BackendModelCatalogEntry[] {
+    const context = this.createResolutionContext(allowedBackendIds);
+    const requestableModelIds = new Set<string>();
+    const candidateModelIds = new Set<string>([
+      ...this.backendIdsByModel.keys(),
+      ...this.modelRewriteMap.keys(),
+    ]);
+
+    for (const modelId of candidateModelIds) {
+      const resolution = this.resolveRequestedModelWithContext(modelId, context);
+      const routedBackendIds = this.getCandidateBackendIdsWithContext(resolution.routedModel, context);
+      if (routedBackendIds.length > 0) {
+        requestableModelIds.add(this.normalizeModelId(modelId));
+      }
+    }
+
+    return Array.from(requestableModelIds)
+      .sort((a, b) => a.localeCompare(b))
+      .map((modelId) => {
+        const resolution = this.resolveRequestedModelWithContext(modelId, context);
+        return {
+          model_id: modelId,
+          backend_ids: this.getCandidateBackendIdsWithContext(resolution.routedModel, context),
+        };
+      });
   }
 
   static getBackendCacheStatus(backendId: number): BackendModelCacheStatus {
@@ -378,13 +526,7 @@ export class ModelCatalogService {
   }
 
   static getCandidateBackendIds(modelId: string, allowedBackendIds: number[]): number[] {
-    const normalized = this.normalizeModelId(modelId);
-    const backendIds = this.backendIdsByModel.get(normalized);
-    if (!backendIds) return [];
-
-    const allowed = new Set(allowedBackendIds);
-    const active = new Set(BackendModel.findActive().map((backend) => backend.id));
-    return Array.from(backendIds).filter((backendId) => allowed.has(backendId) && active.has(backendId));
+    return this.getCandidateBackendIdsWithContext(modelId, this.createResolutionContext(allowedBackendIds));
   }
 
   static getModelsForAllowedBackends(allowedBackendIds: number[]): BackendModelCatalogEntry[] {

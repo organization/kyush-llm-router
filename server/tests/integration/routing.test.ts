@@ -619,5 +619,206 @@ describe('OpenAI Compatible Backend Integration', () => {
       expect(receivedModel).toBe('fallback-model');
       expect(response.body.model).toBe('fallback-model');
     });
+
+    it('should follow force rewrite chains before upstream forwarding', async () => {
+      let receivedModel: string | undefined;
+      const { server, port } = createMockBackend({
+        onRequest: (req) => {
+          if (req.path === '/v1/chat/completions') {
+            receivedModel = req.body.model;
+          }
+        },
+        chatResponse: {
+          id: 'force-chain-success',
+          model: 'chain-final-c',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'chain' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        },
+        modelsResponse: [{ id: 'chain-final-c', object: 'model' }],
+      });
+      mockServer = server;
+      mockPort = port;
+
+      const userResponse = await admin.post('/admin/users').send({ name: 'Force Chain User 8-10' });
+      const userApiKey = userResponse.body.api_key;
+      const userId = userResponse.body.id;
+      const backendResponse = await admin.post('/admin/backends').send({
+        name: 'Force Chain Backend 8-10',
+        base_url: `http://localhost:${port}`,
+      });
+
+      await admin.post('/admin/permissions').send({ user_id: userId, backend_id: backendResponse.body.id });
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'chain-start-a', target_model: 'chain-mid-b', force: true })).status).toBe(201);
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'chain-mid-b', target_model: 'chain-final-c', force: true })).status).toBe(201);
+
+      const response = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${userApiKey}`)
+        .send({ model: 'chain-start-a', messages: [] });
+
+      expect(response.status).toBe(200);
+      expect(receivedModel).toBe('chain-final-c');
+    });
+
+    it('should continue a mixed chain only when the current fallback model is unavailable', async () => {
+      let unavailableReceivedModel: string | undefined;
+      const unavailableBackend = createMockBackend({
+        onRequest: (req) => {
+          if (req.path === '/v1/chat/completions') {
+            unavailableReceivedModel = req.body.model;
+          }
+        },
+        chatResponse: {
+          id: 'mixed-chain-unavailable',
+          model: 'mixed-final-e',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'fallback-chain' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        },
+        modelsResponse: [{ id: 'mixed-final-e', object: 'model' }],
+      });
+      mockServer = unavailableBackend.server;
+      mockPort = unavailableBackend.port;
+
+      const unavailableUser = await admin.post('/admin/users').send({ name: 'Mixed Chain Missing User 8-11' });
+      const unavailableBackendResponse = await admin.post('/admin/backends').send({
+        name: 'Mixed Chain Missing Backend 8-11',
+        base_url: `http://localhost:${unavailableBackend.port}`,
+      });
+      await admin.post('/admin/permissions').send({ user_id: unavailableUser.body.id, backend_id: unavailableBackendResponse.body.id });
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-missing-a', target_model: 'mixed-missing-b', force: true })).status).toBe(201);
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-missing-b', target_model: 'mixed-missing-c', force: true })).status).toBe(201);
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-missing-c', target_model: 'mixed-missing-d', force: false })).status).toBe(201);
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-missing-d', target_model: 'mixed-final-e', force: true })).status).toBe(201);
+
+      const unavailableResponse = await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', `Bearer ${unavailableUser.body.api_key}`)
+        .send({ model: 'mixed-missing-a', messages: [] });
+
+      expect(unavailableResponse.status).toBe(200);
+      expect(unavailableReceivedModel).toBe('mixed-final-e');
+
+      let availableReceivedModel: string | undefined;
+      const availableBackend = createMockBackend({
+        onRequest: (req) => {
+          if (req.path === '/v1/chat/completions') {
+            availableReceivedModel = req.body.model;
+          }
+        },
+        chatResponse: {
+          id: 'mixed-chain-available',
+          model: 'mixed-available-c',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'available-chain' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        },
+        modelsResponse: [{ id: 'mixed-available-c', object: 'model' }, { id: 'mixed-available-e', object: 'model' }],
+      });
+
+      try {
+        const availableUser = await admin.post('/admin/users').send({ name: 'Mixed Chain Available User 8-12' });
+        const availableBackendResponse = await admin.post('/admin/backends').send({
+          name: 'Mixed Chain Available Backend 8-12',
+          base_url: `http://localhost:${availableBackend.port}`,
+        });
+        await admin.post('/admin/permissions').send({ user_id: availableUser.body.id, backend_id: availableBackendResponse.body.id });
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-available-a', target_model: 'mixed-available-b', force: true })).status).toBe(201);
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-available-b', target_model: 'mixed-available-c', force: true })).status).toBe(201);
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-available-c', target_model: 'mixed-available-d', force: false })).status).toBe(201);
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'mixed-available-d', target_model: 'mixed-available-e', force: true })).status).toBe(201);
+
+        const availableResponse = await request(app)
+          .post('/v1/chat/completions')
+          .set('Authorization', `Bearer ${availableUser.body.api_key}`)
+          .send({ model: 'mixed-available-a', messages: [] });
+
+        expect(availableResponse.status).toBe(200);
+        expect(availableReceivedModel).toBe('mixed-available-c');
+      } finally {
+        await new Promise<void>((resolve) => availableBackend.server.close(() => resolve()));
+      }
+    });
+
+    it('should expose only requestable native models and rewrite aliases from /v1/models', async () => {
+      const allowedBackend = createMockBackend({
+        modelsResponse: [
+          { id: 'models-visible-final', object: 'model' },
+          { id: 'models-native-forced-away', object: 'model' },
+        ],
+      });
+      const deniedBackend = createMockBackend({
+        modelsResponse: [{ id: 'models-denied-final', object: 'model' }],
+      });
+      mockServer = allowedBackend.server;
+      mockPort = allowedBackend.port;
+
+      try {
+        const userResponse = await admin.post('/admin/users').send({ name: 'Requestable Models User 8-13' });
+        const allowedBackendResponse = await admin.post('/admin/backends').send({
+          name: 'Requestable Models Allowed Backend 8-13',
+          base_url: `http://localhost:${allowedBackend.port}`,
+        });
+        await admin.post('/admin/backends').send({
+          name: 'Requestable Models Denied Backend 8-13',
+          base_url: `http://localhost:${deniedBackend.port}`,
+        });
+        await admin.post('/admin/permissions').send({ user_id: userResponse.body.id, backend_id: allowedBackendResponse.body.id });
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'models-visible-alias', target_model: 'models-visible-final', force: true })).status).toBe(201);
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'models-missing-alias', target_model: 'models-missing-final', force: true })).status).toBe(201);
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'models-denied-alias', target_model: 'models-denied-final', force: true })).status).toBe(201);
+        expect((await admin.post('/admin/model-rewrites').send({ source_model: 'models-native-forced-away', target_model: 'models-missing-final', force: true })).status).toBe(201);
+
+        const response = await request(app)
+          .get('/v1/models')
+          .set('Authorization', `Bearer ${userResponse.body.api_key}`);
+
+        expect(response.status).toBe(200);
+        const ids = response.body.data.map((item: any) => item.id);
+        expect(ids).toContain('models-visible-final');
+        expect(ids).toContain('models-visible-alias');
+        expect(ids).not.toContain('models-missing-alias');
+        expect(ids).not.toContain('models-denied-alias');
+        expect(ids).not.toContain('models-native-forced-away');
+      } finally {
+        await new Promise<void>((resolve) => deniedBackend.server.close(() => resolve()));
+      }
+    });
+
+    it('should reject active rewrite cycles while allowing inactive cycles until activation', async () => {
+      const selfLoop = await admin.post('/admin/model-rewrites').send({
+        source_model: 'cycle-self-a',
+        target_model: 'cycle-self-a',
+        force: true,
+      });
+      expect(selfLoop.status).toBe(409);
+      expect(selfLoop.body.error).toBe('Model rewrite cycle detected');
+
+      expect((await admin.post('/admin/model-rewrites').send({ source_model: 'cycle-active-a', target_model: 'cycle-active-b', force: true })).status).toBe(201);
+      const activeCycle = await admin.post('/admin/model-rewrites').send({
+        source_model: 'cycle-active-b',
+        target_model: 'cycle-active-a',
+        force: true,
+      });
+      expect(activeCycle.status).toBe(409);
+
+      const inactiveA = await admin.post('/admin/model-rewrites').send({
+        source_model: 'cycle-inactive-a',
+        target_model: 'cycle-inactive-b',
+        is_active: false,
+        force: true,
+      });
+      const inactiveB = await admin.post('/admin/model-rewrites').send({
+        source_model: 'cycle-inactive-b',
+        target_model: 'cycle-inactive-a',
+        is_active: false,
+        force: true,
+      });
+      expect(inactiveA.status).toBe(201);
+      expect(inactiveB.status).toBe(201);
+
+      const activation = await admin.put(`/admin/model-rewrites/${inactiveA.body.id}`).send({ is_active: true });
+      expect(activation.status).toBe(200);
+      const secondActivation = await admin.put(`/admin/model-rewrites/${inactiveB.body.id}`).send({ is_active: true });
+      expect(secondActivation.status).toBe(409);
+    });
   });
 });

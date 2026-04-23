@@ -23,9 +23,10 @@
 `/v1/**`는 기존 사용자 API 키 인증을 유지하며 관리자 인증과 분리된다.
 
 추가 동작:
-- `/v1/chat/completions` 는 요청 모델명을 먼저 전역 rewrite 규칙으로 해석한 뒤, 최종 모델을 서빙하는 허용 가능한 활성 백엔드만 후보로 사용한다
-- `force=true` rewrite 는 항상 적용된다
-- `force=false` rewrite 는 원본 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용된다
+- `/v1/chat/completions` 는 요청 모델명을 먼저 전역 rewrite 체인으로 해석한 뒤, 최종 모델을 서빙하는 허용 가능한 활성 백엔드만 후보로 사용한다
+- `force=true` rewrite 는 항상 적용되고 target 모델의 다음 규칙까지 계속 평가한다
+- `force=false` rewrite 는 현재 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용되고 target 모델의 다음 규칙까지 계속 평가한다
+- `/v1/models` 는 native backend 모델뿐 아니라 현재 사용자 권한에서 최종 후보가 있는 rewrite source alias도 함께 반환한다
 - 최종 후보가 없으면 모델 미지원 오류를 반환하고 `request_model`, `routed_model` 을 함께 내려준다
 
 ## Admin API
@@ -79,6 +80,8 @@
 | POST | `/admin/model-rewrites` | 전역 모델 rewrite 규칙 생성 (`force=true` 면 항상 rewrite, 아니면 fallback) |
 | PUT | `/admin/model-rewrites/:id` | 전역 모델 rewrite 규칙 수정 |
 | DELETE | `/admin/model-rewrites/:id` | 전역 모델 rewrite 규칙 삭제 |
+
+활성 rewrite 그래프에 cycle을 만드는 생성/수정 요청은 `409 { error, cycle }` 로 거부된다. 비활성 규칙끼리의 cycle은 저장할 수 있지만 활성화 시점에는 같은 검사를 통과해야 한다.
 
 `GET /admin/backends/:id/models` 응답에는 아래가 함께 포함된다.
 - `backend`: 백엔드 기본 정보 + 캐시 요약

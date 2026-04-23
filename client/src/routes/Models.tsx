@@ -145,7 +145,7 @@ export const Models: Component = () => {
       <div class="ui-app-page">
         <PageHeader
           title="Models"
-          description="Inspect cached backend model catalogs and manage global model rewrite rules."
+          description="Inspect cached backend model catalogs and manage chained global model rewrite rules."
           actions={<Button onClick={() => void Promise.all([refetchOverview(), refetchRules()])}>Refresh</Button>}
         />
 
@@ -224,7 +224,7 @@ export const Models: Component = () => {
 
         <Panel
           title="Model Rewrite Rules"
-          description="Force rules always rewrite. Fallback rules rewrite only when the original model has no usable backend."
+          description="Force rules always rewrite and continue through the chain. Fallback rules continue only when the current model has no usable backend."
           actions={<IconButton variant="primary" icon={<Plus />} label="Add Rule" onClick={openCreateDialog} />}
         >
           <div class="ui-stack ui-stack--tight">
@@ -266,7 +266,7 @@ export const Models: Component = () => {
           open={dialogOpen()}
           onOpenChange={setDialogOpen}
           title={editingRule() ? 'Edit Model Rule' : 'Add Model Rule'}
-          description="Choose whether the target model should always replace the source, or only act as a fallback when the source is unavailable."
+          description="Choose whether the target model should always replace the source, or only continue the chain when the current model is unavailable."
           footer={
             <>
               <Button onClick={() => setDialogOpen(false)} disabled={submitting()}>Cancel</Button>
@@ -282,7 +282,7 @@ export const Models: Component = () => {
             <TextField label="Note" value={form().note} onInput={(event) => setForm((current) => ({ ...current, note: event.currentTarget.value }))} />
             <Checkbox
               label="Always force rewrite"
-              description="When enabled, requests always route to the target model. When disabled, the target model is only used as a fallback."
+              description="When enabled, requests always continue to the target model. When disabled, the target is used only if the current model has no backend."
               checked={form().force}
               onChange={(checked) => setForm((current) => ({ ...current, force: checked }))}
             />

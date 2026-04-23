@@ -78,7 +78,8 @@ SPA는 `/dashboard`를 라우터 base로 사용하고, 관리자 API는 계속 `
 - `Backends` 화면은 백엔드별 모델 캐시 상태, 모델 수, 마지막 sync 상태를 표시한다
 - `Backends` 화면에서 활성 백엔드는 수동 refresh 와 캐시된 모델 목록 확인이 가능하다
 - 비활성 백엔드는 모델 조회를 시도하지 않으며 UI에서도 `Skipped` 상태로 표시된다
-- `Models` 화면은 전체 메모리 모델 카탈로그와 전역 모델 rewrite 규칙을 관리한다
+- `Models` 화면은 전체 메모리 모델 카탈로그와 전역 모델 rewrite 체인을 관리한다
 - rewrite 규칙은 2가지 모드를 가진다
-  - `Force`: 원본 모델 사용 가능 여부와 관계없이 항상 target model 로 rewrite
-  - `Fallback`: 원본 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 target model 로 rewrite
+  - `Force`: 현재 모델 사용 가능 여부와 관계없이 항상 target model 로 이동하고 다음 규칙을 계속 평가
+  - `Fallback`: 현재 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 target model 로 이동하고 다음 규칙을 계속 평가
+- 활성 rewrite cycle은 저장 시점에 거부되며, `/v1/models` 는 실제 요청 가능한 rewrite alias를 함께 반환한다

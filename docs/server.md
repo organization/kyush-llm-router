@@ -62,11 +62,12 @@ server/src/
 
 ## Model Routing
 
-- 요청 모델명은 먼저 전역 `model_rewrites` 규칙을 확인한다
-- `force=1` 규칙은 항상 `source_model -> target_model` 로 변환한다
-- `force=0` 규칙은 원본 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용한다
+- 요청 모델명은 먼저 전역 `model_rewrites` 체인을 확인한다
+- `force=1` 규칙은 항상 `source_model -> target_model` 로 변환하고 다음 규칙을 계속 확인한다
+- `force=0` 규칙은 현재 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용하고 다음 규칙을 계속 확인한다
+- 활성 rewrite cycle은 관리자 생성/수정 시 거부하고, runtime에서도 방어한다
 - 최종 모델을 서빙하는 허용 가능한 활성 백엔드가 없으면 `/v1/chat/completions` 는 모델 미지원 오류를 반환한다
-- `/v1/models` 는 허용 가능한 활성 백엔드들의 캐시된 모델 목록 합집합을 반환한다
+- `/v1/models` 는 허용 가능한 활성 백엔드들의 native 모델과 실제 요청 가능한 rewrite alias 합집합을 반환한다
 
 참고:
 - 세부 라우팅 규칙과 캐시 트리거는 [docs/model-routing.md](./model-routing.md) 참고

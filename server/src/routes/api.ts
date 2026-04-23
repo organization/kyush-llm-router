@@ -1,11 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { authenticate, AuthenticatedRequest } from './auth';
-import { BackendModel } from '../models/Backend';
 import { RouterService } from '../services/RouterService';
 import { AnalyticsService } from '../services/AnalyticsService';
 import { ScriptEngine } from '../services/ScriptEngine';
 import { logger } from '../utils/logger';
-import { ModelCatalogService } from '../services/ModelCatalogService';
+import { ModelCatalogService, ModelRewriteCycleError } from '../services/ModelCatalogService';
 import { getDetailStreamLogMode } from '../config/stream-logging';
 import { ChatStreamLogAccumulator } from '../utils/streamLog';
 
@@ -36,17 +35,14 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
 
   const requestedModel = typeof req.body?.model === 'string' ? req.body.model : '';
   await ModelCatalogService.ensureInitializedForBackends(allowedBackendIds);
-  const resolution = ModelCatalogService.resolveRequestedModel(requestedModel, allowedBackendIds);
-  const activeAllowedBackendIds = BackendModel.findActive()
-    .map((item) => item.id)
-    .filter((backendId) => allowedBackendIds.includes(backendId));
+  const activeAllowedBackendIds = ModelCatalogService.getActiveAllowedBackendIds(allowedBackendIds);
   if (activeAllowedBackendIds.length === 0) {
     AnalyticsService.logRequest({
       user_id: user.id,
       backend_id: 0,
       endpoint: '/v1/chat/completions',
       request_model: requestedModel,
-      routed_model: resolution.routedModel,
+      routed_model: requestedModel,
       status_code: 403,
       error_message: 'No active backends available',
       detail_logged: user.detail_logging,
@@ -56,7 +52,34 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
     res.status(403).json({ error: 'No active backends available' });
     return;
   }
-  const candidateBackendIds = ModelCatalogService.getCandidateBackendIds(resolution.routedModel, allowedBackendIds);
+
+  let resolution: ReturnType<typeof ModelCatalogService.resolveRequestedModel>;
+  try {
+    resolution = ModelCatalogService.resolveRequestedModel(requestedModel, activeAllowedBackendIds);
+  } catch (error) {
+    const errorMsg = error instanceof ModelRewriteCycleError
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : 'Model rewrite resolution failed';
+    AnalyticsService.logRequest({
+      user_id: user.id,
+      backend_id: 0,
+      endpoint: '/v1/chat/completions',
+      request_model: requestedModel,
+      routed_model: requestedModel,
+      status_code: 500,
+      error_message: errorMsg,
+      detail_logged: user.detail_logging,
+      request_headers: user.detail_logging ? normalizeHeaders(req.headers) : undefined,
+      request_body: user.detail_logging ? req.body : undefined,
+    });
+    logger.error(`Model rewrite resolution failed for user ${user.id}: ${errorMsg}`);
+    res.status(500).json({ error: 'Model rewrite configuration error' });
+    return;
+  }
+
+  const candidateBackendIds = ModelCatalogService.getCandidateBackendIds(resolution.routedModel, activeAllowedBackendIds);
   const backend = RouterService.selectBackend(candidateBackendIds);
   if (!backend) {
     AnalyticsService.logRequest({
@@ -336,17 +359,23 @@ router.get('/models', async (req: AuthenticatedRequest, res: Response) => {
   }
 
   await ModelCatalogService.ensureInitializedForBackends(allowedBackendIds);
-  const activeAllowedBackendIds = BackendModel.findActive()
-    .map((item) => item.id)
-    .filter((backendId) => allowedBackendIds.includes(backendId));
+  const activeAllowedBackendIds = ModelCatalogService.getActiveAllowedBackendIds(allowedBackendIds);
   if (activeAllowedBackendIds.length === 0) {
     res.status(403).json({ error: 'No active backends available' });
     return;
   }
-  const models = ModelCatalogService.getModelsForAllowedBackends(activeAllowedBackendIds).map((entry) => ({
-    id: entry.model_id,
-    object: 'model',
-  }));
+  let models: Array<{ id: string; object: string }>;
+  try {
+    models = ModelCatalogService.getRequestableModelsForAllowedBackends(activeAllowedBackendIds).map((entry) => ({
+      id: entry.model_id,
+      object: 'model',
+    }));
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Model rewrite resolution failed';
+    logger.error(`Model list resolution failed: ${errorMsg}`);
+    res.status(500).json({ error: 'Model rewrite configuration error' });
+    return;
+  }
   res.json({ object: 'list', data: models });
 });
 
