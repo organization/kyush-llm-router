@@ -70,6 +70,7 @@ SPA는 `/dashboard`를 라우터 base로 사용하고, 관리자 API는 계속 `
 - 공통 필터는 기간(`7`, `30`, `90`일)과 backend 선택이다.
 - 상단 summary strip 뒤에 일별 volume, reliability, response time, model trends, response length 분포 패널이 배치된다.
 - 상세 raw request 확인은 계속 `DetailLogs` 화면이 담당한다.
+- `DetailLogs` 의 Conversation 탭은 non-stream completion JSON, 기존 raw SSE stream 문자열, 신규 compact stream JSON(`kyush.chat_stream.compact.v1`)을 모두 파싱한다.
 - 자세한 내용은 [docs/analytics.md](./analytics.md) 참고.
 
 ## Model Management UI

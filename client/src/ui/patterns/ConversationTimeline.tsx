@@ -3,6 +3,8 @@ import { MetaCluster } from './MetaCluster';
 import { StatusBadge, type StatusTone } from './StatusBadge';
 
 type KnownChatRole = 'system' | 'user' | 'assistant';
+const COMPACT_CHAT_STREAM_FORMAT = 'kyush.chat_stream.compact.v1';
+const RAW_CHAT_STREAM_FORMAT = 'kyush.chat_stream.raw.v1';
 
 interface ParsedMessage {
   role: string;
@@ -81,6 +83,49 @@ function normalizePayload(value: unknown): Record<string, unknown> | null {
   }
 
   return typeof value === 'object' ? (value as Record<string, unknown>) : null;
+}
+
+function normalizeCompactStreamResponse(payload: Record<string, unknown> | null): ParsedStreamResponse | null {
+  const compactPayload = payload?.format === RAW_CHAT_STREAM_FORMAT && isRecord(payload.compact)
+    ? payload.compact
+    : payload;
+
+  if (compactPayload?.format !== COMPACT_CHAT_STREAM_FORMAT) return null;
+
+  const rawChoices = compactPayload.choices;
+  const messages = Array.isArray(rawChoices)
+    ? rawChoices
+        .filter((choice): choice is Record<string, unknown> => isRecord(choice))
+        .map((choice) => {
+          const metadata = [
+            choice.finish_reason !== undefined && choice.finish_reason !== null
+              ? { key: 'Finish', value: String(choice.finish_reason) }
+              : null,
+            choice.stop_reason !== undefined && choice.stop_reason !== null
+              ? { key: 'Stop Reason', value: String(choice.stop_reason) }
+              : null,
+            choice.matched_stop !== undefined && choice.matched_stop !== null
+              ? { key: 'Matched Stop', value: String(choice.matched_stop) }
+              : null,
+          ].filter((item): item is { key: string; value: string } => Boolean(item));
+
+          return {
+            role: typeof choice.role === 'string' ? choice.role : 'assistant',
+            content: stringifyValue(choice.content),
+            reasoning: stringifyValue(choice.reasoning).trim() || undefined,
+            toolCalls: choice.tool_calls !== undefined ? prettyJson(choice.tool_calls) : undefined,
+            metadata,
+          };
+        })
+        .filter((message) => message.content || message.reasoning || message.toolCalls || (message.metadata?.length ?? 0) > 0)
+    : [];
+
+  return {
+    messages,
+    model: typeof compactPayload.model === 'string' ? compactPayload.model : undefined,
+    created: typeof compactPayload.created === 'number' ? compactPayload.created : undefined,
+    usage: isRecord(compactPayload.usage) ? compactPayload.usage : undefined,
+  };
 }
 
 function normalizeMessages(payload: Record<string, unknown> | null): ParsedMessage[] {
@@ -276,9 +321,13 @@ function parseStreamResponse(value: unknown): ParsedStreamResponse | null {
 }
 
 function getAssistantMessages(responseBody?: unknown): ParsedMessage[] {
+  const payload = normalizePayload(responseBody);
+  const compactStream = normalizeCompactStreamResponse(payload);
+  if (compactStream) return compactStream.messages;
+
   const stream = parseStreamResponse(responseBody);
   if (stream) return stream.messages;
-  return normalizeAssistantMessages(normalizePayload(responseBody));
+  return normalizeAssistantMessages(payload);
 }
 
 export function extractAssistantConversationPreview(responseBody?: unknown): string {
@@ -331,16 +380,17 @@ function getRoleClass(role: string): string {
 export function ConversationTimeline(props: ConversationTimelineProps) {
   const parsedRequest = createMemo(() => normalizePayload(props.requestBody));
   const parsedResponse = createMemo(() => normalizePayload(props.responseBody));
+  const parsedCompactStreamResponse = createMemo(() => normalizeCompactStreamResponse(parsedResponse()));
   const parsedStreamResponse = createMemo(() => parseStreamResponse(props.responseBody));
 
   const requestMessages = createMemo(() => normalizeMessages(parsedRequest()));
-  const responseMessages = createMemo(() => parsedStreamResponse()?.messages ?? normalizeAssistantMessages(parsedResponse()));
+  const responseMessages = createMemo(() => parsedCompactStreamResponse()?.messages ?? parsedStreamResponse()?.messages ?? normalizeAssistantMessages(parsedResponse()));
   const messages = createMemo(() => [...requestMessages(), ...responseMessages()]);
 
   const summaryItems = createMemo(() => {
     const request = parsedRequest();
     const response = parsedResponse();
-    const stream = parsedStreamResponse();
+    const stream = parsedCompactStreamResponse() ?? parsedStreamResponse();
     const usage = response?.usage && typeof response.usage === 'object' ? response.usage as Record<string, unknown> : null;
     const responseUsage = usage ?? stream?.usage ?? null;
 

@@ -57,6 +57,8 @@ describe('Streaming Response Proxying', () => {
   });
 
   afterEach(async () => {
+    delete process.env.DETAIL_STREAM_LOG_MODE;
+
     if (mockServer) {
       await new Promise<void>(resolve => mockServer.close(resolve));
       mockServer = undefined;
@@ -73,7 +75,7 @@ describe('Streaming Response Proxying', () => {
     }
   });
 
-  async function setupUserAndBackend(mockPort: number) {
+  async function setupUserAndBackend(mockPort: number, options: { detailLogging?: boolean } = {}) {
     // Deactivate all existing backends to ensure only our mock backend is selected
     const allBackendsResponse = await admin.get('/admin/backends');
     for (const backend of allBackendsResponse.body) {
@@ -82,7 +84,10 @@ describe('Streaming Response Proxying', () => {
       }
     }
 
-    const userResponse = await admin.post('/admin/users').send({ name: `Stream Test User ${Date.now()}` });
+    const userResponse = await admin.post('/admin/users').send({
+      name: `Stream Test User ${Date.now()}`,
+      detail_logging: options.detailLogging,
+    });
     const userApiKey = userResponse.body.api_key;
     const userId = userResponse.body.id;
 
@@ -236,5 +241,138 @@ describe('Streaming Response Proxying', () => {
     expect(response.status).toBe(200);
     expect(receivedBody).toBeDefined();
     expect(receivedBody.stream).toBe(true);
+  });
+
+  it('should store compact stream logs by default when detail logging is enabled', async () => {
+    process.env.DETAIL_STREAM_LOG_MODE = 'compact';
+    const compactStreamChunks = [
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { role: 'assistant', reasoning: 'Think' }, finish_reason: null }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { reasoning: ' first. ' }, finish_reason: null }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [{
+          index: 0,
+          delta: {
+            tool_calls: [{
+              id: 'tool-1',
+              type: 'function',
+              index: 0,
+              function: { name: 'search_web', arguments: '' },
+            }],
+          },
+          finish_reason: null,
+        }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: '{"query":"' } }] }, finish_reason: null }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: 'apple"}' } }] }, finish_reason: null }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: null }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { content: ' world' }, finish_reason: 'stop', stop_reason: 106 }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-compact-1',
+        object: 'chat.completion.chunk',
+        created: 1776916142,
+        model: 'mock-model',
+        choices: [],
+        usage: { prompt_tokens: 7, completion_tokens: 5, total_tokens: 12 },
+      }),
+    ];
+    const { server, port } = createMockBackend({
+      streamChunks: compactStreamChunks,
+      modelsResponse: [{ id: 'mock-model', object: 'model' }],
+    });
+    mockServer = server;
+
+    const { userApiKey, userId } = await setupUserAndBackend(port, { detailLogging: true });
+
+    await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${userApiKey}`)
+      .send({
+        model: 'mock-model',
+        messages: [{ role: 'user', content: 'Hello' }],
+        stream: true,
+      });
+
+    const logsResponse = await admin.get(`/admin/analytics/requests?limit=1&userId=${userId}&detailLogged=1`);
+    expect(logsResponse.body.rows).toHaveLength(1);
+
+    const responseBody = logsResponse.body.rows[0].response_body;
+    expect(responseBody).not.toContain('data: ');
+
+    const parsed = JSON.parse(responseBody);
+    expect(parsed.format).toBe('kyush.chat_stream.compact.v1');
+    expect(parsed.id).toBe('chatcmpl-compact-1');
+    expect(parsed.model).toBe('mock-model');
+    expect(parsed.choices[0].reasoning).toBe('Think first. ');
+    expect(parsed.choices[0].content).toBe('Hello world');
+    expect(parsed.choices[0].tool_calls[0].function.arguments).toBe('{"query":"apple"}');
+    expect(parsed.choices[0].finish_reason).toBe('stop');
+    expect(parsed.choices[0].stop_reason).toBe('106');
+    expect(parsed.usage.total_tokens).toBe(12);
+    expect(parsed.stream.done).toBe(true);
+  });
+
+  it('should keep raw SSE logs when DETAIL_STREAM_LOG_MODE=raw', async () => {
+    process.env.DETAIL_STREAM_LOG_MODE = 'raw';
+    const { server, port } = createMockBackend({
+      streamChunks: sampleStreamChunks,
+      modelsResponse: [{ id: 'mock-model', object: 'model' }],
+    });
+    mockServer = server;
+
+    const { userApiKey, userId } = await setupUserAndBackend(port, { detailLogging: true });
+
+    await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${userApiKey}`)
+      .send({
+        model: 'mock-model',
+        messages: [{ role: 'user', content: 'Hello' }],
+        stream: true,
+      });
+
+    const logsResponse = await admin.get(`/admin/analytics/requests?limit=1&userId=${userId}&detailLogged=1`);
+    expect(logsResponse.body.rows).toHaveLength(1);
+    expect(logsResponse.body.rows[0].response_body).toContain('data: ');
+    expect(logsResponse.body.rows[0].response_body).toContain('data: [DONE]');
   });
 });

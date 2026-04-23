@@ -6,6 +6,8 @@ import { AnalyticsService } from '../services/AnalyticsService';
 import { ScriptEngine } from '../services/ScriptEngine';
 import { logger } from '../utils/logger';
 import { ModelCatalogService } from '../services/ModelCatalogService';
+import { getDetailStreamLogMode } from '../config/stream-logging';
+import { ChatStreamLogAccumulator } from '../utils/streamLog';
 
 const router: Router = Router();
 
@@ -189,9 +191,8 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       const decoder = new TextDecoder();
       req.on('close', () => reader.cancel());
 
-      let responseModel: string | undefined;
-      let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
-      const collectedChunks: string[] = [];
+      const detailStreamLogMode = getDetailStreamLogMode();
+      const streamLog = new ChatStreamLogAccumulator(detailLoggingEnabled && (detailStreamLogMode === 'raw' || detailStreamLogMode === 'both'));
 
       try {
         while (true) {
@@ -199,24 +200,21 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
           if (done) break;
           res.write(value);
 
-          // Parse SSE chunks for model and usage metadata
           const text = decoder.decode(value, { stream: true });
-          if (detailLoggingEnabled) collectedChunks.push(text);
+          streamLog.append(text);
+        }
 
-          for (const line of text.split('\n')) {
-            if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
-            try {
-              const parsed = JSON.parse(line.slice(6));
-              if (parsed.model && !responseModel) responseModel = parsed.model;
-              if (parsed.usage) usage = parsed.usage;
-            } catch { /* non-JSON data line, skip */ }
-          }
+        const remainingText = decoder.decode();
+        if (remainingText) {
+          streamLog.append(remainingText, false);
         }
       } catch (err) {
         logger.error(`Stream interrupted for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         res.end();
       }
+
+      streamLog.flush();
 
       const responseTime = Date.now() - startTime;
       AnalyticsService.logRequest({
@@ -225,17 +223,17 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
         endpoint: '/v1/chat/completions',
         request_model: model,
         routed_model: resolution.routedModel,
-        response_model: responseModel,
-        prompt_tokens: usage?.prompt_tokens,
-        completion_tokens: usage?.completion_tokens,
-        total_tokens: usage?.total_tokens,
+        response_model: streamLog.getResponseModel(),
+        prompt_tokens: streamLog.getUsage()?.prompt_tokens,
+        completion_tokens: streamLog.getUsage()?.completion_tokens,
+        total_tokens: streamLog.getUsage()?.total_tokens,
         status_code: backendResponse.status,
         response_time_ms: responseTime,
         detail_logged: detailLoggingEnabled,
         request_headers: detailLoggingEnabled ? modifiedContext.request.headers : undefined,
         request_body: detailLoggingEnabled ? modifiedContext.request.body : undefined,
         response_headers: detailLoggingEnabled ? backendResponseHeaders : undefined,
-        response_body: detailLoggingEnabled ? collectedChunks.join('') : undefined,
+        response_body: detailLoggingEnabled ? streamLog.toLogBody(detailStreamLogMode) : undefined,
         local_date: undefined,
       });
 

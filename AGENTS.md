@@ -78,6 +78,7 @@ pnpm run bench      # 벤치마크 실행
 | `OIDC_ALLOWED_EMAILS` | empty | 관리자 접근을 허용할 이메일 목록 |
 | `OIDC_SCOPES` | `openid profile email` | OIDC authorization scope |
 | `MODEL_CATALOG_REFRESH_MIN_MS` | `300000` 예시 | 모델 카탈로그 refresh 최소 간격(ms) |
+| `DETAIL_STREAM_LOG_MODE` | `compact` | 상세 로그에서 stream response body 저장 방식 (`compact`, `raw`, `both`, `off`) |
 
 ## Detailed Docs
 관련 기능을 수정하기 전에 해당 문서를 반드시 UTF-8로 먼저 읽으세요.

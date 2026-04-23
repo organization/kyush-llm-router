@@ -54,6 +54,11 @@ server/src/
 - `core.db` 에는 `admin_sessions`, `admin_api_tokens` 도 함께 저장된다
 - `core.db` 에는 `backend_models`, `model_rewrites` 도 저장된다
 - 시간 경계 계산은 `TZ` 기준이다
+- 상세 로그가 켜진 stream 응답은 `DETAIL_STREAM_LOG_MODE` 에 따라 저장된다
+  - `compact`(기본): SSE chunk를 전달하면서 동시에 누적 파싱해 반복 필드를 제거한 `kyush.chat_stream.compact.v1` JSON을 `response_body`에 저장한다
+  - `raw`: 기존 동작처럼 raw SSE 문자열 전체를 저장한다
+  - `both`: compact JSON과 raw SSE를 함께 담은 `kyush.chat_stream.raw.v1` JSON을 저장한다
+  - `off`: stream `response_body` 저장을 생략한다. request/response headers와 request body는 detail logging 설정에 따라 계속 저장된다
 
 ## Model Routing
 

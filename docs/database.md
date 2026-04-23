@@ -215,7 +215,16 @@ Indexes: `idx_backend_metrics_backend`, `idx_backend_metrics_date`
 | request_headers | TEXT | JSON 문자열 |
 | request_body | TEXT | JSON 또는 raw 문자열 |
 | response_headers | TEXT | JSON 문자열 |
-| response_body | TEXT | JSON 또는 raw 문자열 |
+| response_body | TEXT | JSON 또는 raw 문자열. stream 상세 로그는 기본적으로 `kyush.chat_stream.compact.v1` JSON으로 저장되며, `DETAIL_STREAM_LOG_MODE=raw` 인 경우 기존 raw SSE 문자열로 저장된다 |
 | created_at | TEXT | UTC ISO timestamp |
 
 Indexes: `idx_request_logs_created_at`, `idx_request_logs_local_date`, `idx_request_logs_user`, `idx_request_logs_backend`, `idx_request_logs_endpoint`, `idx_request_logs_detail_logged`
+
+### Stream response body formats
+
+기존 월별 DB의 raw SSE 문자열은 계속 유효하다. 새 stream 로그는 `DETAIL_STREAM_LOG_MODE` 값에 따라 아래 형식 중 하나로 저장된다.
+
+- `compact`(기본): `response_body` 가 `{"format":"kyush.chat_stream.compact.v1", ...}` JSON 문자열이다. 반복되는 chunk 공통 필드(`id`, `object`, `created`, `model`)는 한 번만 저장하고, `choices[].reasoning`, `choices[].content`, `choices[].tool_calls[].function.arguments` 는 누적 문자열로 저장한다.
+- `raw`: `response_body` 가 기존처럼 `data: ...\n\n` 형태의 raw SSE 문자열이다.
+- `both`: `response_body` 가 `{"format":"kyush.chat_stream.raw.v1","compact":...,"raw_sse":"..."}` JSON 문자열이다.
+- `off`: stream `response_body` 를 저장하지 않는다.

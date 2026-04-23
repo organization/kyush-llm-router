@@ -129,6 +129,7 @@
 - `model-trends` 는 `response_model -> routed_model -> request_model -> unknown` 순서로 모델 키를 결정한다.
 - response length 계열 endpoint는 `completion_tokens` 가 있는 요청만 집계한다.
 - `response-length-histogram` 은 긴 꼬리 분포를 읽기 쉽도록 로그 간격 bin을 반환한다.
+- stream response body 저장 방식은 `DETAIL_STREAM_LOG_MODE=compact|raw|both|off` 로 제어한다. 기본값 `compact` 는 raw SSE를 저장하지 않고 누적된 thinking/content/tool call/usage JSON을 저장하며, 기존 raw SSE 로그는 관리자 UI에서 계속 파싱된다.
 - 자세한 내용은 [docs/analytics.md](./analytics.md) 참고.
 
 ### Dashboard Summary
