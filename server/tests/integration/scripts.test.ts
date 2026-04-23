@@ -3,6 +3,7 @@ import request from 'supertest';
 import { createTestApp } from '../utils/testApp';
 import { initDb } from '../../src/config/database';
 import { createAdminClient } from '../utils/adminClient';
+import { createMockBackend } from '../utils/mockBackend';
 
 describe('Script API Endpoints', () => {
   let app: ReturnType<typeof createTestApp>;
@@ -10,6 +11,8 @@ describe('Script API Endpoints', () => {
   let userId: number;
   let backendId: number;
   let scriptId: number;
+  let backendServer: ReturnType<typeof createMockBackend>['server'];
+  let receivedChatBody: any;
 
   beforeAll(() => {
     initDb();
@@ -22,12 +25,22 @@ describe('Script API Endpoints', () => {
 
   // Setup: Create user and backend for testing
   beforeAll(async () => {
+    const mockBackend = createMockBackend({
+      onRequest: (req) => {
+        if (req.path === '/v1/chat/completions') {
+          receivedChatBody = req.body;
+        }
+      },
+      modelsResponse: [{ id: 'test-model', object: 'model' }],
+    });
+    backendServer = mockBackend.server;
+
     const userResponse = await admin.post('/admin/users').send({ name: 'Script Test User' });
     userId = userResponse.body.id;
 
     const backendResponse = await admin.post('/admin/backends').send({
       name: 'Script Test Backend',
-      base_url: 'http://localhost:8006/v1'
+      base_url: `http://localhost:${mockBackend.port}/v1`
     });
     backendId = backendResponse.body.id;
   });
@@ -36,6 +49,7 @@ describe('Script API Endpoints', () => {
     // Cleanup: Delete created resources
     await admin.delete(`/admin/users/${userId}`);
     await admin.delete(`/admin/backends/${backendId}`);
+    await new Promise<void>((resolve) => backendServer.close(() => resolve()));
   });
 
   describe('GET /admin/scripts', () => {
@@ -369,9 +383,11 @@ export const onResponse = (context) => {
         name: 'Integration Test Script',
         script_code: `
 export const onRequest = (context) => {
-  const body = JSON.parse(context.request.body);
+  const body = typeof context.request.body === 'string'
+    ? JSON.parse(context.request.body)
+    : context.request.body;
   body.messages.push({ role: 'system', content: 'Modified by middleware' });
-  context.request.body = JSON.stringify(body);
+  context.request.body = body;
   return context;
 };
 
@@ -402,6 +418,8 @@ export const onResponse = (context) => {
     it('should execute script when making request to backend', async () => {
       // This test verifies that scripts are executed during actual API calls
       // The script should modify the request before forwarding to backend
+      receivedChatBody = undefined;
+
       const response = await request(app)
         .post('/v1/chat/completions')
         .set('Authorization', `Bearer ${userApiKey}`)
@@ -410,9 +428,8 @@ export const onResponse = (context) => {
           messages: [{ role: 'user', content: 'Hello' }]
         });
 
-      // Request will fail (502) because backend is not actually running,
-      // but we can verify the script was executed by checking logs
-      expect(response.status).toBe(502); // Backend unreachable
+      expect(response.status).toBe(200);
+      expect(receivedChatBody?.messages).toContainEqual({ role: 'system', content: 'Modified by middleware' });
       
       // Check that request was logged with script execution
       const analyticsResponse = await admin.get('/admin/analytics/requests?limit=10');
