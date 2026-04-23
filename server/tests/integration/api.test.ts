@@ -5,6 +5,7 @@ import { initDb } from '../../src/config/database';
 import { RequestLogService } from '../../src/services/RequestLogService';
 import { AnalyticsService } from '../../src/services/AnalyticsService';
 import { createAdminClient } from '../utils/adminClient';
+import { getLocalDateKey, getUtcTimestamp } from '../../src/utils/time';
 
 describe('Auth & Proxy API', () => {
   let app: ReturnType<typeof createTestApp>;
@@ -164,6 +165,10 @@ describe('Auth & Proxy API', () => {
     });
 
     it('should expose chart-friendly analytics endpoints', async () => {
+      const primaryDate = getLocalDateKey();
+      const secondarySourceDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const secondaryDate = getLocalDateKey(secondarySourceDate);
+
       AnalyticsService.logRequest({
         user_id: 7001,
         backend_id: backendId,
@@ -175,8 +180,8 @@ describe('Auth & Proxy API', () => {
         total_tokens: 240,
         response_time_ms: 380,
         status_code: 200,
-        local_date: '2026-03-10',
-        created_at: '2026-03-10T03:00:00.000Z',
+        local_date: primaryDate,
+        created_at: getUtcTimestamp(),
       });
 
       AnalyticsService.logRequest({
@@ -191,8 +196,8 @@ describe('Auth & Proxy API', () => {
         response_time_ms: 510,
         status_code: 500,
         error_message: 'synthetic-error',
-        local_date: '2026-03-11',
-        created_at: '2026-03-11T03:00:00.000Z',
+        local_date: secondaryDate,
+        created_at: getUtcTimestamp(secondarySourceDate),
       });
 
       const [dailyTotals, backendQuality, modelTrends, histogram, boxPlot] = await Promise.all([
@@ -221,7 +226,7 @@ describe('Auth & Proxy API', () => {
 
       expect(boxPlot.status).toBe(200);
       expect(Array.isArray(boxPlot.body)).toBe(true);
-      expect(boxPlot.body.some((row: any) => row.date === '2026-03-10' && row.median === 120)).toBe(true);
+      expect(boxPlot.body.some((row: any) => row.date === primaryDate && row.median === 120)).toBe(true);
     });
 
     it('should expose dashboard summary data for the ops cockpit', async () => {
