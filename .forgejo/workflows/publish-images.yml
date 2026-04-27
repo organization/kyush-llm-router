@@ -80,11 +80,12 @@ jobs:
 
           docker_args=(
             build
-            .
             --file Dockerfile
+            --progress=plain
             --target app
             --label "org.opencontainers.image.source=${REPOSITORY_URL}"
             --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+            .
           )
 
           for tag in "${tags[@]}"; do
@@ -96,5 +97,3 @@ jobs:
           for tag in "${tags[@]}"; do
             docker push "${tag}"
           done
-
-          # The single OCI image contains the public API and the admin dashboard runtime.
