@@ -37,6 +37,7 @@ export const Analytics: Component = () => {
   const [isAutoRefresh, setIsAutoRefresh] = createSignal(false);
   const [refreshInterval, setRefreshInterval] = createSignal('10');
   const [refreshKey, setRefreshKey] = createSignal(0);
+  const [dailyVolumeScale, setDailyVolumeScale] = createSignal<'linear' | 'log'>('linear');
 
   const filters = createMemo(() => ({
     days: Number(days()),
@@ -234,14 +235,25 @@ export const Analytics: Component = () => {
             title="Daily Volume"
             description="Daily request and token totals on shared time axis."
             actions={
-              <ChartLegend
-                items={[
-                  { key: 'requests', label: 'Requests', color: '#2357d8' },
-                  { key: 'tokens', label: 'Tokens', color: '#1f7a45' },
-                ]}
-                mutedKeys={hiddenDailySeries()}
-                onToggle={(key) => toggleHiddenKey(setHiddenDailySeries, key)}
-              />
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <ChartLegend
+                  items={[
+                    { key: 'requests', label: 'Requests', color: '#2357d8' },
+                    { key: 'tokens', label: 'Tokens', color: '#1f7a45' },
+                  ]}
+                  mutedKeys={hiddenDailySeries()}
+                  onToggle={(key) => toggleHiddenKey(setHiddenDailySeries, key)}
+                />
+                <Select
+                  label="Scale"
+                  value={dailyVolumeScale()}
+                  options={[
+                    { value: 'linear', label: 'Linear' },
+                    { value: 'log', label: 'Log' },
+                  ]}
+                  onChange={setDailyVolumeScale}
+                />
+              </div>
             }
           >
             <TimeSeriesChart
@@ -258,6 +270,7 @@ export const Analytics: Component = () => {
               formatLeftValue={(value) => new Intl.NumberFormat('en-US').format(Math.round(value))}
               formatRightValue={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
               tooltipTitle="Daily request and token totals"
+              yScaleType={dailyVolumeScale()}
             />
           </Panel>
 

@@ -214,6 +214,7 @@ interface TimeSeriesChartProps {
   formatLeftValue?: (value: number) => string;
   formatRightValue?: (value: number) => string;
   tooltipTitle?: string;
+  yScaleType?: 'linear' | 'log';
 }
 
 interface ChartLegendProps {
@@ -287,32 +288,82 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
   const leftSeries = createMemo(() => visibleSeries().filter((series) => series.axis !== 'right'));
   const rightSeries = createMemo(() => visibleSeries().filter((series) => series.axis === 'right'));
 
+  const isLogScale = () => props.yScaleType === 'log';
+
   const leftScale = createMemo(() => {
-    const maxValue =
-      d3.max(points(), (point: ParsedTimeSeriesDatum) =>
-        d3.max(leftSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
-      ) ?? 0;
-    return d3.scaleLinear().domain([0, maxValue === 0 ? 1 : maxValue * 1.1]).nice().range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    const values = points().flatMap((point: ParsedTimeSeriesDatum) =>
+      leftSeries().map((series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
+    );
+    const maxValue = d3.max(values) ?? 0;
+    const range = [dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop];
+
+    if (isLogScale()) {
+      const positiveValues = values.filter((v) => v > 0);
+      const minLog = positiveValues.length > 0 ? d3.min(positiveValues) ?? 1 : 1;
+      const maxLog = maxValue === 0 ? 10 : maxValue * 1.1;
+      return d3.scaleLog().domain([minLog, maxLog]).range(range);
+    }
+
+    return d3.scaleLinear().domain([0, maxValue === 0 ? 1 : maxValue * 1.1]).nice().range(range);
   });
 
   const rightScale = createMemo(() => {
-    const maxValue =
-      d3.max(points(), (point: ParsedTimeSeriesDatum) =>
-        d3.max(rightSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
-      ) ?? 0;
-    return d3.scaleLinear().domain([0, maxValue === 0 ? 1 : maxValue * 1.1]).nice().range([dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop]);
+    const values = points().flatMap((point: ParsedTimeSeriesDatum) =>
+      rightSeries().map((series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
+    );
+    const maxValue = d3.max(values) ?? 0;
+    const range = [dimensions().marginTop + getInnerHeight(dimensions()), dimensions().marginTop];
+
+    if (isLogScale()) {
+      const positiveValues = values.filter((v) => v > 0);
+      const minLog = positiveValues.length > 0 ? d3.min(positiveValues) ?? 1 : 1;
+      const maxLog = maxValue === 0 ? 10 : maxValue * 1.1;
+      return d3.scaleLog().domain([minLog, maxLog]).range(range);
+    }
+
+    return d3.scaleLinear().domain([0, maxValue === 0 ? 1 : maxValue * 1.1]).nice().range(range);
   });
 
-  const leftTicks = createMemo(() => leftScale().ticks(4));
-  const rightTicks = createMemo(() => rightSeries().length > 0 ? rightScale().ticks(4) : []);
+  const leftTicks = createMemo(() => {
+    if (isLogScale()) {
+      const maxValue = d3.max(points(), (point: ParsedTimeSeriesDatum) =>
+        d3.max(leftSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
+      ) ?? 0;
+      return getSymlogTicks(maxValue);
+    }
+    return leftScale().ticks(4);
+  });
+  const rightTicks = createMemo(() => {
+    if (rightSeries().length === 0) {
+      return [];
+    }
+    if (isLogScale()) {
+      const maxValue = d3.max(points(), (point: ParsedTimeSeriesDatum) =>
+        d3.max(rightSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
+      ) ?? 0;
+      return getSymlogTicks(maxValue);
+    }
+    return rightScale().ticks(4);
+  });
   const xTicks = createMemo(() => xScale().ticks(Math.max(2, Math.floor(getInnerWidth(dimensions()) / 120))));
   const dateTicks = createMemo(() => getDateTicks(points().map((point) => point.parsedDate), getInnerWidth(dimensions())));
 
-  const linePath = (series: TimeSeriesChartSeries) =>
-    d3.line()
-      .defined((point: ParsedTimeSeriesDatum) => typeof point[series.key] === 'number')
+  const linePath = (series: TimeSeriesChartSeries) => {
+    const scale = series.axis === 'right' ? rightScale() : leftScale();
+    return d3.line()
+      .defined((point: ParsedTimeSeriesDatum) => {
+        const value = Number(point[series.key] ?? 0);
+        if (!Number.isFinite(value)) {
+          return false;
+        }
+        if (isLogScale() && value <= 0) {
+          return false;
+        }
+        return true;
+      })
       .x((point: ParsedTimeSeriesDatum) => xScale()(point.parsedDate))
-      .y((point: ParsedTimeSeriesDatum) => (series.axis === 'right' ? rightScale() : leftScale())(Number(point[series.key] ?? 0)))(points()) ?? '';
+      .y((point: ParsedTimeSeriesDatum) => scale(Number(point[series.key] ?? 0)))(points()) ?? '';
+  };
 
   const hoveredPoint = createMemo(() => {
     const index = hoverIndex();
@@ -326,7 +377,15 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
             ...series,
             value: Number(hoveredPoint()?.[series.key] ?? 0),
           }))
-          .filter((series) => Number.isFinite(series.value))
+          .filter((series) => {
+            if (!Number.isFinite(series.value)) {
+              return false;
+            }
+            if (isLogScale() && series.value <= 0) {
+              return false;
+            }
+            return true;
+          })
       : []
   );
 
