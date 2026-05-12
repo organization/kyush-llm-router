@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, onCleanup, Show, type Component } from 'solid-js';
 import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
@@ -15,6 +15,7 @@ interface FilterState {
 }
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const SEARCH_DEBOUNCE_MS = 350;
 
 const emptyFilters = (): FilterState => ({
   month: '',
@@ -37,6 +38,7 @@ function prettyPrint(value?: string): string {
 
 export const DetailLogs: Component = () => {
   const [filters, setFilters] = createSignal<FilterState>(emptyFilters());
+  const [searchDraft, setSearchDraft] = createSignal('');
   const [page, setPage] = createSignal(1);
   const [pageSize, setPageSize] = createSignal(25);
   const [selectedLogId, setSelectedLogId] = createSignal<number | null>(null);
@@ -62,9 +64,32 @@ export const DetailLogs: Component = () => {
       })
   );
 
-  const requestPage = createMemo(() => logs());
+  const updateFilter = (key: keyof FilterState, value: string) => {
+    let changed = false;
+    setFilters((current) => {
+      if (current[key] === value) return current;
+      changed = true;
+      return { ...current, [key]: value };
+    });
+
+    if (changed) {
+      setPage(1);
+    }
+  };
+
+  createEffect(() => {
+    const nextQuery = searchDraft();
+    const id = window.setTimeout(() => updateFilter('q', nextQuery), SEARCH_DEBOUNCE_MS);
+    onCleanup(() => window.clearTimeout(id));
+  });
+
+  const requestPage = createMemo(() => (logs.state === 'ready' || logs.state === 'refreshing' ? logs.latest : undefined));
   const requestRows = createMemo(() => requestPage()?.rows ?? []);
   const totalRows = createMemo(() => requestPage()?.total ?? 0);
+  const logsError = createMemo(() => {
+    if (!logs.error) return null;
+    return logs.error instanceof Error ? logs.error.message : 'Failed to load detailed logs.';
+  });
   const pageCount = createMemo(() => Math.max(1, Math.ceil(totalRows() / pageSize())));
   const rangeStart = createMemo(() => (totalRows() === 0 ? 0 : (page() - 1) * pageSize() + 1));
   const rangeEnd = createMemo(() => Math.min(totalRows(), page() * pageSize()));
@@ -139,12 +164,8 @@ export const DetailLogs: Component = () => {
   ];
 
   const resetFilters = () => {
+    setSearchDraft('');
     setFilters(emptyFilters());
-    setPage(1);
-  };
-
-  const updateFilter = (key: keyof FilterState, value: string) => {
-    setFilters((current) => ({ ...current, [key]: value }));
     setPage(1);
   };
 
@@ -154,7 +175,18 @@ export const DetailLogs: Component = () => {
         <PageHeader
           title="Detail Logs"
           description="Inspect verbose request logs with monthly filters, text search, and full request/response payload views."
-          actions={<Button onClick={() => void refetch()}><RefreshCcw />Refresh</Button>}
+          actions={
+            <Button
+              class="detail-logs__refresh-button"
+              classList={{ 'ui-button--loading': logs.loading }}
+              onClick={() => void refetch()}
+              disabled={logs.loading}
+              aria-busy={logs.loading}
+            >
+              <RefreshCcw />
+              {logs.loading ? 'Refreshing' : 'Refresh'}
+            </Button>
+          }
         />
 
         <SummaryStrip
@@ -169,9 +201,9 @@ export const DetailLogs: Component = () => {
           <CommandBarGroup>
             <TextField
               label="Search"
-              value={filters().q}
+              value={searchDraft()}
               placeholder="Search body, headers, models, errors"
-              onInput={(event) => updateFilter('q', event.currentTarget.value)}
+              onInput={(event) => setSearchDraft(event.currentTarget.value)}
             />
             <TextField
               label="Month"
@@ -228,7 +260,8 @@ export const DetailLogs: Component = () => {
                 },
               ]}
               getRowKey={(row) => row.id}
-              loading={logs.loading}
+              loading={logs.loading && requestRows().length === 0}
+              error={logsError()}
               emptyMessage="No detailed logs matched the current filters."
               onRowClick={(row) => setSelectedLogId(row.id)}
               pagination={{
@@ -243,7 +276,7 @@ export const DetailLogs: Component = () => {
                 pageSizeOptions: PAGE_SIZE_OPTIONS,
               }}
             />
-            {!logs.loading && requestRows().length === 0 && (
+            {!logs.loading && !logsError() && requestRows().length === 0 && (
               <EmptyState title="No logs found" description="Try a different month, date, or search term." />
             )}
           </Panel>
