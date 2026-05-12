@@ -37,6 +37,7 @@ export const Dashboard: Component = () => {
   const [isAutoRefresh, setIsAutoRefresh] = createSignal(false);
   const [refreshInterval, setRefreshInterval] = createSignal('10');
   const [refreshKey, setRefreshKey] = createSignal(0);
+  const [trafficVolumeScale, setTrafficVolumeScale] = createSignal<'linear' | 'log'>('linear');
 
   const windowDays = createMemo(() => Number(days()));
   const summarySource = createMemo(() => ({ days: windowDays(), key: refreshKey() }));
@@ -237,14 +238,25 @@ export const Dashboard: Component = () => {
               title="Traffic Volume"
               description="Daily request and token totals for the selected window."
               actions={
-                <ChartLegend
-                  items={[
-                    { key: 'requests', label: 'Requests', color: '#2357d8' },
-                    { key: 'tokens', label: 'Tokens', color: '#1f7a45' },
-                  ]}
-                  mutedKeys={hiddenTrafficSeries()}
-                  onToggle={(key) => toggleHiddenKey(setHiddenTrafficSeries, key)}
-                />
+                <div style="display: flex; align-items: center; gap: 16px;">
+                  <ChartLegend
+                    items={[
+                      { key: 'requests', label: 'Requests', color: '#2357d8' },
+                      { key: 'tokens', label: 'Tokens', color: '#1f7a45' },
+                    ]}
+                    mutedKeys={hiddenTrafficSeries()}
+                    onToggle={(key) => toggleHiddenKey(setHiddenTrafficSeries, key)}
+                  />
+                  <Select
+                    label="Scale"
+                    value={trafficVolumeScale()}
+                    options={[
+                      { value: 'linear', label: 'Linear' },
+                      { value: 'log', label: 'Log' },
+                    ]}
+                    onChange={setTrafficVolumeScale}
+                  />
+                </div>
               }
             >
               <TimeSeriesChart
@@ -261,6 +273,7 @@ export const Dashboard: Component = () => {
                 formatLeftValue={(value) => formatInteger.format(Math.round(value))}
                 formatRightValue={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
                 tooltipTitle="Traffic volume"
+                yScaleType={trafficVolumeScale()}
               />
             </Panel>
 
