@@ -1,5 +1,5 @@
-import RefreshCcw from 'lucide-solid/icons/refresh-ccw';
-import { Show, createMemo, createResource, createSignal, type Component } from 'solid-js';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
+import { Show, createEffect, createMemo, createResource, createSignal, onCleanup, type Component } from 'solid-js';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import { formatDurationMs } from '../ui/lib/format';
@@ -14,6 +14,7 @@ import {
   Panel,
   Select,
   SummaryStrip,
+  Switch,
   TimeSeriesChart,
 } from '../ui';
 
@@ -33,10 +34,19 @@ export const Dashboard: Component = () => {
   const [hiddenTrafficSeries, setHiddenTrafficSeries] = createSignal<Set<string>>(new Set());
   const [hiddenLatencySeries, setHiddenLatencySeries] = createSignal<Set<string>>(new Set());
   const [hiddenModelSeries, setHiddenModelSeries] = createSignal<Set<string>>(new Set());
+  const [isAutoRefresh, setIsAutoRefresh] = createSignal(false);
+  const [refreshInterval, setRefreshInterval] = createSignal('30');
 
   const windowDays = createMemo(() => Number(days()));
   const [summary, { refetch }] = createResource(windowDays, (value) => api.dashboard.getSummary(value));
   const [backends] = createResource(() => api.backends.getAll());
+
+  createEffect(() => {
+    if (!isAutoRefresh()) return;
+    const ms = Number(refreshInterval()) * 1000;
+    const id = setInterval(() => void refetch(), ms);
+    onCleanup(() => clearInterval(id));
+  });
 
   const backendNameById = createMemo(() => {
     const entries = new Map<number, string>();
@@ -177,12 +187,33 @@ export const Dashboard: Component = () => {
         <PageHeader
           title="Dashboard"
           description="Operations cockpit for router health, traffic shape, and the configuration context behind current behavior."
-          actions={<button class="ui-button" type="button" onClick={() => void refetch()}><RefreshCcw />Refresh</button>}
         />
 
         <CommandBar class="analytics__filters">
           <CommandBarGroup>
             <Select label="Window" value={days()} options={dayOptions} onChange={setDays} />
+          </CommandBarGroup>
+          <CommandBarGroup>
+            <Switch
+              label="Auto refresh"
+              checked={isAutoRefresh()}
+              onChange={setIsAutoRefresh}
+            />
+            <Select
+              label="Refresh Interval"
+              value={refreshInterval()}
+              options={[
+                { value: '15', label: 'Every 15s' },
+                { value: '30', label: 'Every 30s' },
+                { value: '60', label: 'Every 60s' },
+              ]}
+              onChange={setRefreshInterval}
+            />
+            <div class="ui-divider--vertical" />
+            <button class="ui-button" type="button" onClick={() => void refetch()}>
+              <RefreshCw />
+              Refresh
+            </button>
           </CommandBarGroup>
         </CommandBar>
 

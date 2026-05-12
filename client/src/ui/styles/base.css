@@ -86,3 +86,10 @@ select {
   height: 1px;
   background: var(--color-border);
 }
+
+.ui-divider--vertical {
+  width: 1px;
+  height: 1.5em;
+  background: var(--color-border);
+  align-self: center;
+}
