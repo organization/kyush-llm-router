@@ -1,4 +1,4 @@
-import { For, createResource, createSignal, Show, type Component } from 'solid-js';
+import { For, createMemo, createResource, createSignal, Show, type Component } from 'solid-js';
 import Pencil from 'lucide-solid/icons/pencil';
 import Plus from 'lucide-solid/icons/plus';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
@@ -39,6 +39,7 @@ const emptyForm = (): BackendFormState => ({
 
 export const Backends: Component = () => {
   const [backends, { refetch }] = createResource(() => api.backends.getAll());
+  const currentBackends = createMemo(() => backends.state === 'ready' || backends.state === 'refreshing' ? backends.latest : undefined);
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [editingBackend, setEditingBackend] = createSignal<Backend | null>(null);
@@ -202,11 +203,11 @@ export const Backends: Component = () => {
 
         <Panel title="Backend catalog" description="Operational list with overflow-safe URL presentation and compact actions.">
           <Show
-            when={!backends.loading || (backends()?.length ?? 0) > 0}
+            when={!backends.loading || (currentBackends()?.length ?? 0) > 0}
             fallback={<EmptyState title="Loading backends" description="Reading upstream routing targets from the admin API." />}
           >
             <Show
-              when={(backends()?.length ?? 0) > 0}
+              when={(currentBackends()?.length ?? 0) > 0}
               fallback={
                 <EmptyState
                   title="No backends yet"
@@ -216,7 +217,7 @@ export const Backends: Component = () => {
               }
             >
               <DataGrid
-                rows={backends() ?? []}
+                rows={currentBackends() ?? []}
                 columns={[
                   { id: 'id', header: 'ID', mono: true, cell: (backend) => <span>{backend.id}</span> },
                   { id: 'name', header: 'Name', cell: (backend) => <span>{backend.name}</span> },
@@ -248,7 +249,7 @@ export const Backends: Component = () => {
                   },
                 ]}
                 getRowKey={(backend) => backend.id}
-                loading={backends.loading}
+                loading={backends.loading && (currentBackends()?.length ?? 0) === 0}
                 rowActions={(backend) => (
                   <div class="ui-row-actions">
                     <IconButton

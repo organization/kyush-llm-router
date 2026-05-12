@@ -41,6 +41,9 @@ export const Models: Component = () => {
   const [overview, { refetch: refetchOverview }] = createResource(() => api.modelCache.getOverview());
   const [backends] = createResource(() => api.backends.getAll());
   const [rules, { refetch: refetchRules }] = createResource(() => api.modelRewrites.getAll());
+  const currentOverview = createMemo(() => overview.state === 'ready' || overview.state === 'refreshing' ? overview.latest : undefined);
+  const currentBackends = createMemo(() => backends.state === 'ready' || backends.state === 'refreshing' ? backends.latest : undefined);
+  const currentRules = createMemo(() => rules.state === 'ready' || rules.state === 'refreshing' ? rules.latest : undefined);
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [editingRule, setEditingRule] = createSignal<ModelRewriteRule | null>(null);
@@ -50,7 +53,7 @@ export const Models: Component = () => {
   const [notice, setNotice] = createSignal<{ tone: 'success' | 'danger'; message: string } | null>(null);
   const backendNameById = createMemo(() => {
     const names = new Map<number, string>();
-    for (const backend of backends() ?? []) {
+    for (const backend of currentBackends() ?? []) {
       names.set(backend.id, backend.name);
     }
     return names;
@@ -58,7 +61,7 @@ export const Models: Component = () => {
 
   const getBackendName = (backendId: number) => backendNameById().get(backendId) ?? `Backend ${backendId}`;
   const modelCatalogRows = createMemo(() =>
-    (overview()?.models ?? []).map((entry) => ({
+    (currentOverview()?.models ?? []).map((entry) => ({
       ...entry,
       backend_names: entry.backend_ids.map((backendId) => getBackendName(backendId)).join(', '),
     }))
@@ -151,9 +154,9 @@ export const Models: Component = () => {
 
         <SummaryStrip
           items={[
-            { label: 'Catalog Models', value: overview()?.models.length ?? 0, hint: 'Unique models across active backends' },
-            { label: 'Tracked Backends', value: overview()?.backends.length ?? 0, hint: 'Memory cache status by backend' },
-            { label: 'Rewrite Rules', value: rules()?.length ?? 0, hint: 'Global source -> target mappings' },
+            { label: 'Catalog Models', value: currentOverview()?.models.length ?? 0, hint: 'Unique models across active backends' },
+            { label: 'Tracked Backends', value: currentOverview()?.backends.length ?? 0, hint: 'Memory cache status by backend' },
+            { label: 'Rewrite Rules', value: currentRules()?.length ?? 0, hint: 'Global source -> target mappings' },
           ]}
         />
 
@@ -164,11 +167,11 @@ export const Models: Component = () => {
         <div class="ui-section-grid">
           <Panel title="Backend Cache Status" description="Memory-backed backend cache state used by request routing and `/v1/models`.">
             <Show
-              when={(overview()?.backends.length ?? 0) > 0}
+              when={(currentOverview()?.backends.length ?? 0) > 0 || overview.loading}
               fallback={<EmptyState title="No backend cache yet" description="Backend model states appear here after the server has seen active backends." />}
             >
               <DataGrid
-                rows={overview()?.backends ?? []}
+                rows={currentOverview()?.backends ?? []}
                 columns={[
                   {
                     id: 'backend_id',
@@ -182,14 +185,14 @@ export const Models: Component = () => {
                   { id: 'last_error', header: 'Last Error', cell: (item) => <span title={item.last_error ?? '-'}>{item.last_error ?? '-'}</span> },
                 ]}
                 getRowKey={(item) => item.backend_id}
-                loading={overview.loading}
+                loading={overview.loading && (currentOverview()?.backends.length ?? 0) === 0}
               />
             </Show>
           </Panel>
 
           <Panel title="Model Catalog" description="Unique models and the backend names currently advertising each one.">
             <Show
-              when={modelCatalogRows().length > 0}
+              when={modelCatalogRows().length > 0 || overview.loading}
               fallback={<EmptyState title="No cached models yet" description="Model catalog entries appear here after backend model snapshots are available." />}
             >
               <DataGrid
@@ -216,7 +219,7 @@ export const Models: Component = () => {
                   },
                 ]}
                 getRowKey={(item) => item.model_id}
-                loading={overview.loading}
+                loading={overview.loading && modelCatalogRows().length === 0}
               />
             </Show>
           </Panel>
@@ -229,11 +232,11 @@ export const Models: Component = () => {
         >
           <div class="ui-stack ui-stack--tight">
             <Show
-              when={(rules()?.length ?? 0) > 0}
+              when={(currentRules()?.length ?? 0) > 0 || rules.loading}
               fallback={<EmptyState title="No rewrite rules" description="Requests currently route using the original model name." />}
             >
               <DataGrid
-                rows={rules() ?? []}
+                rows={currentRules() ?? []}
                 columns={[
                   { id: 'source_model', header: 'Source', cell: (rule) => <span>{rule.source_model}</span> },
                   { id: 'target_model', header: 'Target', cell: (rule) => <span>{rule.target_model}</span> },
@@ -242,7 +245,7 @@ export const Models: Component = () => {
                   { id: 'note', header: 'Note', cell: (rule) => <span title={rule.note ?? '-'}>{rule.note ?? '-'}</span> },
                 ]}
                 getRowKey={(rule) => rule.id}
-                loading={rules.loading}
+                loading={rules.loading && (currentRules()?.length ?? 0) === 0}
                 rowActions={(rule) => (
                   <div class="ui-row-actions">
                     <IconButton icon={<Pencil />} label="Edit" onClick={() => openEditDialog(rule)} />

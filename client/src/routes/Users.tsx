@@ -54,6 +54,9 @@ export const Users: Component = () => {
   const [users, { refetch: refetchUsers }] = createResource(() => api.users.getAll());
   const [backends] = createResource(() => api.backends.getAll());
   const [permissions, { refetch: refetchPermissions }] = createResource(() => api.permissions.getAll());
+  const currentUsers = createMemo(() => users.state === 'ready' || users.state === 'refreshing' ? users.latest : undefined);
+  const currentBackends = createMemo(() => backends.state === 'ready' || backends.state === 'refreshing' ? backends.latest : undefined);
+  const currentPermissions = createMemo(() => permissions.state === 'ready' || permissions.state === 'refreshing' ? permissions.latest : undefined);
   const [query, setQuery] = createSignal('');
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [userDeleteConfirmOpen, setUserDeleteConfirmOpen] = createSignal(false);
@@ -70,7 +73,7 @@ export const Users: Component = () => {
 
   const filteredUsers = createMemo(() => {
     const value = query().trim().toLowerCase();
-    const list = users() ?? [];
+    const list = currentUsers() ?? [];
     if (!value) return list;
     return list.filter((user) => {
       const haystack = [user.name, user.email ?? '', user.api_key].join(' ').toLowerCase();
@@ -78,29 +81,29 @@ export const Users: Component = () => {
     });
   });
 
-  const activeCount = createMemo(() => (users() ?? []).filter((user) => user.is_active).length);
-  const selectedUser = createMemo(() => (users() ?? []).find((user) => user.id === selectedUserId()) ?? null);
+  const activeCount = createMemo(() => (currentUsers() ?? []).filter((user) => user.is_active).length);
+  const selectedUser = createMemo(() => (currentUsers() ?? []).find((user) => user.id === selectedUserId()) ?? null);
   const permissionsForSelectedUser = createMemo(() => {
     const currentUserId = selectedUserId();
     if (!currentUserId) return [];
-    return (permissions() ?? []).filter((permission) => permission.user_id === currentUserId);
+    return (currentPermissions() ?? []).filter((permission) => permission.user_id === currentUserId);
   });
   const assignedBackendIds = createMemo(() => new Set(permissionsForSelectedUser().map((permission) => permission.backend_id)));
   const availableBackendOptions = createMemo(() =>
-    (backends() ?? [])
+    (currentBackends() ?? [])
       .filter((backend) => !assignedBackendIds().has(backend.id))
       .map((backend) => ({ value: String(backend.id), label: backend.name }))
   );
   const backendNameById = createMemo(() => {
     const names = new Map<number, string>();
-    for (const backend of backends() ?? []) {
+    for (const backend of currentBackends() ?? []) {
       names.set(backend.id, backend.name);
     }
     return names;
   });
 
   createEffect(() => {
-    const list = users() ?? [];
+    const list = currentUsers() ?? [];
     const currentSelectedUserId = selectedUserId();
 
     if (list.length === 0) {
@@ -369,7 +372,7 @@ export const Users: Component = () => {
                     },
                   ]}
                   getRowKey={(user) => user.id}
-                  loading={users.loading}
+                  loading={users.loading && filteredUsers().length === 0}
                   emptyMessage="No users match the current search."
                   onRowClick={(user) => setSelectedUserId(user.id)}
                   rowActions={(user) => (
@@ -455,7 +458,7 @@ export const Users: Component = () => {
                           },
                         ]}
                         getRowKey={(permission) => `${permission.user_id}-${permission.backend_id}`}
-                        loading={permissions.loading || backends.loading}
+                        loading={(permissions.loading || backends.loading) && permissionsForSelectedUser().length === 0}
                         rowActions={(permission) => (
                           <IconButton
                             variant="danger"

@@ -107,6 +107,9 @@ export const Scripts: Component = () => {
   const [scripts, { refetch: refetchScripts }] = createResource(() => api.scripts.getAll());
   const [users, { refetch: refetchUsers }] = createResource(() => api.users.getAll());
   const [backends, { refetch: refetchBackends }] = createResource(() => api.backends.getAll());
+  const currentScripts = createMemo(() => scripts.state === 'ready' || scripts.state === 'refreshing' ? scripts.latest : undefined);
+  const currentUsers = createMemo(() => users.state === 'ready' || users.state === 'refreshing' ? users.latest : undefined);
+  const currentBackends = createMemo(() => backends.state === 'ready' || backends.state === 'refreshing' ? backends.latest : undefined);
   const [form, setForm] = createSignal<ScriptFormState>(emptyForm());
   const [selectedScriptId, setSelectedScriptId] = createSignal<number | null>(null);
   const [pendingDeleteScript, setPendingDeleteScript] = createSignal<UserScript | null>(null);
@@ -116,11 +119,11 @@ export const Scripts: Component = () => {
   const [testResult, setTestResult] = createSignal<{ success: boolean; error?: string; executionTime?: number } | null>(null);
   const [testing, setTesting] = createSignal(false);
 
-  const userOptions = createMemo(() => (users() ?? []).map((user) => ({ value: String(user.id), label: user.name })));
-  const backendOptions = createMemo(() => (backends() ?? []).map((backend) => ({ value: String(backend.id), label: backend.name })));
+  const userOptions = createMemo(() => (currentUsers() ?? []).map((user) => ({ value: String(user.id), label: user.name })));
+  const backendOptions = createMemo(() => (currentBackends() ?? []).map((backend) => ({ value: String(backend.id), label: backend.name })));
 
-  const activeCount = createMemo(() => (scripts() ?? []).filter((script) => script.is_active).length);
-  const selectedScript = createMemo(() => (scripts() ?? []).find((script) => script.id === selectedScriptId()) ?? null);
+  const activeCount = createMemo(() => (currentScripts() ?? []).filter((script) => script.is_active).length);
+  const selectedScript = createMemo(() => (currentScripts() ?? []).find((script) => script.id === selectedScriptId()) ?? null);
 
   const syncForm = (script?: UserScript | null) => {
     if (!script) {
@@ -144,8 +147,8 @@ export const Scripts: Component = () => {
   };
 
   const getTargetLabel = (script: Pick<UserScript, 'script_type' | 'target_user_id' | 'target_backend_id'>) => {
-    const user = (users() ?? []).find((item) => item.id === script.target_user_id);
-    const backend = (backends() ?? []).find((item) => item.id === script.target_backend_id);
+    const user = (currentUsers() ?? []).find((item) => item.id === script.target_user_id);
+    const backend = (currentBackends() ?? []).find((item) => item.id === script.target_backend_id);
 
     if (script.script_type === 'per-user-backend') {
       return {
@@ -275,8 +278,8 @@ export const Scripts: Component = () => {
     setTestResult(null);
     try {
       const result = await api.scripts.test(current.id, {
-        user: users()?.[0] || undefined,
-        backend: backends()?.[0] || undefined,
+        user: currentUsers()?.[0] || undefined,
+        backend: currentBackends()?.[0] || undefined,
         request: {
           method: 'POST',
           path: '/v1/chat/completions',
@@ -329,11 +332,11 @@ export const Scripts: Component = () => {
             bodyClass="ui-stack ui-stack--tight"
           >
             <Show
-              when={!scripts.loading || (scripts()?.length ?? 0) > 0}
+              when={!scripts.loading || (currentScripts()?.length ?? 0) > 0}
               fallback={<EmptyState title="Loading scripts" description="Reading middleware definitions and target mappings." />}
             >
               <Show
-                when={(scripts()?.length ?? 0) > 0}
+                when={(currentScripts()?.length ?? 0) > 0}
                 fallback={
                   <EmptyState
                     title="No scripts yet"
@@ -345,7 +348,7 @@ export const Scripts: Component = () => {
                 }
               >
                 <DataGrid
-                  rows={scripts() ?? []}
+                  rows={currentScripts() ?? []}
                   columns={[
                     {
                       id: 'name',
@@ -377,7 +380,7 @@ export const Scripts: Component = () => {
                     },
                   ]}
                   getRowKey={(script) => script.id}
-                  loading={scripts.loading}
+                  loading={scripts.loading && (currentScripts()?.length ?? 0) === 0}
                   onRowClick={(script) => syncForm(script)}
                   rowActions={(script) => (
                     <div class="ui-row-actions">
