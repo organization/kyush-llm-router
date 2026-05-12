@@ -654,6 +654,10 @@
   min-width: 116px;
 }
 
+.analytics__refresh-button {
+  min-width: 116px;
+}
+
 .analytics__grid--wide {
   grid-template-columns: 1.5fr minmax(340px, 1fr);
 }

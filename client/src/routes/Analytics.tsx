@@ -1,4 +1,5 @@
-import { Show, createMemo, createResource, createSignal, type Component } from 'solid-js';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
+import { createEffect, createMemo, createResource, createSignal, onCleanup, type Component } from 'solid-js';
 import { api } from '../api/client';
 import { Layout } from '../components/Layout';
 import { formatDurationMs } from '../ui/lib/format';
@@ -13,6 +14,7 @@ import {
   Panel,
   Select,
   SummaryStrip,
+  Switch,
   TimeSeriesChart,
 } from '../ui';
 
@@ -32,10 +34,14 @@ export const Analytics: Component = () => {
   const [hiddenDailySeries, setHiddenDailySeries] = createSignal<Set<string>>(new Set());
   const [hiddenResponseSeries, setHiddenResponseSeries] = createSignal<Set<string>>(new Set());
   const [hiddenModelSeries, setHiddenModelSeries] = createSignal<Set<string>>(new Set());
+  const [isAutoRefresh, setIsAutoRefresh] = createSignal(false);
+  const [refreshInterval, setRefreshInterval] = createSignal('10');
+  const [refreshKey, setRefreshKey] = createSignal(0);
 
   const filters = createMemo(() => ({
     days: Number(days()),
     backendId: backendFilter() === 'all' ? undefined : Number(backendFilter()),
+    key: refreshKey(),
   }));
 
   const [backends] = createResource(() => api.backends.getAll());
@@ -44,6 +50,19 @@ export const Analytics: Component = () => {
   const [modelTrends] = createResource(filters, (params) => api.analytics.getModelTrends({ backendId: params.backendId, days: params.days, limit: 8 }));
   const [histogram] = createResource(filters, (params) => api.analytics.getResponseLengthHistogram({ backendId: params.backendId, days: params.days, bins: 20 }));
   const [boxPlot] = createResource(filters, (params) => api.analytics.getResponseLengthBoxPlot(params.backendId, params.days));
+  const currentDailyTotals = createMemo(() => dailyTotals.latest ?? dailyTotals());
+  const currentBackendQuality = createMemo(() => backendQuality.latest ?? backendQuality());
+  const currentModelTrends = createMemo(() => modelTrends.latest ?? modelTrends());
+  const currentHistogram = createMemo(() => histogram.latest ?? histogram());
+  const currentBoxPlot = createMemo(() => boxPlot.latest ?? boxPlot());
+  const analyticsLoading = createMemo(() => dailyTotals.loading || backendQuality.loading || modelTrends.loading || histogram.loading || boxPlot.loading);
+
+  createEffect(() => {
+    if (!isAutoRefresh()) return;
+    const ms = Number(refreshInterval()) * 1000;
+    const id = setInterval(() => setRefreshKey((key) => key + 1), ms);
+    onCleanup(() => clearInterval(id));
+  });
 
   const backendOptions = createMemo(() => [
     { value: 'all', label: 'All Backends' },
@@ -62,7 +81,7 @@ export const Analytics: Component = () => {
   });
 
   const dailyVolumeRows = createMemo(() =>
-    (dailyTotals() ?? []).map((row) => ({
+    (currentDailyTotals() ?? []).map((row) => ({
       date: row.date,
       requests: row.total_requests,
       tokens: row.total_tokens,
@@ -71,7 +90,7 @@ export const Analytics: Component = () => {
 
   const responseTimeRows = createMemo(() => {
     const grouped = new Map<string, AnalyticsChartRow>();
-    for (const row of backendQuality() ?? []) {
+    for (const row of currentBackendQuality() ?? []) {
       const entry: AnalyticsChartRow = grouped.get(row.date) ?? { date: row.date };
       entry[`backend_${row.backend_id}`] = row.avg_response_time_ms;
       grouped.set(row.date, entry);
@@ -80,7 +99,7 @@ export const Analytics: Component = () => {
   });
 
   const responseTimeSeries = createMemo(() => {
-    const ids = Array.from(new Set((backendQuality() ?? []).map((row) => row.backend_id))).sort((left, right) => left - right);
+    const ids = Array.from(new Set((currentBackendQuality() ?? []).map((row) => row.backend_id))).sort((left, right) => left - right);
     return ids.map((backendId, index) => ({
       key: `backend_${backendId}`,
       label: backendNameById().get(backendId) ?? `Backend ${backendId}`,
@@ -90,7 +109,7 @@ export const Analytics: Component = () => {
 
   const reliabilityRows = createMemo(() => {
     const grouped = new Map<string, { requests: number; errors: number }>();
-    for (const row of backendQuality() ?? []) {
+    for (const row of currentBackendQuality() ?? []) {
       const entry = grouped.get(row.date) ?? { requests: 0, errors: 0 };
       entry.requests += row.total_requests;
       entry.errors += row.error_count;
@@ -108,7 +127,7 @@ export const Analytics: Component = () => {
 
   const modelTrendRows = createMemo(() => {
     const grouped = new Map<string, AnalyticsChartRow>();
-    for (const row of modelTrends() ?? []) {
+    for (const row of currentModelTrends() ?? []) {
       const entry: AnalyticsChartRow = grouped.get(row.date) ?? { date: row.date };
       entry[`model_${row.model}`] = row.request_count;
       grouped.set(row.date, entry);
@@ -117,7 +136,7 @@ export const Analytics: Component = () => {
   });
 
   const modelTrendSeries = createMemo(() => {
-    const models = Array.from(new Set((modelTrends() ?? []).map((row) => row.model)));
+    const models = Array.from(new Set((currentModelTrends() ?? []).map((row) => row.model)));
     return models.map((model, index) => ({
       key: `model_${model}`,
       label: model,
@@ -126,7 +145,7 @@ export const Analytics: Component = () => {
   });
 
   const summaryItems = createMemo(() => {
-    const totals = (dailyTotals() ?? []).reduce(
+    const totals = (currentDailyTotals() ?? []).reduce(
       (acc, row) => {
         acc.requests += row.total_requests;
         acc.tokens += row.total_tokens;
@@ -134,7 +153,7 @@ export const Analytics: Component = () => {
       },
       { requests: 0, tokens: 0 }
     );
-    const qualityRows = backendQuality() ?? [];
+    const qualityRows = currentBackendQuality() ?? [];
     const avgLatency =
       qualityRows.length === 0 ? 0 : qualityRows.reduce((sum, row) => sum + row.avg_response_time_ms, 0) / qualityRows.length;
     const errorCount = qualityRows.reduce((sum, row) => sum + row.error_count, 0);
@@ -174,6 +193,37 @@ export const Analytics: Component = () => {
           <CommandBarGroup>
             <Select label="Window" value={days()} options={dayOptions} onChange={setDays} />
             <Select label="Backend" value={backendFilter()} options={backendOptions()} onChange={setBackendFilter} />
+          </CommandBarGroup>
+          <CommandBarGroup>
+            <Switch
+              label="Auto refresh"
+              checked={isAutoRefresh()}
+              onChange={setIsAutoRefresh}
+            />
+            <Select
+              label="Refresh Interval"
+              value={refreshInterval()}
+              options={[
+                { value: '5', label: 'Every 5s' },
+                { value: '10', label: 'Every 10s' },
+                { value: '30', label: 'Every 30s' },
+                { value: '60', label: 'Every 60s' },
+                { value: '600', label: 'Every 10m' },
+              ]}
+              onChange={setRefreshInterval}
+            />
+            <div class="ui-divider--vertical" />
+            <button
+              class="ui-button analytics__refresh-button"
+              classList={{ 'ui-button--loading': analyticsLoading() }}
+              type="button"
+              onClick={() => setRefreshKey((key) => key + 1)}
+              disabled={analyticsLoading()}
+              aria-busy={analyticsLoading()}
+            >
+              <RefreshCw />
+              {analyticsLoading() ? 'Refreshing' : 'Refresh'}
+            </button>
           </CommandBarGroup>
         </CommandBar>
 
@@ -285,14 +335,14 @@ export const Analytics: Component = () => {
         <div class="ui-section-grid analytics__grid--spread-wide">
           <Panel title="Response Length Distribution" description="Log-scaled completion_tokens histogram across the selected window.">
             <HistogramChart
-              data={histogram() ?? []}
+              data={currentHistogram() ?? []}
               xTickUnit="tok"
               yTickUnit="req"
             />
           </Panel>
 
           <Panel title="Daily Response Length Spread" description="Log-scaled daily completion_tokens spread; outliers are hidden.">
-            <BoxPlotChart data={boxPlot() ?? []} />
+            <BoxPlotChart data={currentBoxPlot() ?? []} />
           </Panel>
         </div>
       </div>
