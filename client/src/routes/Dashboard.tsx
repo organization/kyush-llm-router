@@ -35,16 +35,19 @@ export const Dashboard: Component = () => {
   const [hiddenLatencySeries, setHiddenLatencySeries] = createSignal<Set<string>>(new Set());
   const [hiddenModelSeries, setHiddenModelSeries] = createSignal<Set<string>>(new Set());
   const [isAutoRefresh, setIsAutoRefresh] = createSignal(false);
-  const [refreshInterval, setRefreshInterval] = createSignal('30');
+  const [refreshInterval, setRefreshInterval] = createSignal('10');
+  const [refreshKey, setRefreshKey] = createSignal(0);
 
   const windowDays = createMemo(() => Number(days()));
-  const [summary, { refetch }] = createResource(windowDays, (value) => api.dashboard.getSummary(value));
+  const summarySource = createMemo(() => ({ days: windowDays(), key: refreshKey() }));
+  const [summary] = createResource(summarySource, (value) => api.dashboard.getSummary(value.days));
   const [backends] = createResource(() => api.backends.getAll());
+  const currentSummary = createMemo(() => summary.latest ?? summary());
 
   createEffect(() => {
     if (!isAutoRefresh()) return;
     const ms = Number(refreshInterval()) * 1000;
-    const id = setInterval(() => void refetch(), ms);
+    const id = setInterval(() => setRefreshKey((k) => k + 1), ms);
     onCleanup(() => clearInterval(id));
   });
 
@@ -57,7 +60,7 @@ export const Dashboard: Component = () => {
   });
 
   const trafficRows = createMemo(() =>
-    (summary()?.series.daily_totals ?? []).map((row) => ({
+    (currentSummary()?.series.daily_totals ?? []).map((row) => ({
       date: row.date,
       requests: row.total_requests,
       tokens: row.total_tokens,
@@ -66,7 +69,7 @@ export const Dashboard: Component = () => {
 
   const reliabilityRows = createMemo(() => {
     const grouped = new Map<string, { requests: number; errors: number }>();
-    for (const row of summary()?.series.backend_quality ?? []) {
+    for (const row of currentSummary()?.series.backend_quality ?? []) {
       const entry = grouped.get(row.date) ?? { requests: 0, errors: 0 };
       entry.requests += row.total_requests;
       entry.errors += row.error_count;
@@ -84,7 +87,7 @@ export const Dashboard: Component = () => {
 
   const latencyRows = createMemo(() => {
     const grouped = new Map<string, DashboardChartRow>();
-    for (const row of summary()?.series.backend_quality ?? []) {
+    for (const row of currentSummary()?.series.backend_quality ?? []) {
       const entry: DashboardChartRow = grouped.get(row.date) ?? { date: row.date };
       entry[`backend_${row.backend_id}`] = row.avg_response_time_ms;
       grouped.set(row.date, entry);
@@ -93,7 +96,7 @@ export const Dashboard: Component = () => {
   });
 
   const latencySeries = createMemo(() => {
-    const ids = Array.from(new Set((summary()?.series.backend_quality ?? []).map((row) => row.backend_id))).sort((left, right) => left - right);
+    const ids = Array.from(new Set((currentSummary()?.series.backend_quality ?? []).map((row) => row.backend_id))).sort((left, right) => left - right);
     return ids.map((backendId, index) => ({
       key: `backend_${backendId}`,
       label: backendNameById().get(backendId) ?? `Backend ${backendId}`,
@@ -103,7 +106,7 @@ export const Dashboard: Component = () => {
 
   const modelRows = createMemo(() => {
     const grouped = new Map<string, DashboardChartRow>();
-    for (const row of summary()?.series.model_trends ?? []) {
+    for (const row of currentSummary()?.series.model_trends ?? []) {
       const entry: DashboardChartRow = grouped.get(row.date) ?? { date: row.date };
       entry[`model_${row.model}`] = row.request_count;
       grouped.set(row.date, entry);
@@ -112,7 +115,7 @@ export const Dashboard: Component = () => {
   });
 
   const modelSeries = createMemo(() => {
-    const models = Array.from(new Set((summary()?.series.model_trends ?? []).map((row) => row.model)));
+    const models = Array.from(new Set((currentSummary()?.series.model_trends ?? []).map((row) => row.model)));
     return models.map((model, index) => ({
       key: `model_${model}`,
       label: model,
@@ -121,7 +124,7 @@ export const Dashboard: Component = () => {
   });
 
   const summaryItems = createMemo(() => {
-    const payload = summary();
+    const payload = currentSummary();
     const latestTraffic = payload?.series.daily_totals[payload.series.daily_totals.length - 1];
 
     return [
@@ -133,7 +136,7 @@ export const Dashboard: Component = () => {
   });
 
   const cacheStateItems = createMemo(() => {
-    const counts = summary()?.health.cache_state_counts;
+    const counts = currentSummary()?.health.cache_state_counts;
     if (!counts) return [];
     return [
       { key: 'Ready', value: String(counts.ready) },
@@ -144,7 +147,7 @@ export const Dashboard: Component = () => {
   });
 
   const scriptItems = createMemo(() => {
-    const payload = summary();
+    const payload = currentSummary();
     if (!payload) return [];
 
     return [
@@ -155,7 +158,7 @@ export const Dashboard: Component = () => {
   });
 
   const accessItems = createMemo(() => {
-    const payload = summary();
+    const payload = currentSummary();
     if (!payload) return [];
 
     return [
@@ -203,16 +206,25 @@ export const Dashboard: Component = () => {
               label="Refresh Interval"
               value={refreshInterval()}
               options={[
-                { value: '15', label: 'Every 15s' },
+                { value: '5', label: 'Every 5s' },
+                { value: '10', label: 'Every 10s' },
                 { value: '30', label: 'Every 30s' },
                 { value: '60', label: 'Every 60s' },
+                { value: '600', label: 'Every 10m' },
               ]}
               onChange={setRefreshInterval}
             />
             <div class="ui-divider--vertical" />
-            <button class="ui-button" type="button" onClick={() => void refetch()}>
+            <button
+              class="ui-button dashboard__refresh-button"
+              classList={{ 'ui-button--loading': summary.loading }}
+              type="button"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              disabled={summary.loading}
+              aria-busy={summary.loading}
+            >
               <RefreshCw />
-              Refresh
+              {summary.loading ? 'Refreshing' : 'Refresh'}
             </button>
           </CommandBarGroup>
         </CommandBar>
@@ -308,11 +320,11 @@ export const Dashboard: Component = () => {
             <Panel title="Backend Health" description="Cache readiness, liveness, and sync drift indicators for current backends.">
               <MetaCluster items={cacheStateItems()} />
               <Show
-                when={(summary()?.health.stale_backends.length ?? 0) > 0}
+                when={(currentSummary()?.health.stale_backends.length ?? 0) > 0}
                 fallback={<EmptyState title="No stale backend syncs" description="All active backends synced within the freshness window." />}
               >
                 <div class="dashboard__status-list">
-                  {summary()?.health.stale_backends.map((backend) => (
+                  {currentSummary()?.health.stale_backends.map((backend) => (
                     <div class="dashboard__status-item">
                       <div>
                         <strong>{backend.name}</strong>
