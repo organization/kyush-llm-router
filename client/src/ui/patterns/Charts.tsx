@@ -329,7 +329,7 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
       const maxValue = d3.max(points(), (point: ParsedTimeSeriesDatum) =>
         d3.max(leftSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
       ) ?? 0;
-      return getSymlogTicks(maxValue).filter((tick) => tick > 0);
+      return getSymlogTicks(maxValue, 8).filter((tick) => tick > 0);
     }
     return leftScale().ticks(4);
   });
@@ -341,7 +341,7 @@ export function TimeSeriesChart(props: TimeSeriesChartProps) {
       const maxValue = d3.max(points(), (point: ParsedTimeSeriesDatum) =>
         d3.max(rightSeries(), (series: TimeSeriesChartSeries) => Number(point[series.key] ?? 0))
       ) ?? 0;
-      return getSymlogTicks(maxValue).filter((tick) => tick > 0);
+      return getSymlogTicks(maxValue, 8).filter((tick) => tick > 0);
     }
     return rightScale().ticks(4);
   });
