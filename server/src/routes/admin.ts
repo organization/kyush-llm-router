@@ -47,7 +47,7 @@ router.get('/users', (req: Request, res: Response) => {
 });
 
 router.post('/users', (req: Request, res: Response) => {
-  const { name, email, api_key, detail_logging } = req.body as CreateUserData;
+  const { name, email, api_key, detail_logging, copy_reasoning_to_reasoning_content } = req.body as CreateUserData;
 
   if (!name?.trim()) {
     res.status(400).json({ error: 'Name is required' });
@@ -60,6 +60,7 @@ router.post('/users', (req: Request, res: Response) => {
       email: email?.trim() || undefined,
       api_key: api_key?.trim() || undefined,
       detail_logging,
+      copy_reasoning_to_reasoning_content,
     });
 
     res.status(201).json(user);
@@ -93,7 +94,7 @@ router.put('/users/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { name, email, api_key, is_active, detail_logging } = req.body as UpdateUserData;
+  const { name, email, api_key, is_active, detail_logging, copy_reasoning_to_reasoning_content } = req.body as UpdateUserData;
 
   if (typeof name === 'string' && !name.trim()) {
     res.status(400).json({ error: 'Name cannot be empty' });
@@ -107,6 +108,7 @@ router.put('/users/:id', (req: Request, res: Response) => {
       api_key: typeof api_key === 'string' ? api_key.trim() || undefined : undefined,
       is_active,
       detail_logging,
+      copy_reasoning_to_reasoning_content,
     });
 
     res.json(updatedUser);

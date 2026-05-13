@@ -70,6 +70,13 @@ server/src/
 - `/v1/models` 는 허용 가능한 활성 백엔드들의 native 모델과 실제 요청 가능한 rewrite alias 합집합을 반환한다
 - `MODEL_LIST_INCLUDE_ROUTING_METADATA` 가 켜져 있으면 `/v1/models` 는 비표준 `kyush_router` metadata를 추가해 요청 모델, 최종 라우팅 모델, 적용된 rewrite path를 노출한다.
 
+## Reasoning Compatibility
+
+- 사용자별 `copy_reasoning_to_reasoning_content` 옵션이 켜져 있으면 `/v1/chat/completions` 응답에서 `reasoning` 을 `reasoning_content` 로 추가 복제한다
+- 같은 백엔드라도 API 키별로 옵션을 다르게 둘 수 있다
+- streaming 응답은 옵션이 켜진 경우에만 SSE JSON frame을 변환하고, 옵션이 꺼진 경우 기존처럼 원본 바이트를 전달한다
+- 이미 `reasoning_content` 가 있으면 덮어쓰지 않고 `reasoning` 원본도 유지한다
+
 참고:
 - 세부 라우팅 규칙과 캐시 트리거는 [docs/model-routing.md](./model-routing.md) 참고
 

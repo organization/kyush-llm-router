@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT,
     is_active BOOLEAN DEFAULT 1,
     detail_logging INTEGER NOT NULL DEFAULT 0,
+    copy_reasoning_to_reasoning_content INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

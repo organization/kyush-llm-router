@@ -14,6 +14,9 @@ function runCoreMigrations(database: Database.Database): void {
   if (hasColumn(database, 'model_rewrites', 'force') === false) {
     database.exec('ALTER TABLE model_rewrites ADD COLUMN force BOOLEAN DEFAULT 0');
   }
+  if (hasColumn(database, 'users', 'copy_reasoning_to_reasoning_content') === false) {
+    database.exec('ALTER TABLE users ADD COLUMN copy_reasoning_to_reasoning_content INTEGER NOT NULL DEFAULT 0');
+  }
 }
 
 export function getDb(): Database.Database {

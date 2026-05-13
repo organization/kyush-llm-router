@@ -83,3 +83,8 @@ SPA는 `/dashboard`를 라우터 base로 사용하고, 관리자 API는 계속 `
   - `Force`: 현재 모델 사용 가능 여부와 관계없이 항상 target model 로 이동하고 다음 규칙을 계속 평가
   - `Fallback`: 현재 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 target model 로 이동하고 다음 규칙을 계속 평가
 - 활성 rewrite cycle은 저장 시점에 거부되며, `/v1/models` 는 실제 요청 가능한 rewrite alias를 함께 반환한다
+
+## User Reasoning Compatibility
+
+- `Users` 화면은 API 키별 `Copy reasoning to reasoning_content` 옵션을 표시하고 편집한다
+- 이 옵션은 같은 백엔드를 공유하는 사용자라도 downstream 클라이언트 호환성에 맞춰 독립적으로 켜거나 끌 수 있다

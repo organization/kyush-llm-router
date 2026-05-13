@@ -24,6 +24,7 @@
 
 추가 동작:
 - `/v1/chat/completions` 는 요청 모델명을 먼저 전역 rewrite 체인으로 해석한 뒤, 최종 모델을 서빙하는 허용 가능한 활성 백엔드만 후보로 사용한다
+- 사용자 옵션 `copy_reasoning_to_reasoning_content` 가 켜져 있으면 chat completion 응답의 `reasoning` 필드를 `reasoning_content` 로 추가 복제한다. streaming/non-stream 모두 적용되며 기존 `reasoning_content` 는 덮어쓰지 않는다
 - `force=true` rewrite 는 항상 적용되고 target 모델의 다음 규칙까지 계속 평가한다
 - `force=false` rewrite 는 현재 모델을 서빙하는 허용 가능한 활성 백엔드가 없을 때만 fallback 으로 적용되고 target 모델의 다음 규칙까지 계속 평가한다
 - `/v1/models` 는 native backend 모델뿐 아니라 현재 사용자 권한에서 최종 후보가 있는 rewrite source alias도 함께 반환한다
@@ -54,9 +55,9 @@
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/users` | 전체 사용자 목록 |
-| POST | `/admin/users` | 사용자 생성 (`api_key` 생략 시 자동 발급, 지정 시 수동 등록) |
+| POST | `/admin/users` | 사용자 생성 (`api_key` 생략 시 자동 발급, 지정 시 수동 등록, copy_reasoning_to_reasoning_content 선택 가능) |
 | GET | `/admin/users/:id` | 사용자 조회 |
-| PUT | `/admin/users/:id` | 사용자 수정 (name, email, api_key, is_active, detail_logging) |
+| PUT | `/admin/users/:id` | 사용자 수정 (name, email, api_key, is_active, detail_logging, copy_reasoning_to_reasoning_content) |
 | DELETE | `/admin/users/:id` | 사용자 삭제 |
 | POST | `/admin/users/:id/regenerate-api-key` | API 키 재발급 |
 

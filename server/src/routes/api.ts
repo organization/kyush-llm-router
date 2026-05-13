@@ -8,6 +8,7 @@ import { ModelCatalogService, ModelRewriteCycleError } from '../services/ModelCa
 import { getDetailStreamLogMode } from '../config/stream-logging';
 import { shouldIncludeModelListRoutingMetadata } from '../config/model-list-metadata';
 import { ChatStreamLogAccumulator } from '../utils/streamLog';
+import { ReasoningCompatSseTransformer, copyReasoningToReasoningContentInChatCompletion } from '../utils/reasoningCompat';
 
 const router: Router = Router();
 
@@ -213,6 +214,8 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
 
       const reader = backendResponse.body!.getReader();
       const decoder = new TextDecoder();
+      const encoder = new TextEncoder();
+      const streamTransformer = user.copy_reasoning_to_reasoning_content ? new ReasoningCompatSseTransformer() : null;
       req.on('close', () => reader.cancel());
 
       const detailStreamLogMode = getDetailStreamLogMode();
@@ -222,14 +225,28 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          res.write(value);
 
           const text = decoder.decode(value, { stream: true });
-          streamLog.append(text);
+          if (streamTransformer) {
+            const transformedText = streamTransformer.append(text);
+            if (transformedText) {
+              res.write(encoder.encode(transformedText));
+              streamLog.append(transformedText);
+            }
+          } else {
+            res.write(value);
+            streamLog.append(text);
+          }
         }
 
         const remainingText = decoder.decode();
-        if (remainingText) {
+        if (streamTransformer) {
+          const transformedText = streamTransformer.append(remainingText) + streamTransformer.flush();
+          if (transformedText) {
+            res.write(encoder.encode(transformedText));
+            streamLog.append(transformedText, false);
+          }
+        } else if (remainingText) {
           streamLog.append(remainingText, false);
         }
       } catch (err) {
@@ -277,11 +294,14 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
     );
 
     const responseTime = Date.now() - startTime;
+    const responseData = user.copy_reasoning_to_reasoning_content
+      ? copyReasoningToReasoningContentInChatCompletion(response.data, false)
+      : response.data;
 
     const responseContext = {
       status: response.status,
       headers: response.headers,
-      body: response.data,
+      body: responseData,
       isStream: false,
     };
 
@@ -298,23 +318,23 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       endpoint: '/v1/chat/completions',
       request_model: model,
       routed_model: resolution.routedModel,
-      response_model: response.data && typeof response.data === 'object' && 'model' in response.data ? String(response.data.model) : undefined,
-      prompt_tokens: response.data && typeof response.data === 'object' && 'usage' in response.data && typeof (response.data as { usage?: { prompt_tokens?: number } }).usage === 'object' ? (response.data as { usage: { prompt_tokens: number } }).usage?.prompt_tokens : undefined,
-      completion_tokens: response.data && typeof response.data === 'object' && 'usage' in response.data && typeof (response.data as { usage?: { completion_tokens?: number } }).usage === 'object' ? (response.data as { usage: { completion_tokens: number } }).usage?.completion_tokens : undefined,
-      total_tokens: response.data && typeof response.data === 'object' && 'usage' in response.data && typeof (response.data as { usage?: { total_tokens?: number } }).usage === 'object' ? (response.data as { usage: { total_tokens: number } }).usage?.total_tokens : undefined,
+      response_model: responseData && typeof responseData === 'object' && 'model' in responseData ? String(responseData.model) : undefined,
+      prompt_tokens: responseData && typeof responseData === 'object' && 'usage' in responseData && typeof (responseData as { usage?: { prompt_tokens?: number } }).usage === 'object' ? (responseData as { usage: { prompt_tokens: number } }).usage?.prompt_tokens : undefined,
+      completion_tokens: responseData && typeof responseData === 'object' && 'usage' in responseData && typeof (responseData as { usage?: { completion_tokens?: number } }).usage === 'object' ? (responseData as { usage: { completion_tokens: number } }).usage?.completion_tokens : undefined,
+      total_tokens: responseData && typeof responseData === 'object' && 'usage' in responseData && typeof (responseData as { usage?: { total_tokens?: number } }).usage === 'object' ? (responseData as { usage: { total_tokens: number } }).usage?.total_tokens : undefined,
       status_code: response.status,
       response_time_ms: responseTime,
-      error_message: response.status >= 400 ? JSON.stringify(response.data) : undefined,
+      error_message: response.status >= 400 ? JSON.stringify(responseData) : undefined,
       detail_logged: detailLoggingEnabled,
       request_headers: detailLoggingEnabled ? modifiedContext.request.headers : undefined,
       request_body: detailLoggingEnabled ? modifiedContext.request.body : undefined,
       response_headers: detailLoggingEnabled ? response.headers : undefined,
-      response_body: detailLoggingEnabled ? response.data : undefined,
+      response_body: detailLoggingEnabled ? responseData : undefined,
       local_date: undefined,
     });
 
     if (response.status >= 400) {
-      const errorDetails = response.data as any;
+      const errorDetails = responseData as any;
       const errorInfo = errorDetails.error || 'Unknown error';
       const causeInfo = errorDetails.cause ? ` (Cause: ${errorDetails.cause})` : '';
       const backendInfo = errorDetails.backend ? ` [Backend: ${errorDetails.backend}]` : '';
@@ -322,7 +342,7 @@ router.post('/chat/completions', async (req: AuthenticatedRequest, res: Response
       void ModelCatalogService.refreshBackendAfterFailure(backend.id);
     }
 
-    res.status(response.status).json(response.data);
+    res.status(response.status).json(responseData);
   } catch (error) {
     const responseTime = Date.now() - startTime;
 

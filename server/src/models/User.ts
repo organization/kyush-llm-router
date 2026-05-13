@@ -7,6 +7,7 @@ export class UserModel {
   static asUser(row: any): User {
     row.is_active = !!row.is_active;
     row.detail_logging = !!row.detail_logging;
+    row.copy_reasoning_to_reasoning_content = !!row.copy_reasoning_to_reasoning_content;
     return row as User;
   }
 
@@ -31,10 +32,11 @@ export class UserModel {
     const apiKey = data.api_key ?? generateApiKey();
     const timestamp = getUtcTimestamp();
     const detailLogging = data.detail_logging ?? false;
+    const copyReasoning = data.copy_reasoning_to_reasoning_content ?? false;
     const stmt = getDb().prepare(
-      'INSERT INTO users (api_key, name, email, detail_logging, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (api_key, name, email, detail_logging, copy_reasoning_to_reasoning_content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    const result = stmt.run(apiKey, data.name, data.email || null, detailLogging ? 1 : 0, timestamp, timestamp);
+    const result = stmt.run(apiKey, data.name, data.email || null, detailLogging ? 1 : 0, copyReasoning ? 1 : 0, timestamp, timestamp);
     
     return {
       id: result.lastInsertRowid as number,
@@ -43,6 +45,7 @@ export class UserModel {
       email: data.email,
       is_active: true,
       detail_logging: detailLogging,
+      copy_reasoning_to_reasoning_content: copyReasoning,
       created_at: timestamp,
       updated_at: timestamp,
     };
@@ -71,6 +74,10 @@ export class UserModel {
     if (data.detail_logging !== undefined) {
       updates.push('detail_logging = ?');
       values.push(data.detail_logging ? 1 : 0);
+    }
+    if (data.copy_reasoning_to_reasoning_content !== undefined) {
+      updates.push('copy_reasoning_to_reasoning_content = ?');
+      values.push(data.copy_reasoning_to_reasoning_content ? 1 : 0);
     }
 
     if (updates.length === 0) {

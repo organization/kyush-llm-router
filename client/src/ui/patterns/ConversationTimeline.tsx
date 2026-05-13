@@ -288,8 +288,12 @@ function parseStreamResponse(value: unknown): ParsedStreamResponse | null {
       if (isRecord(delta)) {
         if (typeof delta.role === 'string') choice.role = delta.role;
         if (typeof delta.content === 'string') choice.content.push(delta.content);
-        if (typeof delta.reasoning === 'string') choice.reasoning.push(delta.reasoning);
-        if (typeof delta.reasoning_content === 'string') choice.reasoning.push(delta.reasoning_content);
+        const reasoning = typeof delta.reasoning_content === 'string'
+          ? delta.reasoning_content
+          : typeof delta.reasoning === 'string'
+            ? delta.reasoning
+            : undefined;
+        if (reasoning) choice.reasoning.push(reasoning);
 
         if (Array.isArray(delta.tool_calls)) {
           for (const rawToolCall of delta.tool_calls) {

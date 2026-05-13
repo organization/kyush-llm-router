@@ -75,7 +75,7 @@ describe('Streaming Response Proxying', () => {
     }
   });
 
-  async function setupUserAndBackend(mockPort: number, options: { detailLogging?: boolean } = {}) {
+  async function setupUserAndBackend(mockPort: number, options: { detailLogging?: boolean; copyReasoning?: boolean } = {}) {
     // Deactivate all existing backends to ensure only our mock backend is selected
     const allBackendsResponse = await admin.get('/admin/backends');
     for (const backend of allBackendsResponse.body) {
@@ -87,6 +87,7 @@ describe('Streaming Response Proxying', () => {
     const userResponse = await admin.post('/admin/users').send({
       name: `Stream Test User ${Date.now()}`,
       detail_logging: options.detailLogging,
+      copy_reasoning_to_reasoning_content: options.copyReasoning,
     });
     const userApiKey = userResponse.body.api_key;
     const userId = userResponse.body.id;
@@ -100,6 +101,15 @@ describe('Streaming Response Proxying', () => {
     await admin.post('/admin/permissions').send({ user_id: userId, backend_id: backendId });
 
     return { userApiKey, userId, backendId };
+  }
+
+  async function createUserForBackend(backendId: number, options: { copyReasoning?: boolean } = {}) {
+    const userResponse = await admin.post('/admin/users').send({
+      name: `Stream Compat User ${Date.now()} ${Math.random()}`,
+      copy_reasoning_to_reasoning_content: options.copyReasoning,
+    });
+    await admin.post('/admin/permissions').send({ user_id: userResponse.body.id, backend_id: backendId });
+    return { userApiKey: userResponse.body.api_key as string, userId: userResponse.body.id as number };
   }
 
   it('should return Content-Type text/event-stream for stream requests', async () => {
@@ -377,5 +387,109 @@ describe('Streaming Response Proxying', () => {
     expect(logsResponse.body.rows).toHaveLength(1);
     expect(logsResponse.body.rows[0].response_body).toContain('data: ');
     expect(logsResponse.body.rows[0].response_body).toContain('data: [DONE]');
+  });
+
+  it('should copy streaming reasoning to reasoning_content only for users with compatibility enabled', async () => {
+    const reasoningStreamChunks = [
+      JSON.stringify({
+        id: 'chatcmpl-reasoning-1',
+        object: 'chat.completion.chunk',
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { role: 'assistant', reasoning: 'Think once.' }, finish_reason: null }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-reasoning-1',
+        object: 'chat.completion.chunk',
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { reasoning: ' Keep original.', reasoning_content: 'Existing wins.' }, finish_reason: null }],
+      }),
+      JSON.stringify({
+        id: 'chatcmpl-reasoning-1',
+        object: 'chat.completion.chunk',
+        model: 'mock-model',
+        choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: 'stop' }],
+      }),
+    ];
+    const { server, port } = createMockBackend({
+      streamChunks: reasoningStreamChunks,
+      modelsResponse: [{ id: 'mock-model', object: 'model' }],
+    });
+    mockServer = server;
+
+    const { backendId, userApiKey: defaultUserApiKey } = await setupUserAndBackend(port);
+    const { userApiKey: compatUserApiKey } = await createUserForBackend(backendId, { copyReasoning: true });
+
+    const defaultResponse = await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${defaultUserApiKey}`)
+      .send({
+        model: 'mock-model',
+        messages: [{ role: 'user', content: 'Hello' }],
+        stream: true,
+      });
+
+    const compatResponse = await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${compatUserApiKey}`)
+      .send({
+        model: 'mock-model',
+        messages: [{ role: 'user', content: 'Hello' }],
+        stream: true,
+      });
+
+    const defaultFirstChunk = JSON.parse(defaultResponse.text.split('\n').find((line: string) => line.startsWith('data: {'))!.replace('data: ', ''));
+    expect(defaultFirstChunk.choices[0].delta.reasoning).toBe('Think once.');
+    expect(defaultFirstChunk.choices[0].delta.reasoning_content).toBeUndefined();
+
+    const compatDataLines = compatResponse.text.split('\n').filter((line: string) => line.startsWith('data: {'));
+    const compatFirstChunk = JSON.parse(compatDataLines[0].replace('data: ', ''));
+    expect(compatFirstChunk.choices[0].delta.reasoning).toBe('Think once.');
+    expect(compatFirstChunk.choices[0].delta.reasoning_content).toBe('Think once.');
+
+    const compatSecondChunk = JSON.parse(compatDataLines[1].replace('data: ', ''));
+    expect(compatSecondChunk.choices[0].delta.reasoning).toBe(' Keep original.');
+    expect(compatSecondChunk.choices[0].delta.reasoning_content).toBe('Existing wins.');
+    expect(compatResponse.text).toContain('data: [DONE]');
+  });
+
+  it('should copy non-stream reasoning to reasoning_content only for users with compatibility enabled', async () => {
+    const { server, port } = createMockBackend({
+      chatResponse: {
+        id: 'non-stream-reasoning-1',
+        model: 'mock-model',
+        choices: [{
+          index: 0,
+          message: { role: 'assistant', content: 'Hello', reasoning: 'Think non-stream.' },
+          finish_reason: 'stop',
+        }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      },
+      modelsResponse: [{ id: 'mock-model', object: 'model' }],
+    });
+    mockServer = server;
+
+    const { backendId, userApiKey: defaultUserApiKey } = await setupUserAndBackend(port);
+    const { userApiKey: compatUserApiKey } = await createUserForBackend(backendId, { copyReasoning: true });
+
+    const defaultResponse = await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${defaultUserApiKey}`)
+      .send({
+        model: 'mock-model',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+
+    const compatResponse = await request(app)
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${compatUserApiKey}`)
+      .send({
+        model: 'mock-model',
+        messages: [{ role: 'user', content: 'Hello' }],
+      });
+
+    expect(defaultResponse.body.choices[0].message.reasoning).toBe('Think non-stream.');
+    expect(defaultResponse.body.choices[0].message.reasoning_content).toBeUndefined();
+    expect(compatResponse.body.choices[0].message.reasoning).toBe('Think non-stream.');
+    expect(compatResponse.body.choices[0].message.reasoning_content).toBe('Think non-stream.');
   });
 });

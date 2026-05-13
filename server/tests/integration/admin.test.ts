@@ -34,6 +34,17 @@ describe('Admin API - User Management', () => {
       expect(response.body.email).toBe(userData.email);
       expect(response.body).toHaveProperty('api_key');
       expect(response.body.api_key).toMatch(/^sk-/);
+      expect(response.body.copy_reasoning_to_reasoning_content).toBe(false);
+    });
+
+    it('should create a user with reasoning compatibility enabled', async () => {
+      const response = await admin.post('/admin/users').send({
+        name: 'Reasoning Compat User',
+        copy_reasoning_to_reasoning_content: true,
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.copy_reasoning_to_reasoning_content).toBe(true);
     });
 
     it('should create a user with a manually supplied api key', async () => {
@@ -109,6 +120,15 @@ describe('Admin API - User Management', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.api_key).toBe('legacy-updated-key-001');
+    });
+
+    it('should update user reasoning compatibility setting', async () => {
+      const response = await admin
+        .put(`/admin/users/${userId}`)
+        .send({ copy_reasoning_to_reasoning_content: true });
+
+      expect(response.status).toBe(200);
+      expect(response.body.copy_reasoning_to_reasoning_content).toBe(true);
     });
 
     it('should return 404 for non-existent user', async () => {

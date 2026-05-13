@@ -20,6 +20,8 @@ isolated-vm 기반 JavaScript 샌드박스에서 요청/응답을 조작하는 �
 
 백엔드 응답 수신 후 실행. 현재 구현에서는 응답 컨텍스트를 검사하거나 로그/부가 처리를 수행하는 용도로 실행되며, 훅이 반환한 변경 내용이 최종 HTTP 응답에 다시 반영되지는 않는다.
 
+참고: `reasoning` 을 `reasoning_content` 로 복제하는 OpenAI-compatible 호환 처리는 script hook이 아니라 사용자별 라우터 내장 옵션 `copy_reasoning_to_reasoning_content` 로 수행한다.
+
 ## Script Context
 
 스크립트에서 접근 가능한 데이터:

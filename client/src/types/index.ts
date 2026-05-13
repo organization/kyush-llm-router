@@ -5,6 +5,7 @@ export type User = {
   email?: string;
   is_active: boolean;
   detail_logging: boolean;
+  copy_reasoning_to_reasoning_content: boolean;
   created_at: string;
   updated_at: string;
 };

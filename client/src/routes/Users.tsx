@@ -38,6 +38,7 @@ interface UserFormState {
   api_key: string;
   is_active: boolean;
   detail_logging: boolean;
+  copy_reasoning_to_reasoning_content: boolean;
 }
 
 const emptyForm = (): UserFormState => ({
@@ -46,6 +47,7 @@ const emptyForm = (): UserFormState => ({
   api_key: '',
   is_active: true,
   detail_logging: false,
+  copy_reasoning_to_reasoning_content: false,
 });
 
 const maskApiKey = (apiKey: string) => `${apiKey.slice(0, 5)}...`;
@@ -132,6 +134,7 @@ export const Users: Component = () => {
       api_key: user.api_key,
       is_active: user.is_active,
       detail_logging: user.detail_logging,
+      copy_reasoning_to_reasoning_content: user.copy_reasoning_to_reasoning_content,
     });
     setDialogOpen(true);
   };
@@ -154,6 +157,7 @@ export const Users: Component = () => {
           api_key: current.api_key.trim() || undefined,
           is_active: current.is_active,
           detail_logging: current.detail_logging,
+          copy_reasoning_to_reasoning_content: current.copy_reasoning_to_reasoning_content,
         });
         setNotice({ tone: 'success', message: 'User updated.' });
       } else {
@@ -162,6 +166,7 @@ export const Users: Component = () => {
           email: current.email.trim() || undefined,
           api_key: current.api_key.trim() || undefined,
           detail_logging: current.detail_logging,
+          copy_reasoning_to_reasoning_content: current.copy_reasoning_to_reasoning_content,
         });
         setNotice({ tone: 'success', message: 'User created.' });
       }
@@ -366,6 +371,11 @@ export const Users: Component = () => {
                       cell: (user) => <StatusBadge tone={user.detail_logging ? 'warning' : 'neutral'}>{user.detail_logging ? 'On' : 'Off'}</StatusBadge>,
                     },
                     {
+                      id: 'reasoning_compat',
+                      header: 'Reasoning Compat',
+                      cell: (user) => <StatusBadge tone={user.copy_reasoning_to_reasoning_content ? 'success' : 'neutral'}>{user.copy_reasoning_to_reasoning_content ? 'On' : 'Off'}</StatusBadge>,
+                    },
+                    {
                       id: 'status',
                       header: 'Status',
                       cell: (user) => <StatusBadge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'Active' : 'Inactive'}</StatusBadge>,
@@ -528,6 +538,12 @@ export const Users: Component = () => {
               description="When enabled, proxied request and response headers/bodies are stored for this user."
               checked={form().detail_logging}
               onChange={(checked) => setForm((current) => ({ ...current, detail_logging: checked }))}
+            />
+            <Checkbox
+              label="Copy reasoning to reasoning_content"
+              description="Enable for clients that only display thinking from reasoning_content."
+              checked={form().copy_reasoning_to_reasoning_content}
+              onChange={(checked) => setForm((current) => ({ ...current, copy_reasoning_to_reasoning_content: checked }))}
             />
           </form>
         </FormDialog>
