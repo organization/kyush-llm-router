@@ -1,6 +1,6 @@
 {
   "name": "kyush-llm-router-express",
-  "version": "1.0.8-express",
+  "version": "1.0.9-express",
   "description": "LLM routing server with multi-user API key management",
   "scripts": {
     "dev": "pnpm --parallel dev",
