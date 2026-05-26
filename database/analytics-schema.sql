@@ -28,5 +28,8 @@ CREATE TABLE IF NOT EXISTS backend_metrics (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_usage_stats_user ON usage_stats(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_stats_date ON usage_stats(date);
+CREATE INDEX IF NOT EXISTS idx_usage_stats_backend_date ON usage_stats(backend_id, date);
+CREATE INDEX IF NOT EXISTS idx_usage_stats_user_backend_date ON usage_stats(user_id, backend_id, date);
 CREATE INDEX IF NOT EXISTS idx_backend_metrics_backend ON backend_metrics(backend_id);
 CREATE INDEX IF NOT EXISTS idx_backend_metrics_date ON backend_metrics(date);
+CREATE INDEX IF NOT EXISTS idx_backend_metrics_backend_date ON backend_metrics(backend_id, date);

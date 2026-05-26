@@ -20,6 +20,22 @@ function initRequestLogsSchema(db: Database.Database): void {
   }
 }
 
+function ensureRequestLogsIndexes(db: Database.Database): void {
+  const existingIndexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'request_logs'").all() as Array<{ name: string }>;
+  const indexNames = new Set(existingIndexes.map((idx) => idx.name));
+
+  const indexes = [
+    ['idx_request_logs_local_date_backend', 'CREATE INDEX IF NOT EXISTS idx_request_logs_local_date_backend ON request_logs(local_date, backend_id)'],
+    ['idx_request_logs_completion_tokens', 'CREATE INDEX IF NOT EXISTS idx_request_logs_completion_tokens ON request_logs(completion_tokens)'],
+  ];
+
+  for (const [name, sql] of indexes) {
+    if (!indexNames.has(name)) {
+      db.exec(sql);
+    }
+  }
+}
+
 export function getRequestLogsDb(monthKey: string = getLocalMonthKey()): Database.Database {
   const existing = connections.get(monthKey);
   if (existing) {
@@ -31,6 +47,7 @@ export function getRequestLogsDb(monthKey: string = getLocalMonthKey()): Databas
 
   const db = new Database(dbPath);
   initRequestLogsSchema(db);
+  ensureRequestLogsIndexes(db);
   connections.set(monthKey, db);
   return db;
 }

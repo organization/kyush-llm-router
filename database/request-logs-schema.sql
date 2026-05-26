@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS request_logs (
 
 CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_request_logs_local_date ON request_logs(local_date);
+CREATE INDEX IF NOT EXISTS idx_request_logs_local_date_backend ON request_logs(local_date, backend_id);
 CREATE INDEX IF NOT EXISTS idx_request_logs_user ON request_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_request_logs_backend ON request_logs(backend_id);
 CREATE INDEX IF NOT EXISTS idx_request_logs_endpoint ON request_logs(endpoint);
 CREATE INDEX IF NOT EXISTS idx_request_logs_detail_logged ON request_logs(detail_logged);
+CREATE INDEX IF NOT EXISTS idx_request_logs_completion_tokens ON request_logs(completion_tokens);

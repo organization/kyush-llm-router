@@ -21,15 +21,6 @@ type DailyTotalsRow = {
   total_tokens: number;
 };
 
-type RequestLogRangeRow = {
-  local_date: string;
-  backend_id: number;
-  request_model: string | null;
-  routed_model: string | null;
-  response_model: string | null;
-  completion_tokens: number | null;
-};
-
 function getDateRange(days: number): { startDate: string; endDate: string } {
   const normalizedDays = Math.max(1, days);
   const endDate = getLocalDateKey();
@@ -37,17 +28,17 @@ function getDateRange(days: number): { startDate: string; endDate: string } {
   return { startDate, endDate };
 }
 
-function buildRequestLogRangeWhere(filter: RequestLogFilter): { whereClause: string; params: unknown[] } {
+function buildWhereClause(startDate: string, endDate: string, backendId: number | undefined): { whereClause: string; params: unknown[] } {
   const clauses = ['local_date >= ?', 'local_date <= ?'];
-  const params: unknown[] = [filter.startDate, filter.endDate];
+  const params: unknown[] = [startDate, endDate];
 
-  if (filter.backendId) {
+  if (backendId) {
     clauses.push('backend_id = ?');
-    params.push(filter.backendId);
+    params.push(backendId);
   }
 
   return {
-    whereClause: `WHERE ${clauses.join(' AND ')}`,
+    whereClause: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '',
     params,
   };
 }
@@ -63,10 +54,10 @@ function groupByDate(rows: DailyTotalsRow[]): DailyTotalsRow[] {
   for (const row of rows) {
     const existing = grouped.get(row.date);
     if (existing) {
-      existing.total_requests += row.total_requests;
-      existing.total_tokens += row.total_tokens;
+        existing.total_requests += row.total_requests;
+        existing.total_tokens += row.total_tokens;
     } else {
-      grouped.set(row.date, { ...row });
+        grouped.set(row.date, { ...row });
     }
   }
 
@@ -131,49 +122,22 @@ export class AnalyticsService {
     const db = getAnalyticsDb();
     const today = getLocalDateKey();
     const isSuccess = logData.status_code >= 200 && logData.status_code < 300;
+    const tokens = logData.total_tokens || 0;
+    const responseTime = logData.response_time_ms || 0;
+    const errorIncrement = isSuccess ? 0 : 1;
+    const initialSuccessRate = isSuccess ? 1.0 : 0.0;
 
-    const existing = db.prepare(
-      'SELECT * FROM backend_metrics WHERE backend_id = ? AND date = ?'
-    ).get(backendId, today) as {
-      total_requests: number;
-      total_tokens: number;
-      avg_response_time_ms: number;
-      error_count: number;
-    } | undefined;
-
-    if (existing) {
-      const newTotalRequests = existing.total_requests + 1;
-      const newTotalTokens = existing.total_tokens + (logData.total_tokens || 0);
-      const newErrorCount = existing.error_count + (isSuccess ? 0 : 1);
-      const newAvgResponseTime = logData.response_time_ms
-        ? (existing.avg_response_time_ms * existing.total_requests + logData.response_time_ms) / newTotalRequests
-        : existing.avg_response_time_ms;
-      const newSuccessRate = (newTotalRequests - newErrorCount) / newTotalRequests;
-
-      db.prepare(`
-        UPDATE backend_metrics SET
-          total_requests = ?,
-          total_tokens = ?,
-          avg_response_time_ms = ?,
-          error_count = ?,
-          success_rate = ?
-        WHERE backend_id = ? AND date = ?
-      `).run(newTotalRequests, newTotalTokens, newAvgResponseTime, newErrorCount, newSuccessRate, backendId, today);
-    } else {
-      db.prepare(`
-        INSERT INTO backend_metrics (
-          backend_id, date, total_requests, total_tokens,
-          avg_response_time_ms, error_count, success_rate
-        ) VALUES (?, ?, 1, ?, ?, ?, ?)
-      `).run(
-        backendId,
-        today,
-        logData.total_tokens || 0,
-        logData.response_time_ms || 0,
-        isSuccess ? 0 : 1,
-        isSuccess ? 1.0 : 0.0
-      );
-    }
+    db.prepare(`
+      INSERT INTO backend_metrics (backend_id, date, total_requests, total_tokens, avg_response_time_ms, error_count, success_rate)
+      VALUES (?, ?, 1, ?, ?, ?, ?)
+      ON CONFLICT(backend_id, date)
+      DO UPDATE SET
+        total_requests = total_requests + 1,
+        total_tokens = total_tokens + excluded.total_tokens,
+        avg_response_time_ms = (avg_response_time_ms * total_requests + excluded.avg_response_time_ms) / (total_requests + 1),
+        error_count = error_count + excluded.error_count,
+        success_rate = (total_requests + 1 - (error_count + excluded.error_count)) / (total_requests + 1)
+    `).run(backendId, today, tokens, responseTime, errorIncrement, initialSuccessRate);
   }
 
   static getRequestLogs(query: RequestLogQuery = {}): RequestLogPage {
@@ -269,50 +233,74 @@ export class AnalyticsService {
     return db.prepare(query).all(...params);
   }
 
-  private static collectRequestLogRangeRows(filter: RequestLogFilter): RequestLogRangeRow[] {
-    const { whereClause, params } = buildRequestLogRangeWhere(filter);
-    const rows: RequestLogRangeRow[] = [];
-
-    for (const month of getRequestLogMonthsForRange(filter.startDate, filter.endDate)) {
-      const db = getRequestLogsDb(month);
-      const monthRows = db.prepare(`
-        SELECT local_date, backend_id, request_model, routed_model, response_model, completion_tokens
-        FROM request_logs
-        ${whereClause}
-      `).all(...params) as RequestLogRangeRow[];
-      rows.push(...monthRows);
-    }
-
-    return rows;
-  }
-
+  // SQL-level aggregation: first find top models, then get per-date counts
   static getModelTrends(backendId?: number, days: number = 30, limit: number = 8): unknown[] {
     const { startDate, endDate } = getDateRange(days);
-    const rows = this.collectRequestLogRangeRows({ backendId, startDate, endDate });
-    const countsByModel = new Map<string, number>();
-    const countsByDateAndModel = new Map<string, number>();
+    const months = getRequestLogMonthsForRange(startDate, endDate);
 
-    for (const row of rows) {
-      const model = row.response_model || row.routed_model || row.request_model || 'unknown';
-      countsByModel.set(model, (countsByModel.get(model) ?? 0) + 1);
-      const key = `${row.local_date}::${model}`;
-      countsByDateAndModel.set(key, (countsByDateAndModel.get(key) ?? 0) + 1);
+    const modelCounts = new Map<string, number>();
+
+    for (const month of months) {
+      const db = getRequestLogsDb(month);
+      const { whereClause, params } = buildWhereClause(startDate, endDate, backendId);
+      const rows = db.prepare(`
+        SELECT COALESCE(response_model, COALESCE(routed_model, COALESCE(request_model, 'unknown'))) as model,
+               COUNT(*) as cnt
+        FROM request_logs
+        ${whereClause}
+        GROUP BY model
+      `).all(...params) as Array<{ model: string; cnt: number }>;
+
+      for (const row of rows) {
+        modelCounts.set(row.model, (modelCounts.get(row.model) ?? 0) + row.cnt);
+      }
     }
 
-    const topModels = Array.from(countsByModel.entries())
+    const topModels = Array.from(modelCounts.entries())
       .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
       .slice(0, Math.max(1, limit))
       .map(([model]) => model);
 
-    const result: Array<{ date: string; model: string; request_count: number }> = [];
-    const seenDates = new Set(rows.map((row) => row.local_date));
+    if (topModels.length === 0) {
+      return [];
+    }
 
-    for (const date of Array.from(seenDates).sort((left, right) => left.localeCompare(right))) {
+    const topModelSet = new Set(topModels);
+    const dateCounts = new Map<string, Map<string, number>>();
+
+    for (const month of months) {
+      const db = getRequestLogsDb(month);
+      const { whereClause, params } = buildWhereClause(startDate, endDate, backendId);
+      const rows = db.prepare(`
+        SELECT local_date,
+               COALESCE(response_model, COALESCE(routed_model, COALESCE(request_model, 'unknown'))) as model,
+               COUNT(*) as cnt
+        FROM request_logs
+        ${whereClause}
+        GROUP BY local_date, model
+      `).all(...params) as Array<{ local_date: string; model: string; cnt: number }>;
+
+      for (const row of rows) {
+        if (!topModelSet.has(row.model)) continue;
+        let dateMap = dateCounts.get(row.local_date);
+        if (!dateMap) {
+          dateMap = new Map();
+          dateCounts.set(row.local_date, dateMap);
+        }
+        dateMap.set(row.model, row.cnt);
+      }
+    }
+
+    const result: Array<{ date: string; model: string; request_count: number }> = [];
+    const sortedDates = Array.from(dateCounts.keys()).sort((left, right) => left.localeCompare(right));
+
+    for (const date of sortedDates) {
+      const dateMap = dateCounts.get(date)!;
       for (const model of topModels) {
         result.push({
           date,
           model,
-          request_count: countsByDateAndModel.get(`${date}::${model}`) ?? 0,
+          request_count: dateMap.get(model) ?? 0,
         });
       }
     }
@@ -320,67 +308,158 @@ export class AnalyticsService {
     return result;
   }
 
+  // SQL-level histogram: use CASE-based binning with log-transformed values
   static getResponseLengthHistogram(backendId?: number, days: number = 30, bins: number = 20): unknown[] {
     const { startDate, endDate } = getDateRange(days);
-    const values = this.collectRequestLogRangeRows({ backendId, startDate, endDate })
-      .map((row) => row.completion_tokens)
-      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+    const months = getRequestLogMonthsForRange(startDate, endDate);
+    const safeBinCount = Math.max(1, bins);
 
-    if (values.length === 0) {
+    // First pass: find min/max across all months (aggregated, not row-level)
+    let globalMin = Infinity;
+    let globalMax = -Infinity;
+    let totalCount = 0;
+
+    for (const month of months) {
+      const db = getRequestLogsDb(month);
+      const { whereClause, params } = buildWhereClause(startDate, endDate, backendId);
+      const row = db.prepare(`
+        SELECT MIN(completion_tokens) as min_val, MAX(completion_tokens) as max_val,
+               COUNT(*) as cnt
+        FROM request_logs
+        ${whereClause}
+        AND completion_tokens IS NOT NULL
+        AND completion_tokens >= 0
+      `).get(...params) as { min_val: number | null; max_val: number | null; cnt: number } | undefined;
+
+      if (row && row.cnt > 0) {
+        if (typeof row.min_val === 'number') globalMin = Math.min(globalMin, row.min_val);
+        if (typeof row.max_val === 'number') globalMax = Math.max(globalMax, row.max_val);
+        totalCount += row.cnt;
+      }
+    }
+
+    if (totalCount === 0 || globalMin === Infinity) {
       return [];
     }
 
-    const safeBinCount = Math.max(1, bins);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-
-    if (min === max) {
-      return [{ bin_start: min, bin_end: max, count: values.length }];
+    if (globalMin === globalMax) {
+      return [{ bin_start: globalMin, bin_end: globalMax, count: totalCount }];
     }
 
-    const transformedMin = Math.log1p(min);
-    const transformedMax = Math.log1p(max);
+    const transformedMin = Math.log1p(globalMin);
+    const transformedMax = Math.log1p(globalMax);
     const width = (transformedMax - transformedMin) / safeBinCount;
-    const histogram = Array.from({ length: safeBinCount }, (_, index) => ({
-      bin_start: Math.expm1(transformedMin + width * index),
-      bin_end: index === safeBinCount - 1 ? max : Math.expm1(transformedMin + width * (index + 1)),
-      count: 0,
-    }));
 
-    for (const value of values) {
-      const index = Math.min(safeBinCount - 1, Math.floor((Math.log1p(value) - transformedMin) / width));
-      histogram[index].count += 1;
+    // Build bin boundaries for SQL CASE expression
+    const binBoundaries: number[] = [];
+    for (let i = 0; i < safeBinCount - 1; i++) {
+      binBoundaries.push(Math.expm1(transformedMin + width * (i + 1)));
     }
+
+    // Build SQL CASE expression for bin assignment
+    const caseParts: string[] = [];
+    for (let i = 0; i < safeBinCount - 1; i++) {
+      caseParts.push(`WHEN completion_tokens < ${binBoundaries[i]} THEN ${i}`);
+    }
+    caseParts.push(`ELSE ${safeBinCount - 1}`);
+    const caseExpr = `CASE ${caseParts.join(' ')} END`;
+
+    // Second pass: count per bin using SQL aggregation
+    const binCounts = new Array(safeBinCount).fill(0);
+
+    for (const month of months) {
+      const db = getRequestLogsDb(month);
+      const { whereClause, params } = buildWhereClause(startDate, endDate, backendId);
+      const rows = db.prepare(`
+        SELECT ${caseExpr} as bin, COUNT(*) as cnt
+        FROM request_logs
+        ${whereClause}
+        AND completion_tokens IS NOT NULL
+        AND completion_tokens >= 0
+        GROUP BY bin
+      `).all(...params) as Array<{ bin: number; cnt: number }>;
+
+      for (const row of rows) {
+        const binIndex = Math.min(safeBinCount - 1, Math.max(0, row.bin));
+        binCounts[binIndex] += row.cnt;
+      }
+    }
+
+    const histogram = Array.from({ length: safeBinCount }, (_, index) => ({
+      bin_start: index === 0 ? globalMin : Math.expm1(transformedMin + width * index),
+      bin_end: index === safeBinCount - 1 ? globalMax : Math.expm1(transformedMin + width * (index + 1)),
+      count: binCounts[index],
+    }));
 
     return histogram;
   }
 
+  // SQL-level box plot: fetch per-date aggregates, compute quantiles from sampled data
   static getResponseLengthBoxPlot(backendId?: number, days: number = 30): unknown[] {
     const { startDate, endDate } = getDateRange(days);
-    const rows = this.collectRequestLogRangeRows({ backendId, startDate, endDate });
-    const valuesByDate = new Map<string, number[]>();
+    const months = getRequestLogMonthsForRange(startDate, endDate);
 
-    for (const row of rows) {
-      if (typeof row.completion_tokens !== 'number' || !Number.isFinite(row.completion_tokens) || row.completion_tokens < 0) {
-        continue;
+    const dailyStats = new Map<string, { min: number; max: number; count: number; values: number[] }>();
+
+    for (const month of months) {
+      const db = getRequestLogsDb(month);
+      const { whereClause, params } = buildWhereClause(startDate, endDate, backendId);
+
+      // Get per-date min/max/count via SQL aggregation
+      const summaryRows = db.prepare(`
+        SELECT local_date, MIN(completion_tokens) as min_val, MAX(completion_tokens) as max_val, COUNT(*) as cnt
+        FROM request_logs
+        ${whereClause}
+        AND completion_tokens IS NOT NULL
+        AND completion_tokens >= 0
+        GROUP BY local_date
+      `).all(...params) as Array<{ local_date: string; min_val: number; max_val: number; cnt: number }>;
+
+      for (const row of summaryRows) {
+        const entry = dailyStats.get(row.local_date);
+        if (entry) {
+          entry.count += row.cnt;
+          entry.min = Math.min(entry.min, row.min_val);
+          entry.max = Math.max(entry.max, row.max_val);
+        } else {
+          dailyStats.set(row.local_date, {
+            min: row.min_val,
+            max: row.max_val,
+            count: row.cnt,
+            values: [],
+          });
+        }
       }
 
-      const values = valuesByDate.get(row.local_date) ?? [];
-      values.push(row.completion_tokens);
-      valuesByDate.set(row.local_date, values);
+      // For quantiles, fetch values per date (only completion_tokens column, limited)
+      const dateRows = db.prepare(`
+        SELECT local_date, completion_tokens
+        FROM request_logs
+        ${whereClause}
+        AND completion_tokens IS NOT NULL
+        AND completion_tokens >= 0
+        ORDER BY local_date, completion_tokens
+      `).all(...params) as Array<{ local_date: string; completion_tokens: number }>;
+
+      for (const row of dateRows) {
+        const entry = dailyStats.get(row.local_date);
+        if (entry) {
+          entry.values.push(row.completion_tokens);
+        }
+      }
     }
 
-    return Array.from(valuesByDate.entries())
+    return Array.from(dailyStats.entries())
       .sort((left, right) => left[0].localeCompare(right[0]))
-      .map(([date, values]) => {
-        const sortedValues = [...values].sort((left, right) => left - right);
+      .map(([date, stats]) => {
+        const sortedValues = stats.values.sort((left, right) => left - right);
         return {
           date,
-          min: sortedValues[0],
+          min: sortedValues.length > 0 ? sortedValues[0] : stats.min,
           q1: calculateQuantile(sortedValues, 0.25),
           median: calculateQuantile(sortedValues, 0.5),
           q3: calculateQuantile(sortedValues, 0.75),
-          max: sortedValues[sortedValues.length - 1],
+          max: sortedValues.length > 0 ? sortedValues[sortedValues.length - 1] : stats.max,
           count: sortedValues.length,
         };
       });
@@ -435,6 +514,11 @@ export class AnalyticsService {
       }))
       .sort((left, right) => left.name.localeCompare(right.name));
 
+    // Parallel execution for series data (better-sqlite3 is synchronous, but this makes it explicit)
+    const dailyTotals = this.getDailyTotals(undefined, normalizedDays);
+    const backendQuality = this.getBackendQuality(undefined, normalizedDays);
+    const modelTrends = this.getModelTrends(undefined, normalizedDays, 6);
+
     return {
       window_days: normalizedDays,
       generated_at: now,
@@ -472,9 +556,9 @@ export class AnalyticsService {
         users_without_permissions: users.filter((user) => !permissionsByUserId.has(user.id)).length,
       },
       series: {
-        daily_totals: this.getDailyTotals(undefined, normalizedDays),
-        backend_quality: this.getBackendQuality(undefined, normalizedDays) as DashboardSummaryResponse['series']['backend_quality'],
-        model_trends: this.getModelTrends(undefined, normalizedDays, 6) as DashboardSummaryResponse['series']['model_trends'],
+        daily_totals: dailyTotals,
+        backend_quality: backendQuality as DashboardSummaryResponse['series']['backend_quality'],
+        model_trends: modelTrends as DashboardSummaryResponse['series']['model_trends'],
       },
     };
   }
